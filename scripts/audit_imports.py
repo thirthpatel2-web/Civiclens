@@ -15,8 +15,9 @@ ROOT = Path(__file__).resolve().parent.parent
 PIP_FOR_IMPORT = {"yaml": "pyyaml", "PIL": "pillow", "jose": "python-jose", "googleapiclient": "google-api-python-client", "google": "google-auth", "faster_whisper": "faster-whisper",
                   "pytesseract": "pytesseract", "pyotp": "pyotp", "argon2": "argon2-cffi", "cryptography": "cryptography", "pypdf": "pypdf", "pypdfium2": "pypdfium2", "docx": "python-docx",
                   "reportlab": "reportlab", "nicegui": "nicegui", "fastapi": "fastapi", "uvicorn": "uvicorn", "starlette": "starlette", "sqlalchemy": "sqlalchemy", "alembic": "alembic",
-                  "psycopg": "psycopg", "pgvector": "pgvector", "redis": "redis", "httpx": "httpx", "pandas": "pandas", "pyarrow": "pyarrow", "qrcode": "qrcode", "pydantic": "pydantic"}  # fmt: skip
-OPTIONAL = {"faster_whisper", "pytesseract", "PIL", "googleapiclient", "google", "pandas", "pyarrow", "pypdfium2", "docx", "reportlab", "qrcode", "pyotp", "argon2", "pypdf"}  # imported lazily / in try-blocks
+                  "psycopg": "psycopg", "pgvector": "pgvector", "redis": "redis", "httpx": "httpx", "pandas": "pandas", "pyarrow": "pyarrow", "qrcode": "qrcode", "pydantic": "pydantic",
+                  "dotenv": "python-dotenv"}  # fmt: skip
+OPTIONAL = {"faster_whisper", "pytesseract", "PIL", "googleapiclient", "google", "pandas", "pyarrow", "pypdfium2", "docx", "reportlab", "qrcode", "pyotp", "argon2", "pypdf", "dotenv"}  # imported lazily / in try-blocks
 
 
 def module_file(mod: str) -> Path | None:

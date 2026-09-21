@@ -1,5 +1,6 @@
 # Runtime dependencies. Items marked (core) are exercised by the test-suite in a
 # bare environment; the rest are required by the infrastructure layers.
+python-dotenv>=1.0       # (core) loads .env into the process environment before Settings.load() reads it
 argon2-cffi>=23.1        # (core) password hashing
 pyotp>=2.9               # (core) TOTP / Google Authenticator
 qrcode[pil]>=7.4         # (core) provisioning QR

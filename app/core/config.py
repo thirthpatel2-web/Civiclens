@@ -10,11 +10,24 @@ from __future__ import annotations
 import os
 from collections.abc import Mapping
 from dataclasses import dataclass, field, fields
+from pathlib import Path
 from typing import Any
 
 _PLACEHOLDERS = {"", "change-me", "changeme", "secret", "password"}
 _MIN_SECRET_LEN = 32
 ENVIRONMENTS = ("development", "test", "production")
+_REPO_ROOT = Path(__file__).resolve().parent.parent.parent
+
+
+def _load_dotenv() -> None:
+    """Load .env into os.environ without overriding variables a deployment platform already set
+    for real. A no-op (no error, no exception) when .env doesn't exist, e.g. in production where
+    configuration comes from the platform, not a file. Cheap enough to call on every Settings.load()."""
+    try:
+        from dotenv import load_dotenv
+    except ImportError:
+        return
+    load_dotenv(_REPO_ROOT / ".env", override=False)
 
 
 class ConfigError(ValueError):
@@ -108,6 +121,8 @@ class Settings:
 
     @classmethod
     def load(cls, env: Mapping[str, str] | None = None) -> Settings:
+        if env is None:
+            _load_dotenv()  # tests pass an explicit `env` dict and must stay isolated from .env
         e: Mapping[str, str] = os.environ if env is None else env
         app_env = e.get("APP_ENV", "development").strip().lower() or "development"
         if app_env not in ENVIRONMENTS:
