@@ -1,0 +1,39 @@
+{
+  "expo": {
+    "name": "CivicLens",
+    "slug": "civiclens",
+    "scheme": "civiclens",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "splash": { "image": "./assets/splash-icon.png", "resizeMode": "contain", "backgroundColor": "#1f4e79" },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "org.civiclens.mobile",
+      "infoPlist": {
+        "NSMicrophoneUsageDescription": "CivicLens records your voice so it can be turned into text, in the language you speak, for your complaint. Nothing is recorded until you press the microphone button.",
+        "NSCameraUsageDescription": "CivicLens uses the camera to photograph the problem (for example a pothole) as evidence for your complaint.",
+        "NSPhotoLibraryUsageDescription": "CivicLens lets you attach an existing photo as evidence for your complaint.",
+        "NSLocationWhenInUseUsageDescription": "CivicLens uses your location, only when you ask it to, to attach the place of the problem to your complaint."
+      }
+    },
+    "android": {
+      "package": "org.civiclens.mobile",
+      "adaptiveIcon": { "foregroundImage": "./assets/adaptive-icon.png", "backgroundColor": "#1f4e79" },
+      "softwareKeyboardLayoutMode": "resize",
+      "permissions": ["RECORD_AUDIO", "CAMERA", "ACCESS_FINE_LOCATION", "ACCESS_COARSE_LOCATION", "POST_NOTIFICATIONS"]
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      ["expo-notifications", { "color": "#1f4e79" }],
+      ["expo-location", { "locationWhenInUsePermission": "CivicLens uses your location, only when you ask it to, to attach the place of the problem to your complaint." }],
+      ["expo-av", { "microphonePermission": "CivicLens records your voice so it can be turned into text, in the language you speak, for your complaint." }],
+      ["expo-image-picker", { "cameraPermission": "CivicLens uses the camera to photograph the problem as evidence.", "photosPermission": "CivicLens lets you attach an existing photo as evidence." }],
+      "expo-background-task"
+    ],
+    "experiments": { "typedRoutes": false },
+    "extra": { "apiBaseUrl": "http://10.0.2.2:8080" }
+  }
+}

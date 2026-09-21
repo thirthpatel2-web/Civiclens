@@ -1,0 +1,31 @@
+# Runtime dependencies. Items marked (core) are exercised by the test-suite in a
+# bare environment; the rest are required by the infrastructure layers.
+argon2-cffi>=23.1        # (core) password hashing
+pyotp>=2.9               # (core) TOTP / Google Authenticator
+qrcode[pil]>=7.4         # (core) provisioning QR
+cryptography>=42         # (core) encryption-at-rest for MFA secrets
+pypdf>=4.0               # (core) PDF text extraction
+reportlab>=4.0           # (core) RTI PDF generation
+numpy>=1.26              # (core) vector maths
+pandas>=2.2              # legal-metadata ingestion
+pyarrow>=15              # parquet engine for pandas
+fastapi>=0.110
+uvicorn[standard]>=0.29
+nicegui>=1.4,<3           # UI code targets the 1.4-2.x API (ui.upload e.content, ui.leaflet, ui.timeline)
+pydantic>=2.6
+pydantic-settings>=2.2
+sqlalchemy>=2.0
+psycopg[binary]>=3.1
+pgvector>=0.2
+alembic>=1.13
+redis>=5.0
+httpx>=0.27
+python-multipart>=0.0.9
+google-api-python-client>=2.100   # optional: Google Drive storage
+google-auth>=2.23                # optional: Google Drive storage
+starlette>=0.36            # web framework underneath FastAPI (imported directly by middleware/websocket code)
+pillow>=10.1               # QR rendering; image handling for OCR
+pypdfium2>=4.30            # render scanned-PDF pages for OCR
+# ---- optional engines (the app degrades honestly without them) --------------------------------------------------------------
+pytesseract>=0.3.10        # OCR_PROVIDER=tesseract (also needs the tesseract binary + traineddata for OCR_LANGUAGES)
+faster-whisper>=1.0        # STT_PROVIDER=whisper (self-hosted multilingual speech-to-text)

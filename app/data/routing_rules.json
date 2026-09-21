@@ -1,0 +1,58 @@
+[
+ {
+  "id": "default-roads",
+  "priority": 100,
+  "department_code": "roads",
+  "categories": [
+   "roads"
+  ]
+ },
+ {
+  "id": "default-water",
+  "priority": 100,
+  "department_code": "water",
+  "categories": [
+   "water"
+  ]
+ },
+ {
+  "id": "default-electricity",
+  "priority": 100,
+  "department_code": "electricity",
+  "categories": [
+   "electricity"
+  ]
+ },
+ {
+  "id": "default-sanitation",
+  "priority": 100,
+  "department_code": "sanitation",
+  "categories": [
+   "sanitation"
+  ]
+ },
+ {
+  "id": "default-drainage",
+  "priority": 100,
+  "department_code": "drainage",
+  "categories": [
+   "drainage"
+  ]
+ },
+ {
+  "id": "default-encroachment",
+  "priority": 100,
+  "department_code": "encroachment",
+  "categories": [
+   "encroachment"
+  ]
+ },
+ {
+  "id": "default-police",
+  "priority": 100,
+  "department_code": "police",
+  "categories": [
+   "police"
+  ]
+ }
+]

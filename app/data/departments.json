@@ -1,0 +1,34 @@
+[
+ {
+  "code": "roads",
+  "name": "Roads Department"
+ },
+ {
+  "code": "water",
+  "name": "Water Supply Department"
+ },
+ {
+  "code": "electricity",
+  "name": "Electricity Board"
+ },
+ {
+  "code": "sanitation",
+  "name": "Sanitation Department"
+ },
+ {
+  "code": "drainage",
+  "name": "Drainage / Stormwater Department"
+ },
+ {
+  "code": "encroachment",
+  "name": "Town Planning Department"
+ },
+ {
+  "code": "police",
+  "name": "Police Department"
+ },
+ {
+  "code": "general",
+  "name": "General Administration"
+ }
+]

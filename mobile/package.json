@@ -1,0 +1,41 @@
+{
+  "name": "civiclens-mobile",
+  "version": "1.0.0",
+  "private": true,
+  "main": "expo-router/entry",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "typecheck": "tsc --noEmit",
+    "test": "node --experimental-strip-types --no-warnings --test tests/*.test.ts"
+  },
+  "dependencies": {
+    "@expo/vector-icons": "^15.0.3",
+    "@react-native-async-storage/async-storage": "2.2.0",
+    "@react-native-community/netinfo": "11.4.1",
+    "expo": "^54.0.37",
+    "expo-av": "~16.0.8",
+    "expo-background-task": "~1.0.0",
+    "expo-constants": "~18.0.14",
+    "expo-crypto": "~15.0.7",
+    "expo-file-system": "~19.0.16",
+    "expo-image-picker": "~17.0.11",
+    "expo-linking": "~8.0.0",
+    "expo-location": "~19.0.7",
+    "expo-notifications": "~0.32.0",
+    "expo-router": "~6.0.0",
+    "expo-secure-store": "~15.0.0",
+    "expo-status-bar": "~3.0.9",
+    "expo-task-manager": "~14.0.0",
+    "react": "19.1.0",
+    "react-native": "0.81.5",
+    "react-native-maps": "1.20.1",
+    "react-native-safe-area-context": "~5.6.0",
+    "react-native-screens": "~4.16.0"
+  },
+  "devDependencies": {
+    "@types/react": "~19.1.0",
+    "typescript": "~5.9.2"
+  }
+}

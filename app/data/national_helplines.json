@@ -1,0 +1,166 @@
+[
+ {
+  "code": "emergency",
+  "number": "112",
+  "name": "National Emergency",
+  "description": "Police, Fire, Ambulance (All India)",
+  "translations": {
+   "en": {
+    "name": "National Emergency",
+    "desc": "Police, Fire, Ambulance (All India)"
+   },
+   "hi": {
+    "name": "राष्ट्रीय आपातकालीन सेवा",
+    "desc": "पुलिस, अग्निशमन, एम्बुलेंस (अखिल भारतीय)"
+   },
+   "kn": {
+    "name": "ರಾಷ್ಟ್ರೀಯ ತುರ್ತು ಸೇವೆ",
+    "desc": "ಪೊಲೀಸ್, ಅಗ್ನಿಶಾಮಕ, ಆಂಬ್ಯುಲೆನ್ಸ್ (ಅಖಿಲ ಭಾರತ)"
+   },
+   "ta": {
+    "name": "தேசிய அவசர சேவை",
+    "desc": "காவல்துறை, தீயணைப்பு, ஆம்புலன்ஸ்"
+   },
+   "te": {
+    "name": "జాతీయ అత్యవసర సేవ",
+    "desc": "పోలీస్, అగ్నిమాపక, అంబులెన్స్"
+   },
+   "mr": {
+    "name": "राष्ट्रीय आपत्कालीन सेवा",
+    "desc": "पोलीस, अग्निशमन, रुग्णवाहिका"
+   },
+   "bn": {
+    "name": "জাতীয় জরুরি পরিষেবা",
+    "desc": "পুলিশ, দমকল, অ্যাম্বুলেন্স"
+   }
+  },
+  "scope": "national"
+ },
+ {
+  "code": "cyber",
+  "number": "1930",
+  "name": "Cyber Crime Helpline",
+  "description": "Online fraud & cyber incidents",
+  "translations": {
+   "en": {
+    "name": "Cyber Crime Helpline",
+    "desc": "Online fraud & cyber incidents"
+   },
+   "hi": {
+    "name": "साइबर अपराध हेल्पलाइन",
+    "desc": "ऑनलाइन वित्तीय धोखाधड़ी व शिकायत"
+   },
+   "kn": {
+    "name": "ಸೈಬರ್ ಕ್ರೈಮ್ ಸಹಾಯವಾಣಿ",
+    "desc": "ಆನ್‌ಲೈನ್ ವಂಚನೆ ಮತ್ತು ಸೈಬರ್ ದೂರುಗಳು"
+   },
+   "ta": {
+    "name": "சைபர் குற்ற உதவி எண்",
+    "desc": "ஆன்லைன் மோசடி புகார்கள்"
+   },
+   "te": {
+    "name": "సైబర్ క్రైమ్ హెల్ప్‌లైన్",
+    "desc": "ఆన్‌లైన్ మోసాలు & ఫిర్యాదులు"
+   },
+   "mr": {
+    "name": "सायबर क्राईम हेल्पलाईन",
+    "desc": "ऑनलाइन आर्थिक फसवणूक"
+   },
+   "bn": {
+    "name": "সাইবার ক্রাইম হেল্পলাইন",
+    "desc": "অনলাইন প্রতারণা ও অভিযোগ"
+   }
+  },
+  "scope": "national"
+ },
+ {
+  "code": "consumer",
+  "number": "1915",
+  "name": "National Consumer Helpline",
+  "description": "Consumer complaints & refunds",
+  "translations": {
+   "en": {
+    "name": "National Consumer Helpline",
+    "desc": "Consumer complaints & refunds"
+   },
+   "hi": {
+    "name": "राष्ट्रीय उपभोक्ता हेल्पलाइन",
+    "desc": "उपभोक्ता शिकायत व रिफंड"
+   },
+   "kn": {
+    "name": "ಗ್ರಾಹಕರ ಸಹಾಯವಾಣಿ",
+    "desc": "ಗ್ರಾಹಕ ದೂರುಗಳು ಮತ್ತು ಮರುಪಾವತಿ"
+   },
+   "ta": {
+    "name": "நுகர்வோர் உதவி எண்",
+    "desc": "நுகர்வோர் குறைதீர்ப்பு"
+   },
+   "te": {
+    "name": "వినియోగదారుల హెల్ప్‌లైన్",
+    "desc": "వినియోగదారుల సమస్యలు & రీఫండ్"
+   },
+   "mr": {
+    "name": "ग्राहक हेल्पलाईन",
+    "desc": "ग्राहक तक्रारी व परतावा"
+   },
+   "bn": {
+    "name": "ভোক্তা বিষয়ক হেল্পলাইন",
+    "desc": "ভোক্তা অভিযোগ ও রিফান্ড"
+   }
+  },
+  "scope": "national"
+ },
+ {
+  "code": "women",
+  "number": "1091",
+  "name": "Women in Distress",
+  "description": "24x7 Women Safety Support",
+  "translations": {
+   "en": {
+    "name": "Women in Distress",
+    "desc": "24x7 Women Safety Support"
+   },
+   "hi": {
+    "name": "महिला सुरक्षा हेल्पलाइन",
+    "desc": "24x7 महिला सुरक्षा सहायता"
+   },
+   "kn": {
+    "name": "ಮಹಿಳಾ ಸುರಕ್ಷತಾ ಸಹಾಯವಾಣಿ",
+    "desc": "24x7 ಮಹಿಳಾ ಸಹಾಯ"
+   },
+   "ta": {
+    "name": "பெண்கள் பாதுகாப்பு எண்",
+    "desc": "24x7 பெண்கள் உதவி"
+   },
+   "te": {
+    "name": "మహిళా భద్రత హెల్ప్‌లైన్",
+    "desc": "24x7 మహిళా సహాయం"
+   },
+   "mr": {
+    "name": "महिला सुरक्षा हेल्पलाईन",
+    "desc": "24x7 महिला सुरक्षा"
+   },
+   "bn": {
+    "name": "নারী সুরক্ষা হেল্পলাইন",
+    "desc": "24x7 নারী সুরক্ষা ও সাহায্য"
+   }
+  },
+  "scope": "national"
+ },
+ {
+  "code": "child",
+  "number": "1098",
+  "name": "Childline Emergency",
+  "description": "Care and protection for children",
+  "translations": {},
+  "scope": "national"
+ },
+ {
+  "code": "disaster",
+  "number": "1078",
+  "name": "National Disaster Helpline",
+  "description": "NDMA Flood/Earthquake response",
+  "translations": {},
+  "scope": "national"
+ }
+]

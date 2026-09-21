@@ -1,0 +1,298 @@
+[
+ {
+  "code": "bengaluru",
+  "name": "Bengaluru",
+  "state": "Karnataka",
+  "lat": 12.9716,
+  "lng": 77.5946,
+  "translations": {
+   "en": {
+    "name": "Bengaluru",
+    "state": "Karnataka"
+   },
+   "hi": {
+    "name": "बेंगलुरु",
+    "state": "कर्नाटक"
+   },
+   "kn": {
+    "name": "ಬೆಂಗಳೂರು",
+    "state": "ಕರ್ನಾಟಕ"
+   },
+   "ta": {
+    "name": "பெங்களூரு",
+    "state": "கர்நாடகா"
+   },
+   "te": {
+    "name": "బెంగళూరు",
+    "state": "కర్ణాటక"
+   },
+   "mr": {
+    "name": "बंगळुरू",
+    "state": "कर्नाटक"
+   },
+   "bn": {
+    "name": "বেঙ্গালুরু",
+    "state": "কর্ণাটক"
+   }
+  }
+ },
+ {
+  "code": "delhi",
+  "name": "Delhi NCR",
+  "state": "Delhi",
+  "lat": 28.6139,
+  "lng": 77.209,
+  "translations": {
+   "en": {
+    "name": "Delhi NCR",
+    "state": "Delhi"
+   },
+   "hi": {
+    "name": "दिल्ली एनसीआर",
+    "state": "दिल्ली"
+   },
+   "kn": {
+    "name": "ದೆಹಲಿ ಎನ್‌ಸಿಆರ್",
+    "state": "ದೆಹಲಿ"
+   },
+   "ta": {
+    "name": "டெல்லி என்.சி.ஆர்",
+    "state": "டெல்லி"
+   },
+   "te": {
+    "name": "ఢిల్లీ ఎన్సీఆర్",
+    "state": "ఢిల్లీ"
+   },
+   "mr": {
+    "name": "दिल्ली एनसीआर",
+    "state": "दिल्ली"
+   },
+   "bn": {
+    "name": "দিল্লি এনসিআর",
+    "state": "দিল্লি"
+   }
+  }
+ },
+ {
+  "code": "mumbai",
+  "name": "Mumbai",
+  "state": "Maharashtra",
+  "lat": 19.076,
+  "lng": 72.8777,
+  "translations": {
+   "en": {
+    "name": "Mumbai",
+    "state": "Maharashtra"
+   },
+   "hi": {
+    "name": "मुंबई",
+    "state": "महाराष्ट्र"
+   },
+   "kn": {
+    "name": "ಮುಂಬೈ",
+    "state": "ಮಹಾರಾಷ್ಟ್ರ"
+   },
+   "ta": {
+    "name": "மும்பை",
+    "state": "மகாராஷ்டிரா"
+   },
+   "te": {
+    "name": "ముంబై",
+    "state": "మహారాష్ట్ర"
+   },
+   "mr": {
+    "name": "मुंबई",
+    "state": "महाराष्ट्र"
+   },
+   "bn": {
+    "name": "মুম্বই",
+    "state": "মহারাষ্ট্র"
+   }
+  }
+ },
+ {
+  "code": "hyderabad",
+  "name": "Hyderabad",
+  "state": "Telangana",
+  "lat": 17.385,
+  "lng": 78.4867,
+  "translations": {
+   "en": {
+    "name": "Hyderabad",
+    "state": "Telangana"
+   },
+   "hi": {
+    "name": "हैदराबाद",
+    "state": "तेलंगाना"
+   },
+   "kn": {
+    "name": "ಹೈದರಾಬಾದ್",
+    "state": "ತೆಲಂಗಾಣ"
+   },
+   "ta": {
+    "name": "ஹைதராபாத்",
+    "state": "தெலுங்கானா"
+   },
+   "te": {
+    "name": "హైదరాబాద్",
+    "state": "తెలంగాణ"
+   },
+   "mr": {
+    "name": "हैदराबाद",
+    "state": "तेलंगणा"
+   },
+   "bn": {
+    "name": "হায়দ্রাবাদ",
+    "state": "তেলেঙ্গানা"
+   }
+  }
+ },
+ {
+  "code": "chennai",
+  "name": "Chennai",
+  "state": "Tamil Nadu",
+  "lat": 13.0827,
+  "lng": 80.2707,
+  "translations": {
+   "en": {
+    "name": "Chennai",
+    "state": "Tamil Nadu"
+   },
+   "hi": {
+    "name": "चेन्नई",
+    "state": "तमिलनाडु"
+   },
+   "kn": {
+    "name": "ಚೆನ್ನೈ",
+    "state": "ತಮಿಳುನಾಡು"
+   },
+   "ta": {
+    "name": "சென்னை",
+    "state": "தமிழ்நாடு"
+   },
+   "te": {
+    "name": "చెన్నై",
+    "state": "తమిళనాడు"
+   },
+   "mr": {
+    "name": "चेन्नई",
+    "state": "तमिळनाडू"
+   },
+   "bn": {
+    "name": "চেন্নাই",
+    "state": "তামিলনাড়ু"
+   }
+  }
+ },
+ {
+  "code": "pune",
+  "name": "Pune",
+  "state": "Maharashtra",
+  "lat": 18.5204,
+  "lng": 73.8567,
+  "translations": {
+   "en": {
+    "name": "Pune",
+    "state": "Maharashtra"
+   },
+   "hi": {
+    "name": "पुणे",
+    "state": "महाराष्ट्र"
+   },
+   "kn": {
+    "name": "ಪುಣೆ",
+    "state": "ಮಹಾರಾಷ್ಟ್ರ"
+   },
+   "ta": {
+    "name": "புனே",
+    "state": "மகாராஷ்டிரா"
+   },
+   "te": {
+    "name": "పుణె",
+    "state": "మహారాష్ట్ర"
+   },
+   "mr": {
+    "name": "पुणे",
+    "state": "महाराष्ट्र"
+   },
+   "bn": {
+    "name": "পুনে",
+    "state": "মহারাষ্ট্র"
+   }
+  }
+ },
+ {
+  "code": "kolkata",
+  "name": "Kolkata",
+  "state": "West Bengal",
+  "lat": 22.5726,
+  "lng": 88.3639,
+  "translations": {
+   "en": {
+    "name": "Kolkata",
+    "state": "West Bengal"
+   },
+   "hi": {
+    "name": "कोलकाता",
+    "state": "पश्चिम बंगाल"
+   },
+   "kn": {
+    "name": "ಕೋಲ್ಕತ್ತಾ",
+    "state": "ಪಶ್ಚಿಮ ಬಂಗಾಳ"
+   },
+   "ta": {
+    "name": "கொல்கத்தா",
+    "state": "மேற்கு வங்கம்"
+   },
+   "te": {
+    "name": "కోల్‌కతా",
+    "state": "పశ్చిమ బెంగాల్"
+   },
+   "mr": {
+    "name": "कोलकाता",
+    "state": "पश्चिम बंगाल"
+   },
+   "bn": {
+    "name": "কলকাতা",
+    "state": "পশ্চিমবঙ্গ"
+   }
+  }
+ },
+ {
+  "code": "ahmedabad",
+  "name": "Ahmedabad",
+  "state": "Gujarat",
+  "lat": 23.0225,
+  "lng": 72.5714,
+  "translations": {
+   "en": {
+    "name": "Ahmedabad",
+    "state": "Gujarat"
+   },
+   "hi": {
+    "name": "अहमदाबाद",
+    "state": "गुजरात"
+   },
+   "kn": {
+    "name": "ಅಹಮದಾಬಾದ್",
+    "state": "ಗುಜರಾತ್"
+   },
+   "ta": {
+    "name": "அகமதாபாத்",
+    "state": "குஜராத்"
+   },
+   "te": {
+    "name": "అహ్మదాబాద్",
+    "state": "గుజరాత్"
+   },
+   "mr": {
+    "name": "अहमदाबाद",
+    "state": "गुजरात"
+   },
+   "bn": {
+    "name": "আহমেদাবাদ",
+    "state": "গুজরাট"
+   }
+  }
+ }
+]
