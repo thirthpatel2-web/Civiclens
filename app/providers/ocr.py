@@ -54,7 +54,8 @@ class _PagedOcr:
 class TesseractOcr(_PagedOcr):
     name = "tesseract"
 
-    def __init__(self, languages: str = "eng", *, engine: Callable[[bytes, str], str] | None = None, render_pdf: Callable[[bytes], list[bytes]] | None = None) -> None:
+    def __init__(self, languages: str = "eng", *, tesseract_cmd: str = "", tessdata_dir: str = "",
+                 engine: Callable[[bytes, str], str] | None = None, render_pdf: Callable[[bytes], list[bytes]] | None = None) -> None:  # fmt: skip
         super().__init__(render_pdf)
         self._langs = languages
         if engine is not None:  # injected (tests)
@@ -64,12 +65,18 @@ class TesseractOcr(_PagedOcr):
             import pytesseract
             from PIL import Image
 
+            if tesseract_cmd:  # not on system PATH (e.g. a non-admin Windows install)
+                pytesseract.pytesseract.tesseract_cmd = tesseract_cmd
             pytesseract.get_tesseract_version()  # raises if the binary is missing
         except ImportError as exc:
             raise NotConfigured("Install pytesseract and Pillow (and the tesseract binary) to use OCR_PROVIDER=tesseract.") from exc
         except Exception as exc:
-            raise NotConfigured("The tesseract binary is not installed or not on PATH.") from exc
-        self._engine = lambda img, langs: pytesseract.image_to_string(Image.open(io.BytesIO(img)), lang=langs)
+            raise NotConfigured("The tesseract binary is not installed, not on PATH, and TESSERACT_CMD is not set.") from exc
+        # No quotes: pytesseract splits `config` with shlex(posix=False) on Windows, which does
+        # NOT strip quote characters (they'd end up literally embedded in the path and fail) - so
+        # a tessdata_dir containing a space cannot be passed this way. Documented in .env.example.
+        config = f"--tessdata-dir {tessdata_dir}" if tessdata_dir else ""
+        self._engine = lambda img, langs: pytesseract.image_to_string(Image.open(io.BytesIO(img)), lang=langs, config=config)
 
     def _one(self, image: bytes) -> str:
         try:
@@ -91,11 +98,11 @@ class OllamaVisionOcr(_PagedOcr):
         return str(self._client.chat(self._model, [{"role": "user", "content": _PROMPT}], images=[base64.b64encode(image).decode("ascii")]))
 
 
-def build_ocr(provider: str, *, languages: str, ollama_client: Any | None, vision_model: str) -> Any | None:
+def build_ocr(provider: str, *, languages: str, ollama_client: Any | None, vision_model: str, tesseract_cmd: str = "", tessdata_dir: str = "") -> Any | None:
     if provider == "none":
         return None
     if provider == "tesseract":
-        return TesseractOcr(languages)
+        return TesseractOcr(languages, tesseract_cmd=tesseract_cmd, tessdata_dir=tessdata_dir)
     if provider == "ollama_vision":
         if ollama_client is None:
             raise NotConfigured("OCR_PROVIDER=ollama_vision needs an Ollama connection.")

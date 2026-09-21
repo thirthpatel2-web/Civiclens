@@ -99,6 +99,8 @@ class Settings:
     expo_push_enabled: bool = False
     ocr_provider: str = "none"  # none | tesseract | ollama_vision
     ocr_languages: str = "eng"  # Tesseract language codes, e.g. "eng+hin+kan"
+    tesseract_cmd: str = ""     # full path to tesseract.exe; unset = resolved from PATH
+    tessdata_dir: str = ""      # directory holding <lang>.traineddata; unset = tesseract's own default
 
     @property
     def is_production(self) -> bool:
@@ -164,6 +166,8 @@ class Settings:
             expo_push_enabled=_bool(e.get("EXPO_PUSH_ENABLED")),
             ocr_provider=e.get("OCR_PROVIDER", "none").strip().lower() or "none",
             ocr_languages=e.get("OCR_LANGUAGES", "eng").strip() or "eng",
+            tesseract_cmd=e.get("TESSERACT_CMD", "").strip(),
+            tessdata_dir=e.get("TESSDATA_DIR", "").strip(),
         )
         settings._validate()
         return settings

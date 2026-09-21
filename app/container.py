@@ -376,6 +376,8 @@ def _attach_documents(c: AppContainer, sf: Any, embedder: Any, settings: Setting
     languages=settings.ocr_languages,
     ollama_client=c.ollama,
     vision_model=settings.ollama_vision_model,
+    tesseract_cmd=settings.tesseract_cmd,
+    tessdata_dir=settings.tessdata_dir,
 )
     def factory(uow: Any) -> DocumentIngestor:
         return DocumentIngestor(uow.documents, c.storage, _PersistingIndex(c.rag_index, chunk_store_cls(uow.session)), embedder=embedder, ocr=c.ocr)
