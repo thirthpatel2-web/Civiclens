@@ -8,14 +8,20 @@ from pathlib import Path
 from app.core.authorization import AuthContext, Role
 from app.core.exceptions import NotConfigured, ValidationFailed
 from app.rag.bm25 import BM25Index
+from app.rag.grounded_generation import GroundedGenerator
 from app.rag.hybrid_retrieval import HybridRetriever
 from app.rag.index import RagIndex
-from app.rag.rag_service import RagService
-from app.rag.grounded_generation import GroundedGenerator
 from app.rag.query_router import QueryRegistry
+from app.rag.rag_service import RagService
 from app.rag.vector_search import InMemoryVectorIndex
 from app.services.document_service import (
-    DocumentIngestor, DocumentStatus, LocalStorage, document_access_filter, extract_pages, safe_filename, validate_upload,
+    DocumentIngestor,
+    DocumentStatus,
+    LocalStorage,
+    document_access_filter,
+    extract_pages,
+    safe_filename,
+    validate_upload,
 )
 from app.services.rti_service import render_pdf
 from tests.rag.helpers import DIM, HashingEmbedder, ScriptedChat
@@ -201,7 +207,7 @@ class IngestionTests(unittest.TestCase):
     def test_visibility_rules(self):
         ing = self.build()
         for vis, dept in [("private", None), ("department", "roads"), ("public", None)]:
-            doc = ing.process(ing.upload("owner", f"{vis}.txt", BUDGET.encode(), max_bytes=MAX, visibility=vis, department_id=dept).id)
+            ing.process(ing.upload("owner", f"{vis}.txt", BUDGET.encode(), max_bytes=MAX, visibility=vis, department_id=dept).id)
         chunks = {c.metadata["visibility"]: c for c in self.index.chunks.values()}
         owner, other = AuthContext("owner", Role.CITIZEN), AuthContext("x", Role.CITIZEN)
         officer_r, officer_w = AuthContext("o1", Role.OFFICER, "roads"), AuthContext("o2", Role.OFFICER, "water")

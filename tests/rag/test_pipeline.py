@@ -1,15 +1,26 @@
+import re
 import unittest
 
 from app.core.authorization import AuthContext, Permission, Role
 from app.core.exceptions import DependencyUnavailable, PermissionDenied
 from app.rag.citation_builder import Citation, validate_answer_citations
-from app.rag.grounded_generation import INSUFFICIENT_EVIDENCE_ANSWER, AnswerStatus, GroundedGenerator
+from app.rag.grounded_generation import (
+    INSUFFICIENT_EVIDENCE_ANSWER,
+    AnswerStatus,
+    GroundedGenerator,
+)
 from app.rag.hybrid_retrieval import RetrievalConfig
 from app.rag.prompt_defense import fence, neutralize, scan_for_injection
 from app.rag.query_router import ParamSpec, QueryRegistry, QueryRouter, QuerySpec
 from app.rag.rag_service import RagService
-import re
-from tests.rag.helpers import POISONED, WARD_BUDGET, WATER_POLICY, HashingEmbedder, ScriptedChat, build_corpus
+from tests.rag.helpers import (
+    POISONED,
+    WARD_BUDGET,
+    WATER_POLICY,
+    HashingEmbedder,
+    ScriptedChat,
+    build_corpus,
+)
 
 CIT = AuthContext("citizen-1", Role.CITIZEN)
 OFFICER = AuthContext("off-1", Role.OFFICER, "roads")

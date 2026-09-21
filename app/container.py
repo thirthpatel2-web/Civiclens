@@ -17,19 +17,25 @@ from app.core.config import Settings
 from app.core.exceptions import DependencyUnavailable
 from app.core.rate_limit import FailureThrottle, SlidingWindowLimiter
 from app.core.security import PasswordHasher, SecretBox, SessionPolicy
+from app.i18n.translator import Translator
 from app.integrations.adapters import build_adapters
 from app.integrations.health import IntegrationHealthService
 from app.legal.analysis import LegalAnalysisService
 from app.legal.precedents import PrecedentIndex
+from app.providers.push import ExpoPushSender
 from app.providers.speech import BHASHINI_DEFAULT_LANGUAGES, BhashiniConfig, BhashiniProvider
 from app.providers.stt import SpeechToTextProvider, TranslationProvider, WhisperProvider
-from app.services.voice_service import TranslationService, VoiceService
 from app.providers.vision import OllamaVisionProvider, VisionProvider
 from app.rag.bm25 import BM25Index
 from app.rag.grounded_generation import GroundedGenerator
 from app.rag.hybrid_retrieval import HybridRetriever, RetrievalConfig
 from app.rag.index import RagIndex
-from app.rag.ollama import EmbeddingProvider, OllamaChatProvider, OllamaClient, OllamaEmbeddingProvider
+from app.rag.ollama import (
+    EmbeddingProvider,
+    OllamaChatProvider,
+    OllamaClient,
+    OllamaEmbeddingProvider,
+)
 from app.rag.rag_service import RagService
 from app.realtime.websocket_manager import EventBus, LocalEventBus, WebSocketManager
 from app.services.admin_service import AdminService
@@ -42,15 +48,18 @@ from app.services.complaint_common import ComplaintEffects
 from app.services.complaint_service import ComplaintService
 from app.services.dashboard_service import DashboardService
 from app.services.document_service import DocumentIngestor, Storage, document_access_filter
-from app.providers.push import ExpoPushSender
 from app.services.duplicate_review import DuplicateReviewApp
 from app.services.emergency_service import EmergencyHubService
-from app.services.government_service import GovernmentSubmissionService
-from app.services.legal_service import LegalApplicationService
-from app.services.workflow_service import WorkflowService
 from app.services.gis_service import GisService
-from app.services.interop_service import ClassificationCorrectionService, ExceptionService, ExternalLinksService, MasterDataService
+from app.services.government_service import GovernmentSubmissionService
+from app.services.interop_service import (
+    ClassificationCorrectionService,
+    ExceptionService,
+    ExternalLinksService,
+    MasterDataService,
+)
 from app.services.investigation_service import InvestigationService
+from app.services.legal_service import LegalApplicationService
 from app.services.mfa_service import MFAService, TotpEngine
 from app.services.notification_service import NotificationService
 from app.services.officer_service import OfficerService
@@ -59,7 +68,8 @@ from app.services.rti_service import RtiRules, RtiService
 from app.services.rti_workflow import RtiReminderService
 from app.services.sla_workflow import SlaWorkflowService
 from app.services.uow import UowFactory
-from app.i18n.translator import Translator
+from app.services.voice_service import TranslationService, VoiceService
+from app.services.workflow_service import WorkflowService
 from app.workers.handlers import GrievanceWorker
 from app.workers.queue import JobService, QueueBackend
 from app.workers.scheduler import LockProvider, SchedulerService, SchedulerState, TaskSpec
@@ -272,7 +282,12 @@ def build_container(settings: Settings) -> AppContainer:
     if settings.redis_url:
         import redis
 
-        from app.workers.redis_backend import RedisEventBus, RedisLock, RedisQueueBackend, RedisSchedulerState
+        from app.workers.redis_backend import (
+            RedisEventBus,
+            RedisLock,
+            RedisQueueBackend,
+            RedisSchedulerState,
+        )
 
         redis_client = redis.Redis.from_url(settings.redis_url, socket_timeout=3, socket_connect_timeout=3)
         backend, lock, state = RedisQueueBackend(redis_client), RedisLock(redis_client), RedisSchedulerState(redis_client)  # type: ignore[assignment]
@@ -310,7 +325,12 @@ def build_container(settings: Settings) -> AppContainer:
                              scheduler_state=SqlSchedulerState(sf) if redis_client is None else state, lock=lock, health_repo=SqlIntegrationHealthRepository(sf), qr_renderer=render_qr_png, mailer=mailer,
                              admin_setup_token=_env("ADMIN_SETUP_TOKEN"), public_base_url=_env("PUBLIC_BASE_URL"), judgment_search=judgment_search)  # fmt: skip
     if redis_client is not None:
-        from app.core.redis_limits import RedisFailureThrottle, RedisFixedWindowLimiter, ResilientLimiter, ResilientThrottle
+        from app.core.redis_limits import (
+            RedisFailureThrottle,
+            RedisFixedWindowLimiter,
+            ResilientLimiter,
+            ResilientThrottle,
+        )
 
         container.limiters = {n: ResilientLimiter(RedisFixedWindowLimiter(redis_client, n, lim, 60), container.limiters[n]) for n, lim in (("expensive", 30), ("upload", 20))}  # type: ignore[assignment]
         container.login_throttle = ResilientThrottle(RedisFailureThrottle(redis_client, "login"), container.login_throttle)  # type: ignore[assignment]

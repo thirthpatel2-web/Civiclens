@@ -5,17 +5,17 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
+from app.core.exceptions import CivicLensError
 from app.providers.vision import VisionProvider, analyze_evidence
 from app.realtime.events import COMPLAINT_PROCESSED
-from app.core.exceptions import CivicLensError
 from app.services.classification_service import SEVERITIES, ClassificationService, compute_priority
 from app.services.complaint_common import ComplaintEffects, Outbox
 from app.services.complaint_service import ComplaintService
 from app.services.document_service import DocumentIngestor, Storage
 from app.services.notification_service import NotificationService
 from app.services.sla_service import SlaCalculator
-from app.services.voice_service import TranslationService
 from app.services.uow import UowFactory
+from app.services.voice_service import TranslationService
 from app.workers.queue import Handler, PermanentJobError
 
 LOW_CONFIDENCE = 0.6

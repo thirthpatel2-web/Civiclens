@@ -9,15 +9,26 @@ from typing import Any
 from nicegui import app, ui
 
 from app.container import AppContainer
-from app.core.transactions import run_in_uow
 from app.core.exceptions import CivicLensError
+from app.core.transactions import run_in_uow
 from app.services.classification_service import CATEGORIES
 from app.services.complaint_service import ComplaintInput
 from app.services.complaint_status import TRACKER_FILTERS
 from app.services.rti_service import RtiDraft, build_rti_questions, default_records_for_category
 from app.ui import theme
 from app.ui.base import UiUser, data_table, error_banner, info_banner, lang, page, tr
-from app.ui.components import chat_bubble, chip, divider, field_hint, page_header, run_with_loading, section_title, state_panel, stat_tile, status_timeline
+from app.ui.components import (
+    chat_bubble,
+    chip,
+    divider,
+    field_hint,
+    page_header,
+    run_with_loading,
+    section_title,
+    stat_tile,
+    state_panel,
+    status_timeline,
+)
 from app.ui.navigation import CIT
 
 
@@ -669,7 +680,12 @@ def register(c: AppContainer) -> None:
 
         from app.interop.adapters import SYSTEMS
         from app.interop.common_data_model import score_quality
-        from app.interop.fragmentation import NATIONAL_UMANG_DEPARTMENTS, NATIONAL_UMANG_SERVICES, NATIONAL_UMANG_SOURCE, personal_diagnostic
+        from app.interop.fragmentation import (
+            NATIONAL_UMANG_DEPARTMENTS,
+            NATIONAL_UMANG_SERVICES,
+            NATIONAL_UMANG_SOURCE,
+            personal_diagnostic,
+        )
 
         page_header(tr(c, "nav.interop"), "Different government systems describe the same request with different field names, casing and status words. See the actual normalization mechanism, live.", icon="hub")
 
@@ -783,7 +799,7 @@ def register(c: AppContainer) -> None:
                 divider()
                 ui.label("Government sharing: nothing is sent to a government platform unless an integration is configured and you consent.").classes("text-xs").style("color: var(--cl-fg-subtle);")
                 with ui.row().classes("gap-2 flex-wrap"):
-                    for platform, a in c.adapters.items():
+                    for _platform, a in c.adapters.items():
                         chip(f"{a.display_name}: {a.state.value}", color="muted", outline=True)
 
             with ui.column().classes("cl-card gap-3 w-full"):

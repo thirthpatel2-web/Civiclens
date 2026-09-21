@@ -142,7 +142,6 @@ class RerankerTests(unittest.TestCase):
         self.assertEqual(ordered[0].rerank_score, 1.0)
 
     def test_llm_reranker_degrades_honestly(self):
-        cands = [rc("a", "x", 0.3), rc("b", "y", 0.2)]
         for reply in (DependencyUnavailable("down"), "not json at all", '{"index": 0}'):
             ordered, warn = LlmReranker(ScriptedChat(reply)).rerank("q", [rc("a", "x", 0.3), rc("b", "y", 0.2)])
             self.assertIsNotNone(warn)

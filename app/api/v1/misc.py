@@ -10,8 +10,8 @@ from app.api.serialize import to_jsonable
 from app.container import AppContainer
 from app.core.authorization import AuthContext, Permission
 from app.core.dependencies import get_container, guard
-from app.core.transactions import run_in_uow
 from app.core.exceptions import NotConfigured
+from app.core.transactions import run_in_uow
 from app.schemas.api import ConsentBody, DeviceBody, PrefsBody, ProfileBody
 
 notifications = APIRouter(prefix="/notifications", tags=["notifications"])

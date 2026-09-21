@@ -8,7 +8,13 @@ from sqlalchemy.orm import Session
 from app.core.authorization import Role
 from app.core.security import SessionRecord
 from app.db.models.identity import (
-    ConsentModel, MfaConfigModel, NotificationPreferenceModel, PasswordResetTokenModel, ProfileModel, SessionModel, UserModel,
+    ConsentModel,
+    MfaConfigModel,
+    NotificationPreferenceModel,
+    PasswordResetTokenModel,
+    ProfileModel,
+    SessionModel,
+    UserModel,
 )
 from app.services.auth_service import ResetTokenRecord, UserRecord
 from app.services.mfa_service import MfaRecord

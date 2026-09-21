@@ -3,7 +3,12 @@ from dataclasses import replace
 
 from app.core.authorization import Role
 from app.core.exceptions import (
-    AuthenticationFailed, Conflict, MfaRequired, PermissionDenied, RateLimited, ValidationFailed,
+    AuthenticationFailed,
+    Conflict,
+    MfaRequired,
+    PermissionDenied,
+    RateLimited,
+    ValidationFailed,
 )
 from app.core.rate_limit import FailureThrottle, ThrottlePolicy
 from app.core.security import SecretBox, hash_token
@@ -11,8 +16,14 @@ from app.services.audit_service import AuditService
 from app.services.auth_service import AuthService
 from app.services.mfa_service import MFAService
 from tests.support import (
-    FakeClock, MemoryAuditRepo, MemoryMfaRepo, MemoryResetRepo, MemorySessionRepo,
-    MemoryUserRepo, ReferenceTotp, ScryptTestHasher,
+    FakeClock,
+    MemoryAuditRepo,
+    MemoryMfaRepo,
+    MemoryResetRepo,
+    MemorySessionRepo,
+    MemoryUserRepo,
+    ReferenceTotp,
+    ScryptTestHasher,
 )
 
 PW = "a-long-enough-passphrase"

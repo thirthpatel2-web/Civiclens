@@ -2,13 +2,16 @@
 
 from __future__ import annotations
 
+import logging
 from datetime import datetime
 from typing import Any
 
+from app.realtime.events import DomainEvent
 from app.services.notification_service import NotificationService
 from app.services.rti_service import RtiRules, due_reminders
 from app.services.uow import UowFactory
-from app.realtime.events import DomainEvent
+
+logger = logging.getLogger("civiclens.rti_workflow")
 
 
 class RtiReminderService:
@@ -33,6 +36,6 @@ class RtiReminderService:
         for ev in events:
             try:
                 self._bus.publish(ev)
-            except Exception:  # best-effort push; the notification row is the record
-                pass
+            except Exception as exc:  # best-effort push; the notification row is the record
+                logger.debug("RTI reminder event publish failed (row is still the record): %s", exc)
         return {"reminders_sent": sent}

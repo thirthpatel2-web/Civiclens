@@ -14,12 +14,19 @@ from nicegui import app, ui
 
 from app.container import AppContainer
 from app.core.authorization import Role
-from app.core.transactions import run_in_uow
 from app.core.exceptions import AuthenticationFailed, CivicLensError, MfaRequired
+from app.core.transactions import run_in_uow
 from app.services.profile_service import CONSENT_PURPOSES
 from app.ui import navigation
 from app.ui.base import UiUser, info_banner, page, sign_in, tr
-from app.ui.components import divider, field_hint, page_header, run_with_loading, section_title, state_panel
+from app.ui.components import (
+    divider,
+    field_hint,
+    page_header,
+    run_with_loading,
+    section_title,
+    state_panel,
+)
 
 logger = logging.getLogger("civiclens.ui")
 PRIV = (Role.ADMIN, Role.SUPER_ADMIN)

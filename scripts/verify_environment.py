@@ -97,7 +97,9 @@ def main() -> int:
     versions = sorted((Path(__file__).resolve().parent.parent / "alembic" / "versions").glob("0*.py"))
     rows.append(Row("alembic revisions present", "PASS" if len(versions) >= 3 else "FAIL", ", ".join(v.stem for v in versions), True))
     try:
-        from app.main import create_app  # needs fastapi/nicegui/sqlalchemy; a missing package is reported, not hidden
+        from app.main import (
+            create_app,  # needs fastapi/nicegui/sqlalchemy; a missing package is reported, not hidden
+        )
 
         app = create_app(with_ui=False)
         rows.append(Row("application factory / routes", "PASS", f"{len(app.routes)} routes registered", True))

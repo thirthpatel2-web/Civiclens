@@ -18,8 +18,20 @@ from app.core.dependencies import get_container, guard
 from app.core.exceptions import ValidationFailed
 from app.interop.adapters import SYSTEMS, corrupt_payload
 from app.interop.common_data_model import score_quality
-from app.interop.fragmentation import NATIONAL_UMANG_DEPARTMENTS, NATIONAL_UMANG_SERVICES, NATIONAL_UMANG_SOURCE, personal_diagnostic
-from app.schemas.api import AddExternalLinkBody, LinkExternalIdBody, LogExceptionBody, NormalizeDemoBody, ResolveExceptionBody, UpdateExternalLinkStatusBody
+from app.interop.fragmentation import (
+    NATIONAL_UMANG_DEPARTMENTS,
+    NATIONAL_UMANG_SERVICES,
+    NATIONAL_UMANG_SOURCE,
+    personal_diagnostic,
+)
+from app.schemas.api import (
+    AddExternalLinkBody,
+    LinkExternalIdBody,
+    LogExceptionBody,
+    NormalizeDemoBody,
+    ResolveExceptionBody,
+    UpdateExternalLinkStatusBody,
+)
 
 router = APIRouter(prefix="/interop", tags=["interop"])
 ANY = Depends(guard(Permission.ASSISTANT_USE))  # every role (citizen/officer/admin/super_admin) holds this

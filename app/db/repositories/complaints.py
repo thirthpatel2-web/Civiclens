@@ -6,10 +6,22 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.authorization import Role
-from app.db.models.complaints import ComplaintEventModel, ComplaintEvidenceModel, ComplaintModel, FeedbackModel
+from app.db.models.complaints import (
+    ComplaintEventModel,
+    ComplaintEvidenceModel,
+    ComplaintModel,
+    FeedbackModel,
+)
 from app.db.models.identity import UserModel
 from app.services.complaint_status import FINISHED, ComplaintStatus
-from app.services.ports import ComplaintEvent, ComplaintRecord, ComplaintRow, EvidenceRecord, FeedbackRecord, OfficerLoad
+from app.services.ports import (
+    ComplaintEvent,
+    ComplaintRecord,
+    ComplaintRow,
+    EvidenceRecord,
+    FeedbackRecord,
+    OfficerLoad,
+)
 
 _FINISHED = [str(s) for s in FINISHED]
 _COLS = ("reference citizen_id title description language category subcategory severity priority complaint_type department_code service_code ward lat lng address city "

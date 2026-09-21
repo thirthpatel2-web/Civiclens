@@ -14,7 +14,7 @@ from app.core.exceptions import CivicLensError
 from app.services.complaint_status import TRANSITIONS, ComplaintStatus
 from app.ui import theme
 from app.ui.base import UiUser, data_table, info_banner, page, tr
-from app.ui.components import chip, divider, page_header, section_title, state_panel, stat_tile
+from app.ui.components import chip, divider, page_header, section_title, stat_tile, state_panel
 from app.ui.navigation import OFFICER_UP, STAFF
 from app.ui.pages.citizen import _events, _timeline, government_panel
 

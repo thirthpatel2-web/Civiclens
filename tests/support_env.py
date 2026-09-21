@@ -10,7 +10,14 @@ from app.services.officer_service import OfficerService
 from app.services.sla_workflow import SlaWorkflowService
 from app.workers.queue import JobService
 from tests.support import FakeClock
-from tests.support_mem import MemQueueBackend, MemStorage, MemoryUow, RecordingBus, Stores, uow_factory
+from tests.support_mem import (
+    MemoryUow,
+    MemQueueBackend,
+    MemStorage,
+    RecordingBus,
+    Stores,
+    uow_factory,
+)
 
 CIT = AuthContext("cit-1", Role.CITIZEN)
 CIT2 = AuthContext("cit-2", Role.CITIZEN)

@@ -14,7 +14,12 @@ from app.core.authorization import AuthContext, Permission, require
 from app.core.exceptions import NotFound, ValidationFailed
 from app.db.repositories.interop import hash_external_id
 from app.services.audit_service import AuditService
-from app.services.ports import ClassificationCorrectionRecord, ExternalIdRecord, ExternalServiceLinkRecord, IntegrationExceptionRecord
+from app.services.ports import (
+    ClassificationCorrectionRecord,
+    ExternalIdRecord,
+    ExternalServiceLinkRecord,
+    IntegrationExceptionRecord,
+)
 from app.services.uow import UowFactory
 
 ID_TYPES = ("aadhaar_ref", "pan", "voter_id", "driving_license", "ration_card")

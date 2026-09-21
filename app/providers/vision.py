@@ -16,8 +16,8 @@ from app.services.ports import EvidenceRecord
 
 _FENCE = re.compile(r"^```(?:json)?\s*|\s*```$")
 _PROMPT = ("Describe this photo submitted with a civic complaint. Reply with ONLY JSON: "
-           '{"summary": short string, "issue_category": one of %s or "unknown", "severity_hint": one of %s or "unknown", '
-           '"visible_text": string or "", "confidence": number 0-1}. Describe only what is visible; do not guess.') % (list(CATEGORIES), list(SEVERITIES))  # fmt: skip
+           f'{{"summary": short string, "issue_category": one of {list(CATEGORIES)} or "unknown", "severity_hint": one of {list(SEVERITIES)} or "unknown", '
+           '"visible_text": string or "", "confidence": number 0-1}. Describe only what is visible; do not guess.')  # fmt: skip
 
 
 class VisionProvider(Protocol):

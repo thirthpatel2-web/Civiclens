@@ -8,7 +8,14 @@ from app.api.serialize import complaint_json, to_jsonable
 from app.container import AppContainer
 from app.core.authorization import AuthContext, Permission
 from app.core.dependencies import get_container, guard, limited
-from app.schemas.api import AttachEvidenceBody, ClassifyPreviewBody, ComplaintBody, DraftBody, FeedbackBody, GovSubmitBody
+from app.schemas.api import (
+    AttachEvidenceBody,
+    ClassifyPreviewBody,
+    ComplaintBody,
+    DraftBody,
+    FeedbackBody,
+    GovSubmitBody,
+)
 from app.services.complaint_service import ComplaintInput
 
 router = APIRouter(prefix="/complaints", tags=["complaints"])

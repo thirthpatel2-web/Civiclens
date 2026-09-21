@@ -1,8 +1,16 @@
 import unittest
 
 from app.core.authorization import (
-    AuthContext, Permission as P, Role, can_access_complaint, can_assign_role, require,
-    require_complaint_access, require_mfa_for_privileged,
+    AuthContext,
+    Role,
+    can_access_complaint,
+    can_assign_role,
+    require,
+    require_complaint_access,
+    require_mfa_for_privileged,
+)
+from app.core.authorization import (
+    Permission as P,
 )
 from app.core.exceptions import PermissionDenied
 

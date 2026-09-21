@@ -6,7 +6,16 @@ from datetime import datetime
 from sqlalchemy import delete, func, select, text
 from sqlalchemy.orm import Session
 
-from app.db.models.content import ConversationMessageModel, ConversationModel, DocumentChunkModel, DocumentModel, LegalJudgmentChunkModel, LegalJudgmentModel, LegalPrecedentModel, RtiApplicationModel
+from app.db.models.content import (
+    ConversationMessageModel,
+    ConversationModel,
+    DocumentChunkModel,
+    DocumentModel,
+    LegalJudgmentChunkModel,
+    LegalJudgmentModel,
+    LegalPrecedentModel,
+    RtiApplicationModel,
+)
 from app.legal.judgment_ingest import JudgmentRecord
 from app.legal.precedents import PrecedentRecord
 from app.rag.models import Chunk

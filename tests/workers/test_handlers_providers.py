@@ -1,22 +1,27 @@
 import json
 import logging
 import unittest
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from app.core.exceptions import DependencyUnavailable, NotConfigured, NotFound, ValidationFailed
-from app.integrations.base import TransportResponse
 from app.i18n.languages import detect_language
+from app.integrations.base import TransportResponse
 from app.providers.speech import BhashiniConfig, BhashiniProvider, sniff_audio
 from app.providers.stt import SttCapabilities, Transcript
-from app.services.voice_service import TranslationService, VoiceService
 from app.providers.vision import analyze_evidence
 from app.realtime.events import DomainEvent, event_from_json, event_to_json
 from app.services.classification_service import ClassificationService
 from app.services.notification_service import NotificationService
 from app.services.ports import EvidenceRecord
+from app.services.voice_service import TranslationService, VoiceService
 from app.storage.providers import GoogleDriveStorageProvider
 from app.workers.handlers import GrievanceWorker
-from app.workers.redis_backend import RedisEventBus, RedisLock, RedisQueueBackend, RedisSchedulerState
+from app.workers.redis_backend import (
+    RedisEventBus,
+    RedisLock,
+    RedisQueueBackend,
+    RedisSchedulerState,
+)
 from tests.rag.helpers import ScriptedChat
 from tests.support_env import CIT, PNG, VAGUE, Env
 from tests.support_mem import MemQueueBackend
@@ -339,15 +344,15 @@ class RedisWrapperTests(unittest.TestCase):
     def test_queue_ordering_delay_and_workers(self):
         r = FakeRedis()
         q = RedisQueueBackend(r)
-        t = datetime(2026, 1, 1, tzinfo=timezone.utc)
-        q.push("later", datetime(2026, 1, 1, 1, tzinfo=timezone.utc))
+        t = datetime(2026, 1, 1, tzinfo=UTC)
+        q.push("later", datetime(2026, 1, 1, 1, tzinfo=UTC))
         q.push("now", t)
         self.assertEqual(q.depth(), 2)
         self.assertEqual(q.pop_due(t), "now")
         self.assertIsNone(q.pop_due(t))
         q.heartbeat("w1", t, {"handlers": ["a"]})
         self.assertEqual(q.workers(t)["w1"]["handlers"], ["a"])
-        self.assertEqual(q.workers(datetime(2026, 1, 1, 0, 5, tzinfo=timezone.utc)), {})  # stale heartbeat
+        self.assertEqual(q.workers(datetime(2026, 1, 1, 0, 5, tzinfo=UTC)), {})  # stale heartbeat
         self.assertTrue(q.ping())
 
     def test_lock_and_state(self):
@@ -361,7 +366,7 @@ class RedisWrapperTests(unittest.TestCase):
         self.assertTrue(b.acquire("x", 10))
         st = RedisSchedulerState(r)
         self.assertIsNone(st.last_run("t"))
-        now = datetime(2026, 1, 1, tzinfo=timezone.utc)
+        now = datetime(2026, 1, 1, tzinfo=UTC)
         st.set_last_run("t", now)
         self.assertEqual(st.last_run("t"), now)
 

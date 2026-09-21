@@ -24,7 +24,12 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from app.legal.judgment_ingest import build_chunks, download_and_extract, judgment_id_for, list_sc_pdf_keys  # noqa: E402
+from app.legal.judgment_ingest import (  # noqa: E402
+    build_chunks,
+    download_and_extract,
+    judgment_id_for,
+    list_sc_pdf_keys,
+)
 
 
 def ingest_year(year: int, language: str, limit: int, embedder, session_factory, repo_cls) -> dict[str, int]:

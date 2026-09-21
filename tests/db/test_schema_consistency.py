@@ -52,7 +52,7 @@ class MigrationTests(unittest.TestCase):
             self.assertIn(f'"{table}"', self.text)
             for c in cols:
                 self.assertRegex(self.text, rf'op.create_table\(\s*"{table}",[\s\S]*?sa.Column\("{c["name"]}"')
-        for table, spec in tables.items():
+        for _table, spec in tables.items():
             for e in spec["extras"]:
                 if e.func.id == "Index":
                     self.assertIn(ast.unparse(e.args[0]), self.text)

@@ -8,7 +8,12 @@ from datetime import datetime
 from typing import Any
 
 from app.core.authorization import (
-    AuthContext, Permission, Role, can_access_complaint, require, require_complaint_access,
+    AuthContext,
+    Permission,
+    Role,
+    can_access_complaint,
+    require,
+    require_complaint_access,
 )
 from app.core.exceptions import NotFound, PermissionDenied, ValidationFailed
 from app.realtime.events import COMPLAINT_ASSIGNED, COMPLAINT_ESCALATED, COMPLAINT_STATUS_CHANGED

@@ -13,10 +13,17 @@ import uuid
 from dataclasses import dataclass, field
 from typing import Any
 
-from app.core.authorization import AuthContext, Permission, Role, can_access_complaint, require, require_complaint_access
+from app.core.authorization import (
+    AuthContext,
+    Permission,
+    Role,
+    can_access_complaint,
+    require,
+    require_complaint_access,
+)
 from app.core.exceptions import Conflict, NotFound, ValidationFailed
-from app.realtime.events import COMPLAINT_ASSIGNED, COMPLAINT_CREATED
 from app.i18n.languages import LANGUAGES, detect_language
+from app.realtime.events import COMPLAINT_ASSIGNED, COMPLAINT_CREATED
 from app.services.classification_service import CATEGORIES, ClassificationService, compute_priority
 from app.services.complaint_common import ComplaintEffects, Outbox, assign_least_loaded
 from app.services.complaint_status import ComplaintStatus as S

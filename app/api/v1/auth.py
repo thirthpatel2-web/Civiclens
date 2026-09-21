@@ -8,11 +8,27 @@ from fastapi import APIRouter, Depends, Request, Response
 
 from app.container import AppContainer
 from app.core.authorization import AuthContext, Role
-from app.core.dependencies import SESSION_COOKIE, client_ip, csrf_secret, get_container, get_ctx, session_token
-from app.core.transactions import run_in_uow
+from app.core.dependencies import (
+    SESSION_COOKIE,
+    client_ip,
+    csrf_secret,
+    get_container,
+    get_ctx,
+    session_token,
+)
 from app.core.exceptions import AuthenticationFailed, NotFound
 from app.core.security import csrf_token_for, hash_token
-from app.schemas.api import BootstrapBody, ChangePasswordBody, DisableMfaBody, ForgotBody, LoginBody, OtpBody, RegisterBody, ResetBody
+from app.core.transactions import run_in_uow
+from app.schemas.api import (
+    BootstrapBody,
+    ChangePasswordBody,
+    DisableMfaBody,
+    ForgotBody,
+    LoginBody,
+    OtpBody,
+    RegisterBody,
+    ResetBody,
+)
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 PRIVILEGED = (Role.ADMIN, Role.SUPER_ADMIN)

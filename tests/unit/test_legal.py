@@ -8,7 +8,13 @@ from pathlib import Path
 from app.core.exceptions import DependencyUnavailable
 from app.legal.analysis import LegalAnalysisService, detect_concepts
 from app.legal.judgment_search import JudgmentExcerpt
-from app.legal.precedents import PrecedentIndex, load_records, normalize_neutral, normalize_row, normalize_scr
+from app.legal.precedents import (
+    PrecedentIndex,
+    load_records,
+    normalize_neutral,
+    normalize_row,
+    normalize_scr,
+)
 from tests.rag.helpers import ScriptedChat
 
 ROWS = json.loads((Path(__file__).parent.parent / "fixtures" / "sc_metadata_sample.json").read_text(encoding="utf-8"))

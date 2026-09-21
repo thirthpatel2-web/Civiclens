@@ -26,7 +26,18 @@ from app.services.rti_service import RtiApplication, RtiDraft, RtiRules, RtiStat
 from app.services.rti_workflow import RtiReminderService
 from tests.rag.helpers import ScriptedChat
 from tests.support import FakeClock, ReferenceTotp, ScryptTestHasher
-from tests.support_env import ADMIN, ADMIN_ROADS, CIT, CIT2, OFF_R1, OFF_W1, SUPER, VAGUE, Env, complaint_input
+from tests.support_env import (
+    ADMIN,
+    ADMIN_ROADS,
+    CIT,
+    CIT2,
+    OFF_R1,
+    OFF_W1,
+    SUPER,
+    VAGUE,
+    Env,
+    complaint_input,
+)
 from tests.support_mem import MemoryUow
 
 

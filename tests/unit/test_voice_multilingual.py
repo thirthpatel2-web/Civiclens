@@ -7,7 +7,13 @@ service's guarantees, not any real model's accuracy. Real-provider accuracy is e
 import unittest
 
 from app.core.exceptions import ValidationFailed
-from app.i18n.languages import LANGUAGES, detect_language, dominant_script, script_histogram, script_matches
+from app.i18n.languages import (
+    LANGUAGES,
+    detect_language,
+    dominant_script,
+    script_histogram,
+    script_matches,
+)
 from app.providers.stt import SttCapabilities, Transcript, WhisperProvider
 from tests.support_env import CIT, Env
 from tests.support_mem import MemDict  # noqa: F401  (voice repo lives in the memory UoW)

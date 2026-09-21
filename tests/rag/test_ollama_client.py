@@ -6,7 +6,13 @@ import unittest
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 from app.core.exceptions import DependencyUnavailable, NotConfigured
-from app.rag.ollama import OllamaChatProvider, OllamaClient, OllamaEmbeddingProvider, probe, validate_base_url
+from app.rag.ollama import (
+    OllamaChatProvider,
+    OllamaClient,
+    OllamaEmbeddingProvider,
+    probe,
+    validate_base_url,
+)
 
 
 class Stub(BaseHTTPRequestHandler):

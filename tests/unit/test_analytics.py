@@ -1,7 +1,13 @@
 import unittest
 
 from app.services.analytics_service import (
-    AnomalyEvent, InsufficientData, detect_backlog, detect_sla_failure_rate, detect_volume_spike, detect_ward_spikes, forecast_linear,
+    AnomalyEvent,
+    InsufficientData,
+    detect_backlog,
+    detect_sla_failure_rate,
+    detect_volume_spike,
+    detect_ward_spikes,
+    forecast_linear,
 )
 
 NORMAL = [10, 12, 9, 11, 10, 13, 8, 11, 10, 12, 9, 10, 11, 12]

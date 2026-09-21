@@ -8,7 +8,12 @@ from datetime import datetime, timedelta
 from typing import Any
 
 from app.services.analytics_service import (
-    AnomalyEvent, InsufficientData, detect_backlog, detect_sla_failure_rate, detect_volume_spike, detect_ward_spikes,
+    AnomalyEvent,
+    InsufficientData,
+    detect_backlog,
+    detect_sla_failure_rate,
+    detect_volume_spike,
+    detect_ward_spikes,
 )
 from app.services.complaint_status import FINISHED
 from app.services.ports import AnomalyRecord, ComplaintRow

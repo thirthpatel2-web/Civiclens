@@ -6,7 +6,7 @@ from app.services.complaint_service import ComplaintInput
 from app.services.complaint_status import ComplaintStatus as S
 from app.services.reference import is_valid_reference
 from tests.rag.helpers import ScriptedChat
-from tests.support_env import CIT, CIT2, OFF_R1, PNG, POTHOLE, VAGUE, Env, complaint_input
+from tests.support_env import CIT, CIT2, OFF_R1, PNG, VAGUE, Env, complaint_input
 
 
 class CreateTests(unittest.TestCase):

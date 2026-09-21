@@ -16,8 +16,17 @@ from app.services.audit_service import AuditRepository
 from app.services.auth_service import ResetTokenRepository, SessionRepository, UserRepository
 from app.services.mfa_service import MfaRepository
 from app.services.ports import (
-    AnomalyRepository, ComplaintRepository, ConfigRepository, ConsentRepository, ConversationRepository,
-    DraftRepository, InvestigationRepository, JobRepository, NotificationRepository, OfficerDirectory, ProfileRepository,
+    AnomalyRepository,
+    ComplaintRepository,
+    ConfigRepository,
+    ConsentRepository,
+    ConversationRepository,
+    DraftRepository,
+    InvestigationRepository,
+    JobRepository,
+    NotificationRepository,
+    OfficerDirectory,
+    ProfileRepository,
 )
 from app.services.rti_service import RtiRepository
 

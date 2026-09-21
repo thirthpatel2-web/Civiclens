@@ -4,8 +4,18 @@ from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
-from app.db.models.interop import CitizenExternalIdModel, ClassificationCorrectionModel, ExternalServiceLinkModel, IntegrationExceptionModel
-from app.services.ports import ClassificationCorrectionRecord, ExternalIdRecord, ExternalServiceLinkRecord, IntegrationExceptionRecord
+from app.db.models.interop import (
+    CitizenExternalIdModel,
+    ClassificationCorrectionModel,
+    ExternalServiceLinkModel,
+    IntegrationExceptionModel,
+)
+from app.services.ports import (
+    ClassificationCorrectionRecord,
+    ExternalIdRecord,
+    ExternalServiceLinkRecord,
+    IntegrationExceptionRecord,
+)
 
 
 class SqlMasterDataRepository:

@@ -3,7 +3,6 @@ import unittest
 from datetime import timedelta
 
 from app.core.exceptions import DependencyUnavailable
-from app.services.ports import NotificationPreference
 from app.workers.queue import JobService, PermanentJobError
 from app.workers.scheduler import SchedulerService, TaskSpec
 from tests.support import FakeClock
@@ -115,7 +114,7 @@ class MemState:
 
 class MemLock:
     def __init__(self): self.held, self.deny = set(), set()
-    def acquire(self, name, ttl): return name not in self.deny and not (name in self.held) and (self.held.add(name) or True)
+    def acquire(self, name, ttl): return name not in self.deny and name not in self.held and (self.held.add(name) or True)
     def release(self, name): self.held.discard(name)
 
 

@@ -21,7 +21,6 @@ def parse_routes():
         if f.stem in ("__init__", "router"):
             continue
         tree = ast.parse(f.read_text(encoding="utf-8"))
-        src = f.read_text(encoding="utf-8")
         prefixes, guards = {}, set()
         for n in tree.body:
             if isinstance(n, ast.Assign) and isinstance(n.value, ast.Call):

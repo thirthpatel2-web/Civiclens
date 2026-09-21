@@ -6,7 +6,6 @@ from app.core.exceptions import ValidationFailed
 from app.services.complaint_service import ComplaintInput
 from app.services.voice_service import TranslationService, VoiceService
 from app.workers.handlers import GrievanceWorker
-from tests.rag.helpers import ScriptedChat
 from tests.support_env import CIT, CIT2, Env
 from tests.unit.test_voice_multilingual import ENGLISH_TRANSLATION, SAMPLES, WAV, ScriptedEngine
 

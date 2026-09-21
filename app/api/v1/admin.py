@@ -9,7 +9,21 @@ from app.container import AppContainer
 from app.core.authorization import AuthContext, Permission, Role
 from app.core.dependencies import get_container, guard
 from app.core.exceptions import ValidationFailed
-from app.schemas.api import ActiveBody, AnomalyStatusBody, CityBody, DepartmentBody, EmergencyBody, OfficeBody, WorkflowRuleBody, RoleBody, RuleBody, ServiceBody, SlaBody, StaffBody, WardBody
+from app.schemas.api import (
+    ActiveBody,
+    AnomalyStatusBody,
+    CityBody,
+    DepartmentBody,
+    EmergencyBody,
+    OfficeBody,
+    RoleBody,
+    RuleBody,
+    ServiceBody,
+    SlaBody,
+    StaffBody,
+    WardBody,
+    WorkflowRuleBody,
+)
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 ADM = Depends(guard(Permission.ADMIN_DASHBOARD))

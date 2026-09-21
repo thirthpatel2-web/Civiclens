@@ -19,7 +19,12 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from app.legal.precedents import PARQUET_COLUMNS, PrecedentIndex, load_records, read_parquet_rows  # noqa: E402
+from app.legal.precedents import (  # noqa: E402
+    PARQUET_COLUMNS,
+    PrecedentIndex,
+    load_records,
+    read_parquet_rows,
+)
 
 
 def _minimal_rows(path: str) -> list[dict]:

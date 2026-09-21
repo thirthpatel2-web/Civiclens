@@ -7,7 +7,13 @@ from collections.abc import Callable
 from fastapi import Depends, Request
 
 from app.container import AppContainer
-from app.core.authorization import AuthContext, Permission, Role, require, require_mfa_for_privileged
+from app.core.authorization import (
+    AuthContext,
+    Permission,
+    Role,
+    require,
+    require_mfa_for_privileged,
+)
 from app.core.exceptions import PermissionDenied
 from app.core.security import hash_token, verify_csrf
 from app.core.transactions import run_in_uow  # noqa: F401  (re-exported for routers)

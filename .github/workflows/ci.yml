@@ -1,0 +1,74 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: civiclens
+          POSTGRES_PASSWORD: civiclens
+          POSTGRES_DB: civiclens
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U civiclens"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql+psycopg://civiclens:civiclens@localhost:5432/civiclens
+      APP_SECRET_KEY: ci-only-secret-key-not-for-production
+      EMBEDDING_DIMENSIONS: "768"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt -r requirements-dev.txt
+
+      - name: Ruff lint
+        run: ruff check app/ scripts/ tests/
+
+      - name: Mypy type-check
+        run: mypy app/
+        continue-on-error: true # not yet a hard gate; see pending-items list
+
+      - name: Apply migrations
+        run: alembic upgrade head
+
+      - name: Schema-consistency + unit + API tests
+        run: pytest tests/ -q --ignore=tests/end_to_end
+
+  mobile:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Tests (includes i18n byte-identical backend/mobile check)
+        run: npm test

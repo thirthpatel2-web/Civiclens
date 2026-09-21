@@ -1,7 +1,13 @@
 import logging
 import unittest
 
-from app.core.exceptions import Conflict, DependencyUnavailable, NotConfigured, NotFound, ValidationFailed
+from app.core.exceptions import (
+    Conflict,
+    DependencyUnavailable,
+    NotConfigured,
+    NotFound,
+    ValidationFailed,
+)
 from app.providers.ocr import OllamaVisionOcr, TesseractOcr, build_ocr
 from app.services.complaint_status import ComplaintStatus as S
 from app.services.document_service import extract_pages
@@ -95,7 +101,6 @@ class RealTesseractTests(unittest.TestCase):
 
     @staticmethod
     def _image(text="Road repair budget 2025"):
-        import io
 
         from PIL import Image, ImageDraw, ImageFont
 

@@ -10,10 +10,25 @@ import copy
 from datetime import datetime, timedelta
 from typing import Any
 
-from app.services.complaint_status import FINISHED, ComplaintStatus
+from app.services.complaint_status import FINISHED
 from app.services.ports import (
-    AnomalyRecord, ComplaintEvent, ComplaintRecord, ComplaintRow, ConsentRecord, ConversationMessage, ConversationRecord, DepartmentRecord,
-    DraftRecord, EvidenceRecord, FeedbackRecord, InvestigationRecord, JobRecord, NotificationPreference, NotificationRecord, OfficerLoad, ProfileRecord,
+    AnomalyRecord,
+    ComplaintEvent,
+    ComplaintRecord,
+    ComplaintRow,
+    ConsentRecord,
+    ConversationMessage,
+    ConversationRecord,
+    DepartmentRecord,
+    DraftRecord,
+    EvidenceRecord,
+    FeedbackRecord,
+    InvestigationRecord,
+    JobRecord,
+    NotificationPreference,
+    NotificationRecord,
+    OfficerLoad,
+    ProfileRecord,
 )
 from app.services.routing_service import RoutingRule
 from app.services.sla_service import SlaPolicy

@@ -23,7 +23,9 @@ from datetime import UTC, datetime
 from enum import StrEnum
 from pathlib import Path
 from typing import Protocol
-from xml.etree import ElementTree as ET  # noqa: S405 - DOCX XML from an already size-limited zip; see _docx_text
+from xml.etree import (
+    ElementTree as ET,  # noqa: S405 - DOCX XML from an already size-limited zip; see _docx_text
+)
 
 from app.core.exceptions import CivicLensError, NotConfigured, NotFound, ValidationFailed
 from app.rag.chunking import ChunkConfig, chunk_document

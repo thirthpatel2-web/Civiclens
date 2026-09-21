@@ -14,10 +14,29 @@ target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP", "S"]
-ignore = ["S101"]
+# S101: asserts are used deliberately (tests, and a few invariant checks).
+# E501: the house style is dense single-line functions/branches with `# fmt: skip`, not
+# 100-char-wrapped prose; line length was never actually enforced (2000+ pre-existing
+# "violations" of it), so keeping the rule selected just makes real findings harder to see.
+ignore = ["S101", "E501"]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["S", "B011"]
+# E702/E741: same dense one-liner style as the rest of the codebase (short test-double methods,
+# `l` for "language code" in small local scopes) - not a real readability risk at test scale.
+"tests/**" = ["S", "B011", "E702", "E741"]
+# flush_para/flush_table are redefined fresh every outer-loop iteration and always called
+# synchronously within that same iteration (never stored/deferred), so the closures over
+# para/table/heading are safe despite B023's static (and here, false-positive) warning.
+"app/rag/chunking.py" = ["B023"]
+# GovernmentAdapter is deliberately a marker/template base class (subclasses declare identity
+# via class attributes, not an abstract method) - real behaviour lives in the base class itself.
+"app/integrations/base.py" = ["B024"]
+
+[tool.ruff.lint.flake8-bugbear]
+# FastAPI's dependency-injection pattern is `param: T = Depends(...)` (also File/Form/Query) -
+# a call in a default argument is the framework's intended, documented usage, not the mutable-
+# default-argument bug B008 exists to catch.
+extend-immutable-calls = ["fastapi.Depends", "fastapi.File", "fastapi.Form", "fastapi.Query", "app.core.dependencies.guard"]
 
 [tool.mypy]
 python_version = "3.12"

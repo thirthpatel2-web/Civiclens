@@ -55,8 +55,8 @@ class WebSocketManager:
         if closer is not None:
             try:
                 await asyncio.wait_for(closer(code=4401), timeout=self._timeout)
-            except Exception:  # the peer may already be gone
-                pass
+            except Exception as exc:  # the peer may already be gone
+                logger.debug("websocket close failed (peer likely already gone): %s", exc)
 
     async def drop_session(self, session_hash: str) -> int:
         """Close every socket that belongs to a session that has just ended (logout, revocation)."""

@@ -8,17 +8,32 @@ from collections.abc import Callable
 from datetime import UTC, datetime
 from typing import Any
 
-from app.core.authorization import AuthContext, Permission, Role, require, require_mfa_for_privileged
+from app.core.authorization import (
+    AuthContext,
+    Permission,
+    Role,
+    require,
+    require_mfa_for_privileged,
+)
 from app.core.exceptions import NotFound, PermissionDenied, ValidationFailed
 from app.services.audit_service import AuditEvent
 from app.services.auth_service import AuthService, UserRecord
 from app.services.classification_service import CATEGORIES, SEVERITIES
-from app.services.ports import AnomalyRecord, CityRecord, CivicServiceRecord, DepartmentRecord, EmergencyContactRecord, GovOfficeRecord, WardRecord, WorkflowRuleRecord
 from app.services.emergency_service import validate_contact
+from app.services.ports import (
+    AnomalyRecord,
+    CityRecord,
+    CivicServiceRecord,
+    DepartmentRecord,
+    EmergencyContactRecord,
+    GovOfficeRecord,
+    WardRecord,
+    WorkflowRuleRecord,
+)
 from app.services.routing_service import DepartmentRouter, RoutingRule
-from app.services.workflow_service import validate_rule
 from app.services.sla_service import SlaPolicy
 from app.services.uow import UowFactory
+from app.services.workflow_service import validate_rule
 
 PRIORITIES = ("low", "medium", "high", "critical")
 

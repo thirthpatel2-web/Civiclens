@@ -2,21 +2,27 @@
 
 from __future__ import annotations
 
+import json
 from typing import Any
 
 from nicegui import ui
 
 from app.container import AppContainer
 from app.core.authorization import Role
-from app.core.transactions import run_in_uow
 from app.core.exceptions import CivicLensError
-import json
-
+from app.core.transactions import run_in_uow
 from app.services.classification_service import CATEGORIES, SEVERITIES
 from app.services.workflow_service import ACTIONS as WF_ACTIONS
 from app.services.workflow_service import TRIGGERS as WF_TRIGGERS
 from app.ui.base import UiUser, data_table, info_banner, page, tr
-from app.ui.components import chip, confirm_dialog, page_header, section_title, state_panel, stat_tile
+from app.ui.components import (
+    chip,
+    confirm_dialog,
+    page_header,
+    section_title,
+    stat_tile,
+    state_panel,
+)
 from app.ui.navigation import ADMINS
 
 

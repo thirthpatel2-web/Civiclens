@@ -2,9 +2,9 @@ import unittest
 
 from app.data.seed import load_seed, validate
 from app.i18n.translator import Translator
+from app.services.classification_service import RuleClassifier
 from app.services.emergency_service import EmergencyHubService
 from app.services.routing_service import DepartmentRouter, RoutingRule
-from app.services.classification_service import RuleClassifier
 
 
 class TranslatorTests(unittest.TestCase):

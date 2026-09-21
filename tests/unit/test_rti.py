@@ -6,7 +6,13 @@ from app.core.authorization import AuthContext, Role
 from app.core.exceptions import NotConfigured, NotFound, PermissionDenied, ValidationFailed
 from app.services.reference import is_valid_reference
 from app.services.rti_service import (
-    RtiApplication, RtiDraft, RtiRules, RtiService, RtiStatus, due_reminders, render_pdf,
+    RtiApplication,
+    RtiDraft,
+    RtiRules,
+    RtiService,
+    RtiStatus,
+    due_reminders,
+    render_pdf,
 )
 from tests.support import FakeClock
 

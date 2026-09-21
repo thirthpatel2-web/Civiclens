@@ -13,11 +13,12 @@ from typing import Any
 
 from fastapi import Request
 from nicegui import app, ui
+
 from app.container import AppContainer
 from app.core.authorization import AuthContext, Role
-from app.core.transactions import run_in_uow
 from app.core.exceptions import AuthenticationFailed, CivicLensError
 from app.core.security import hash_token
+from app.core.transactions import run_in_uow
 from app.ui import navigation, theme
 
 logger = logging.getLogger("civiclens.ui")
@@ -58,7 +59,7 @@ def sign_in(token: str, language: str | None = None) -> None:
         app.storage.user["lang"] = language
 
 
-def set_language(c: AppContainer, user: "UiUser", code: str) -> None:
+def set_language(c: AppContainer, user: UiUser, code: str) -> None:
     """Switch the interface language now, and persist it on the account."""
     app.storage.user["lang"] = code
     try:

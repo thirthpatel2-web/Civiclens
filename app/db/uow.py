@@ -7,12 +7,42 @@ from typing import Any
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.db.repositories.complaints import SqlComplaintRepository, SqlOfficerDirectory
-from app.db.repositories.content import SqlConversationRepository, SqlDocumentRepository, SqlRtiRepository
-from app.db.repositories.identity import SqlConsentRepository, SqlMfaRepository, SqlProfileRepository, SqlResetTokenRepository, SqlSessionRepository, SqlUserRepository
-from app.db.repositories.ops import (
-    SqlAnalyticsRepository, SqlAnomalyRepository, SqlAuditRepository, SqlDuplicateReviewRepository, SqlEmergencyRepository, SqlGovernmentSubmissionRepository, SqlLegalAnalysisRepository, SqlPushDeviceRepository, SqlWorkflowRepository, SqlConfigRepository, SqlDraftRepository, SqlInvestigationRepository, SqlJobRepository, SqlNotificationRepository, SqlVoiceRepository,
+from app.db.repositories.content import (
+    SqlConversationRepository,
+    SqlDocumentRepository,
+    SqlRtiRepository,
 )
-from app.db.repositories.interop import SqlClassificationCorrectionRepository, SqlExceptionRepository, SqlExternalLinkRepository, SqlMasterDataRepository
+from app.db.repositories.identity import (
+    SqlConsentRepository,
+    SqlMfaRepository,
+    SqlProfileRepository,
+    SqlResetTokenRepository,
+    SqlSessionRepository,
+    SqlUserRepository,
+)
+from app.db.repositories.interop import (
+    SqlClassificationCorrectionRepository,
+    SqlExceptionRepository,
+    SqlExternalLinkRepository,
+    SqlMasterDataRepository,
+)
+from app.db.repositories.ops import (
+    SqlAnalyticsRepository,
+    SqlAnomalyRepository,
+    SqlAuditRepository,
+    SqlConfigRepository,
+    SqlDraftRepository,
+    SqlDuplicateReviewRepository,
+    SqlEmergencyRepository,
+    SqlGovernmentSubmissionRepository,
+    SqlInvestigationRepository,
+    SqlJobRepository,
+    SqlLegalAnalysisRepository,
+    SqlNotificationRepository,
+    SqlPushDeviceRepository,
+    SqlVoiceRepository,
+    SqlWorkflowRepository,
+)
 
 
 class SqlUnitOfWork:

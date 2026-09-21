@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import hashlib
-import re
 
 from app.core.exceptions import DependencyUnavailable
 from app.rag.bm25 import BM25Index

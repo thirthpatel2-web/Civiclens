@@ -10,7 +10,12 @@ from app.core.authorization import AuthContext, Permission
 from app.core.dependencies import get_container, guard
 from app.core.transactions import run_in_uow
 from app.schemas.api import RtiBody, RtiFileBody, RtiQuestionsPreviewBody
-from app.services.rti_service import RTI_CATEGORY_RECORDS, RtiDraft, build_rti_questions, default_records_for_category
+from app.services.rti_service import (
+    RTI_CATEGORY_RECORDS,
+    RtiDraft,
+    build_rti_questions,
+    default_records_for_category,
+)
 
 router = APIRouter(prefix="/rti", tags=["rti"])
 OWNER = Depends(guard(Permission.RTI_MANAGE_OWN))

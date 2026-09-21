@@ -3,18 +3,36 @@ from datetime import UTC, date, datetime, timedelta
 
 from app.core.authorization import AuthContext, Role
 from app.core.exceptions import DependencyUnavailable, PermissionDenied, ValidationFailed
-from app.services.classification_service import ClassificationService, RuleClassifier, compute_priority
+from app.services.classification_service import (
+    ClassificationService,
+    RuleClassifier,
+    compute_priority,
+)
 from app.services.complaint_status import (
-    ComplaintStatus as S, TRANSITIONS, apply_transition, build_timeline, can_transition, matches_filter,
+    TRANSITIONS,
+    apply_transition,
+    build_timeline,
+    can_transition,
+    matches_filter,
+)
+from app.services.complaint_status import (
+    ComplaintStatus as S,
 )
 from app.services.duplicate_service import (
-    ComplaintSnapshot, DuplicateDetector, DuplicateReviewService, lexical_similarity,
+    ComplaintSnapshot,
+    DuplicateDetector,
+    DuplicateReviewService,
+    lexical_similarity,
 )
 from app.services.location_service import aggregate_hotspots, haversine_m, validate_location
 from app.services.reference import generate_reference, is_valid_reference
 from app.services.routing_service import AiSuggestion, DepartmentRouter, RoutingRule
 from app.services.sla_service import (
-    EscalationEngine, SlaCalculator, SlaPolicy, SlaScanner, SlaSubject,
+    EscalationEngine,
+    SlaCalculator,
+    SlaPolicy,
+    SlaScanner,
+    SlaSubject,
 )
 from tests.rag.helpers import ScriptedChat
 
@@ -24,7 +42,7 @@ T0 = datetime(2026, 3, 1, 9, 0, tzinfo=UTC)
 class StatusTests(unittest.TestCase):
     def test_happy_path_and_illegal_jumps(self):
         path = [S.SUBMITTED, S.AI_ROUTED, S.ASSIGNED, S.UNDER_REVIEW, S.IN_PROGRESS, S.RESOLVED, S.CLOSED]
-        for a, b in zip(path, path[1:]):
+        for a, b in zip(path, path[1:], strict=False):  # deliberately different lengths: pairwise iteration
             self.assertTrue(can_transition(a, b), (a, b))
         for a, b in [(S.SUBMITTED, S.RESOLVED), (S.CLOSED, S.IN_PROGRESS), (S.REJECTED, S.ASSIGNED), (S.ASSIGNED, S.RESOLVED)]:
             self.assertFalse(can_transition(a, b), (a, b))

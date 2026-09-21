@@ -7,7 +7,11 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 
 from app.integrations.adapters import ADAPTER_CLASSES, CPGRAMSAdapter, build_adapters
 from app.integrations.base import (
-    AdapterConfig, IntegrationState, OperationStatus, TransportError, assert_safe_url,
+    AdapterConfig,
+    IntegrationState,
+    OperationStatus,
+    TransportError,
+    assert_safe_url,
 )
 from app.integrations.health import IntegrationHealthService
 

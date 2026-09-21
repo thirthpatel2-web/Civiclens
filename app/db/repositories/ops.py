@@ -10,21 +10,56 @@ from sqlalchemy.orm import Session
 
 from app.db.models.complaints import DuplicateReviewModel
 from app.db.models.content import LegalAnalysisModel
-from app.db.models.ops import EmergencyContactModel, GovernmentSubmissionModel, PushDeviceModel, WorkflowExecutionModel, WorkflowRuleModel
-from app.db.models.ops import AnalyticsSnapshotModel, AnomalyModel, AuditLogModel, DraftModel, InvestigationModel, JobModel, NotificationModel, SchedulerStateModel
+from app.db.models.ops import (
+    AnalyticsSnapshotModel,
+    AnomalyModel,
+    AuditLogModel,
+    DraftModel,
+    EmergencyContactModel,
+    GovernmentSubmissionModel,
+    InvestigationModel,
+    JobModel,
+    NotificationModel,
+    PushDeviceModel,
+    SchedulerStateModel,
+    WorkflowExecutionModel,
+    WorkflowRuleModel,
+)
 from app.db.models.reference import (
-    CityModel, CivicServiceModel, DepartmentModel, GovernmentOfficeModel, IntegrationHealthModel, RoutingRuleModel, SlaPolicyModel, WardModel,
+    CityModel,
+    CivicServiceModel,
+    DepartmentModel,
+    GovernmentOfficeModel,
+    IntegrationHealthModel,
+    RoutingRuleModel,
+    SlaPolicyModel,
+    WardModel,
 )
 from app.db.repositories.identity import SqlNotificationPrefs
 from app.integrations.base import HealthReport, IntegrationState
-from app.services.voice_service import VoiceRecord
 from app.services.audit_service import AuditEvent
 from app.services.ports import (
-    AnomalyRecord, CityRecord, CivicServiceRecord, DepartmentRecord, DraftRecord, EmergencyContactRecord, GovernmentSubmissionRecord, GovOfficeRecord, InvestigationRecord, JobRecord, LegalAnalysisRecord,
-    NotificationPreference, NotificationRecord, PushDeviceRecord, WardRecord, WorkflowExecutionRecord, WorkflowRuleRecord,
+    AnomalyRecord,
+    CityRecord,
+    CivicServiceRecord,
+    DepartmentRecord,
+    DraftRecord,
+    EmergencyContactRecord,
+    GovernmentSubmissionRecord,
+    GovOfficeRecord,
+    InvestigationRecord,
+    JobRecord,
+    LegalAnalysisRecord,
+    NotificationPreference,
+    NotificationRecord,
+    PushDeviceRecord,
+    WardRecord,
+    WorkflowExecutionRecord,
+    WorkflowRuleRecord,
 )
 from app.services.routing_service import RoutingRule
 from app.services.sla_service import SlaPolicy
+from app.services.voice_service import VoiceRecord
 
 
 class SqlAuditRepository:
