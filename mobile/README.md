@@ -29,3 +29,9 @@ Microphone (voice input), camera / photos (evidence), location (only when you ta
 ## Known limits
 Never run on a device/emulator by the author. Push notifications need an EAS project id and `EXPO_PUSH_ENABLED=true` on the server; without them alerts work while the app is open (polling). Not ported from the legacy prototype: document scanner,
 locator, department directory, official portal; no mobile screens yet for password reset, 2-factor enrolment or adding evidence to an existing complaint (the API supports all three).
+
+## Building for app stores
+`eas.json` has `development`/`preview`/`production` profiles scaffolded, but two things need real values before a build is usable, neither of which can be filled in without your accounts:
+1. Run `eas login` then `eas init` (needs an Expo account) - this writes a real `extra.eas.projectId` into `app.json`.
+2. Replace the placeholder `EXPO_PUBLIC_API_URL` values in `eas.json` (`https://staging.example.org`, `https://api.example.org`) with your actual deployed backend URLs - both must be HTTPS.
+Store submission also needs: a privacy policy URL (required by both stores given this app requests microphone/camera/location), Play Store data-safety form answers, and an Apple App Store Connect listing. None of that is scaffolded here since it requires your legal/business decisions, not code.

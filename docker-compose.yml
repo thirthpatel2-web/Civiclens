@@ -1,0 +1,86 @@
+networks:
+  default:
+    name: civiclens
+
+volumes:
+  postgres_data:
+  ollama_models:
+  uploads:
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: civiclens
+      POSTGRES_PASSWORD: civiclens
+      POSTGRES_DB: civiclens
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports: ["5432:5432"] # dev convenience (psql from the host); remove for a real deployment
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U civiclens"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - /data # ephemeral is fine: it's a queue/cache, not a system of record
+
+  ollama:
+    image: ollama/ollama:latest
+    restart: unless-stopped
+    volumes:
+      - ollama_models:/root/.ollama
+    ports: ["11434:11434"] # dev convenience; remove for a real deployment
+    # Models are NOT baked into the image (multi-GB each, and which ones you need is a config
+    # choice). Pull them once after first start:
+    #   docker compose exec ollama ollama pull llama3.1:8b
+    #   docker compose exec ollama ollama pull nomic-embed-text
+
+  migrate:
+    build: .
+    env_file: [.env]
+    environment:
+      DATABASE_URL: postgresql+psycopg://civiclens:civiclens@postgres:5432/civiclens
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: ["alembic", "upgrade", "head"]
+
+  app:
+    build: .
+    restart: unless-stopped
+    env_file: [.env]
+    environment:
+      DATABASE_URL: postgresql+psycopg://civiclens:civiclens@postgres:5432/civiclens
+      REDIS_URL: redis://redis:6379/0
+      OLLAMA_BASE_URL: http://ollama:11434
+    ports: ["8080:8080"]
+    volumes:
+      - uploads:/srv/civiclens/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+  worker:
+    build: .
+    restart: unless-stopped
+    env_file: [.env]
+    environment:
+      DATABASE_URL: postgresql+psycopg://civiclens:civiclens@postgres:5432/civiclens
+      REDIS_URL: redis://redis:6379/0
+      OLLAMA_BASE_URL: http://ollama:11434
+    volumes:
+      - uploads:/srv/civiclens/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    command: ["python", "-m", "app.workers.run", "all"]

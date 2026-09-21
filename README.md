@@ -69,9 +69,36 @@ ruff check . && ruff format --check . && mypy app   # not run in the build envir
 No Redis ⇒ jobs stay `pending` in PostgreSQL and are pushed later; rate limits use the in-process limiter and say so. No Ollama ⇒ rules-only routing, `ai_status` explains, RAG shows sources but composes no answer.
 No STT/translation engine ⇒ `NOT_CONFIGURED`. No vision model ⇒ `IMAGE_ANALYSIS_UNAVAILABLE`. No OCR ⇒ scanned documents fail with a stated reason. No SMTP ⇒ e-mail `not_configured`. Push disabled ⇒ `not_configured`.
 Government platforms (CPGRAMS, UMANG, Swachhata, BBMP Sahaaya, MyGov): orchestration, consent gate, state machine and admin view are complete; without base URL/key/endpoints the state is `not_configured` and **nothing is sent**.
-The legal index is metadata-only (856 Supreme Court rows): it can show that a case exists; it never states a holding.
+The legal index has two layers: a metadata-only citation index (38,000+ Supreme Court judgments, 1950-2026 - can confirm a case exists, cites and dates) and a growing full-text corpus (`legal_judgments`/`legal_judgment_chunks`, ingested by `scripts/ingest_legal_fulltext.py`) that can quote and reason over what a case actually says wherever real text has been ingested. See `THIRD_PARTY_DATA.md` for the data's license and attribution.
 
 ## Map
 `app/core` config/security/RBAC/limits · `app/services` domain + application services · `app/rag` retrieval pipeline · `app/legal` precedents · `app/integrations` gov adapters · `app/providers` STT, OCR, vision, push ·
 `app/i18n` languages + dictionaries · `app/db` models/repositories/UoW/schema check · `alembic/` migrations · `app/api/v1` REST · `app/ui` NiceGUI · `app/workers` queue/scheduler/handlers ·
 `app/realtime` events + WebSocket manager · `mobile/` Expo app · `scripts/` operations + audits · `tests/` · `docs/` API contract.
+
+## Running with Docker
+```
+cp .env.example .env        # then edit it - at minimum APP_SECRET_KEY and EMBEDDING_DIMENSIONS
+docker compose up -d --build
+docker compose exec ollama ollama pull llama3.1:8b       # once, after first start
+docker compose exec ollama ollama pull nomic-embed-text  # once, after first start
+```
+Brings up Postgres+pgvector, Redis, Ollama, a one-shot `migrate` service (runs `alembic upgrade
+head` before `app`/`worker` start), the API/UI (`:8080`), and the background worker. Postgres/
+Ollama ports are exposed to the host for local development convenience; remove those `ports:`
+entries for anything beyond a single dev machine.
+
+**Honesty note:** this Dockerfile/compose setup was written and statically checked (YAML parses,
+service graph and env vars cross-referenced against `app/core/config.py`) but not build-tested
+end-to-end, because this development environment has no Docker installed. Verify it with a real
+`docker compose up --build` before relying on it.
+
+## Backups
+```
+python scripts/backup_database.py backup                       # -> backups/civiclens_<db>_<timestamp>.dump
+python scripts/backup_database.py restore backups/<file> --yes # DESTRUCTIVE: replaces current data
+```
+Reads `DATABASE_URL` the same way the app does, so it always targets whatever database is actually configured - never a hardcoded guess. Uses `pg_dump`/`pg_restore` custom format (compressed, consistent snapshot); verified end-to-end against a real database with `pg_restore --list`.
+
+## License
+CivicLens's own code is MIT-licensed (`LICENSE`). Ingested government judgment data carries its own separate license - see `THIRD_PARTY_DATA.md`.

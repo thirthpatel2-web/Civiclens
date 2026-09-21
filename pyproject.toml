@@ -31,6 +31,10 @@ ignore = ["S101", "E501"]
 # GovernmentAdapter is deliberately a marker/template base class (subclasses declare identity
 # via class attributes, not an abstract method) - real behaviour lives in the base class itself.
 "app/integrations/base.py" = ["B024"]
+# An operator-run backup/restore tool: pg_dump/pg_restore are invoked with a fixed argument list
+# (no shell=True, so no injection surface) resolved via PATH, exactly as an operator would type
+# them at a terminal - not user-facing request handling, so S603/S607 do not apply here.
+"scripts/backup_database.py" = ["S603", "S607"]
 
 [tool.ruff.lint.flake8-bugbear]
 # FastAPI's dependency-injection pattern is `param: T = Depends(...)` (also File/Form/Query) -
