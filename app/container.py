@@ -229,6 +229,9 @@ class AppContainer:
         out["storage"] = self.storage.health() if hasattr(self.storage, "health") else {"provider": type(self.storage).__name__, "state": "UNKNOWN"}
         out["ollama"] = "not_configured" if self.ollama is None else "configured"
         out["rag"] = {"chunks": len(self.rag_index), "semantic_search": self.vector_index is not None and self.embedder is not None, "model": self.llm is not None}
+        from app.core.error_tracking import error_tracking_status
+
+        out["error_tracking"] = error_tracking_status()
         return out
 
     # ------------------------------------------------------------- scheduled work

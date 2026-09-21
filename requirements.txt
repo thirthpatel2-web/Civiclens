@@ -30,3 +30,4 @@ pypdfium2>=4.30            # render scanned-PDF pages for OCR
 # ---- optional engines (the app degrades honestly without them) --------------------------------------------------------------
 pytesseract>=0.3.10        # OCR_PROVIDER=tesseract (also needs the tesseract binary + traineddata for OCR_LANGUAGES)
 faster-whisper>=1.0        # STT_PROVIDER=whisper (self-hosted multilingual speech-to-text)
+sentry-sdk>=2.0            # SENTRY_DSN (error tracking; send_default_pii is always off - see app/core/error_tracking.py)

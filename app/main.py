@@ -16,6 +16,7 @@ from app.container import AppContainer, build_container
 from app.core import middleware
 from app.core.config import Settings
 from app.core.dependencies import SESSION_COOKIE
+from app.core.error_tracking import init_error_tracking
 from app.core.exceptions import AuthenticationFailed
 from app.core.logging import configure_logging
 from app.realtime.websocket_manager import LocalEventBus
@@ -41,6 +42,7 @@ def _load_precedents(container: AppContainer) -> int:
 def create_app(container: AppContainer | None = None, *, with_ui: bool = True) -> FastAPI:
     settings = container.settings if container else Settings.load()
     configure_logging()
+    logger.info("error tracking: %s", "configured" if init_error_tracking() else "not_configured")
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:

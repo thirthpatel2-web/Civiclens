@@ -16,8 +16,8 @@ PIP_FOR_IMPORT = {"yaml": "pyyaml", "PIL": "pillow", "jose": "python-jose", "goo
                   "pytesseract": "pytesseract", "pyotp": "pyotp", "argon2": "argon2-cffi", "cryptography": "cryptography", "pypdf": "pypdf", "pypdfium2": "pypdfium2", "docx": "python-docx",
                   "reportlab": "reportlab", "nicegui": "nicegui", "fastapi": "fastapi", "uvicorn": "uvicorn", "starlette": "starlette", "sqlalchemy": "sqlalchemy", "alembic": "alembic",
                   "psycopg": "psycopg", "pgvector": "pgvector", "redis": "redis", "httpx": "httpx", "pandas": "pandas", "pyarrow": "pyarrow", "qrcode": "qrcode", "pydantic": "pydantic",
-                  "dotenv": "python-dotenv"}  # fmt: skip
-OPTIONAL = {"faster_whisper", "pytesseract", "PIL", "googleapiclient", "google", "pandas", "pyarrow", "pypdfium2", "docx", "reportlab", "qrcode", "pyotp", "argon2", "pypdf", "dotenv"}  # imported lazily / in try-blocks
+                  "dotenv": "python-dotenv", "sentry_sdk": "sentry-sdk"}  # fmt: skip
+OPTIONAL = {"faster_whisper", "pytesseract", "PIL", "googleapiclient", "google", "pandas", "pyarrow", "pypdfium2", "docx", "reportlab", "qrcode", "pyotp", "argon2", "pypdf", "dotenv", "sentry_sdk"}  # imported lazily / in try-blocks
 
 
 def module_file(mod: str) -> Path | None:
