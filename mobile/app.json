@@ -7,7 +7,11 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
-    "splash": { "image": "./assets/splash-icon.png", "resizeMode": "contain", "backgroundColor": "#1f4e79" },
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#1f4e79"
+    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "org.civiclens.mobile",
@@ -20,20 +24,60 @@
     },
     "android": {
       "package": "org.civiclens.mobile",
-      "adaptiveIcon": { "foregroundImage": "./assets/adaptive-icon.png", "backgroundColor": "#1f4e79" },
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#1f4e79"
+      },
       "softwareKeyboardLayoutMode": "resize",
-      "permissions": ["RECORD_AUDIO", "CAMERA", "ACCESS_FINE_LOCATION", "ACCESS_COARSE_LOCATION", "POST_NOTIFICATIONS"]
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.CAMERA",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.MODIFY_AUDIO_SETTINGS"
+      ]
     },
     "plugins": [
       "expo-router",
       "expo-secure-store",
-      ["expo-notifications", { "color": "#1f4e79" }],
-      ["expo-location", { "locationWhenInUsePermission": "CivicLens uses your location, only when you ask it to, to attach the place of the problem to your complaint." }],
-      ["expo-av", { "microphonePermission": "CivicLens records your voice so it can be turned into text, in the language you speak, for your complaint." }],
-      ["expo-image-picker", { "cameraPermission": "CivicLens uses the camera to photograph the problem as evidence.", "photosPermission": "CivicLens lets you attach an existing photo as evidence." }],
+      [
+        "expo-notifications",
+        {
+          "color": "#1f4e79"
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "CivicLens uses your location, only when you ask it to, to attach the place of the problem to your complaint."
+        }
+      ],
+      [
+        "expo-av",
+        {
+          "microphonePermission": "CivicLens records your voice so it can be turned into text, in the language you speak, for your complaint."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "CivicLens uses the camera to photograph the problem as evidence.",
+          "photosPermission": "CivicLens lets you attach an existing photo as evidence."
+        }
+      ],
       "expo-background-task"
     ],
-    "experiments": { "typedRoutes": false },
-    "extra": { "apiBaseUrl": "http://10.0.2.2:8080" }
+    "experiments": {
+      "typedRoutes": false
+    },
+    "extra": {
+      "apiBaseUrl": "http://10.0.2.2:8080",
+      "router": {},
+      "eas": {
+        "projectId": "436d3a95-5c84-4309-a8bf-1ce44d050022"
+      }
+    },
+    "owner": "thirth"
   }
 }
