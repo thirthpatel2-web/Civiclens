@@ -59,6 +59,11 @@ services:
       DATABASE_URL: postgresql+psycopg://civiclens:civiclens@postgres:5432/civiclens
       REDIS_URL: redis://redis:6379/0
       OLLAMA_BASE_URL: http://ollama:11434
+      # .env's OCR_PROVIDER/TESSERACT_CMD are host (Windows) values; this image doesn't install
+      # tesseract-ocr by design (see Dockerfile), and OCR_PROVIDER=tesseract fails loudly at
+      # startup when the binary is missing (same as STT_PROVIDER=whisper without faster-whisper) -
+      # so override to none here rather than let a host-only setting crash the container.
+      OCR_PROVIDER: none
     ports: ["8080:8080"]
     volumes:
       - uploads:/srv/civiclens/uploads
@@ -76,6 +81,7 @@ services:
       DATABASE_URL: postgresql+psycopg://civiclens:civiclens@postgres:5432/civiclens
       REDIS_URL: redis://redis:6379/0
       OLLAMA_BASE_URL: http://ollama:11434
+      OCR_PROVIDER: none  # see app service comment
     volumes:
       - uploads:/srv/civiclens/uploads
     depends_on:
@@ -84,3 +90,5 @@ services:
       migrate:
         condition: service_completed_successfully
     command: ["python", "-m", "app.workers.run", "all"]
+    healthcheck:
+      disable: true  # the worker serves no HTTP endpoint; it would otherwise inherit the app image's curl-based healthcheck and always show unhealthy
