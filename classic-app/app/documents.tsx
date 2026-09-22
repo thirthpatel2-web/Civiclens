@@ -1,12 +1,18 @@
+// Ported from legacy-prototype/src/screens/DocumentScannerScreen.js (upload card with camera/gallery
+// actions, status badges). The zip's per-document-type OCR chips assumed a client-side vision model
+// (analyzeDocumentImage) with per-category prompts; our real backend runs the same OCR+indexing
+// pipeline regardless of category, so those chips are dropped rather than kept as non-functional UI.
 import React, { useCallback, useEffect, useState } from 'react';
 import { Text, View } from 'react-native';
-import { AppButton, Body, Card, EmptyState, ErrorBanner, H1, InfoBanner, Loading, Screen } from '../src/components/ui.tsx';
+import { Ionicons } from '@expo/vector-icons';
+import { AppButton, Body, ErrorBanner, InfoBanner, Loading, Screen } from '../src/components/ui.tsx';
 import { endpoints } from '../src/api/instance.ts';
 import type { DocumentRecord } from '../src/api/types.ts';
 import { pickPhotos, takePhoto } from '../src/hooks/usePhotos.ts';
 import { useI18n } from '../src/i18n/I18nContext.tsx';
 import { useTheme } from '../src/theme/ThemeContext.tsx';
 import { ApiError } from '../src/api/errors.ts';
+import { fontFamily, radius, shadow, spacing } from '../src/theme.ts';
 
 export default function Documents() {
   const { t } = useI18n();
@@ -31,7 +37,6 @@ export default function Documents() {
     }
   }, []);
   useEffect(() => { load(); }, [load]);
-  // Documents finish processing in the background - poll gently while any are still in flight.
   useEffect(() => {
     if (!items?.some((d) => d.status === 'uploaded' || d.status === 'processing')) return;
     const id = setInterval(load, 4000);
@@ -52,19 +57,29 @@ export default function Documents() {
 
   return (
     <Screen>
-      <H1>{t('nav.documents')}</H1>
-      <Body soft>Scan a notice, receipt or previous reply. Once processed, Civic Saathi can cite it when you ask a question.</Body>
+      <Text style={{ fontFamily: fontFamily.displayBold, fontSize: 20, color: colors.text }}>📄 {t('nav.documents')}</Text>
+      <Body soft>Scan notices, receipts, FIR copies or bills - once processed, Civic Saathi can cite them when you ask a question.</Body>
       {notConfigured ? <InfoBanner tone="warn" message="Document processing is not configured on this server yet. Ask an administrator to enable it." /> : null}
       {error ? <ErrorBanner message={error} onRetry={load} /> : null}
-      <View style={{ flexDirection: 'row', gap: 8 }}>
-        <AppButton label="Scan with camera" kind="secondary" onPress={() => upload('camera')} busy={uploading} disabled={notConfigured} />
-        <AppButton label="Choose from gallery" kind="secondary" onPress={() => upload('library')} busy={uploading} disabled={notConfigured} />
+
+      <View style={[{ borderRadius: radius.lg, padding: spacing.md, borderWidth: 1, alignItems: 'center', backgroundColor: colors.card, borderColor: colors.border }, shadow.sm]}>
+        <View style={{ alignItems: 'center', paddingVertical: 16 }}>
+          <Ionicons name="document-scanner-outline" size={48} color={colors.primary} />
+          <Text style={{ fontFamily: fontFamily.bodyExtraBold, fontSize: 14, marginTop: 10, color: colors.text }}>Snap or Upload an Official Document</Text>
+          <Text style={{ fontSize: 11, textAlign: 'center', marginTop: 4, paddingHorizontal: 20, color: colors.textMuted }}>Traffic challans, municipal notices, FIR copies, utility bills, or a photo of the civic problem itself</Text>
+        </View>
+        <View style={{ flexDirection: 'row', gap: 12, width: '100%' }}>
+          <View style={{ flex: 1 }}><AppButton label="Camera" icon="📷" onPress={() => upload('camera')} busy={uploading} disabled={notConfigured} /></View>
+          <View style={{ flex: 1 }}><AppButton label="Gallery" kind="secondary" icon="🖼️" onPress={() => upload('library')} busy={uploading} disabled={notConfigured} /></View>
+        </View>
       </View>
 
-      {items === null ? <Loading label={t('msg.loading')} /> : items.length === 0 && !notConfigured ? <EmptyState message="No documents yet." /> : items.map((d) => {
+      {items === null ? <Loading label={t('msg.loading')} /> : items.length === 0 && !notConfigured ? (
+        <Body soft>No documents yet - the ones you scan will appear here with their processing status.</Body>
+      ) : items.map((d) => {
         const st = STATUS_LABEL[d.status] ?? { text: d.status, color: colors.textMuted };
         return (
-          <Card key={d.id}>
+          <View key={d.id} style={[{ borderRadius: radius.lg, padding: spacing.md, borderWidth: 1, backgroundColor: colors.card, borderColor: colors.border }, shadow.sm]}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
               <Text style={{ fontWeight: '700', flex: 1, color: colors.text }} numberOfLines={1}>{d.name}</Text>
               <Text style={{ color: st.color, fontSize: 12, fontWeight: '700' }}>{st.text}</Text>
@@ -76,7 +91,7 @@ export default function Documents() {
                 <AppButton label="Retry" kind="secondary" onPress={async () => { await endpoints.retryDocument(d.id); await load(); }} />
               </>
             ) : null}
-          </Card>
+          </View>
         );
       })}
     </Screen>

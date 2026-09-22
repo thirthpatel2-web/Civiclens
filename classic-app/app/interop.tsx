@@ -1,11 +1,11 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Text, View } from 'react-native';
-import { AppButton, Body, Card, Chip, EmptyState, ErrorBanner, Field, H1, InfoBanner, Loading, Screen } from '../src/components/ui.tsx';
+import { AppButton, Body, Card, Chip, EmptyState, ErrorBanner, Field, InfoBanner, Loading, Screen } from '../src/components/ui.tsx';
 import { endpoints } from '../src/api/instance.ts';
 import type { ExternalIdLink, ExternalServiceLink, FragmentationDiagnostic, InteropSystem, IntegrationException, NormalizeDemoResult } from '../src/api/types.ts';
 import { useAuth } from '../src/auth/AuthContext.tsx';
 import { useI18n } from '../src/i18n/I18nContext.tsx';
-import { radius, withAlpha } from '../src/theme.ts';
+import { fontFamily, radius, withAlpha } from '../src/theme.ts';
 import { useTheme } from '../src/theme/ThemeContext.tsx';
 
 // Same fixed ID taxonomy the backend accepts (app.services.interop_service.ID_TYPES) - not deployment data.
@@ -69,7 +69,7 @@ export default function InteropLab() {
 
   return (
     <Screen>
-      <H1>{t('nav.interop')}</H1>
+      <Text style={{ fontFamily: fontFamily.displayBold, fontSize: 20, color: colors.text }}>🌉 {t('nav.interop')}</Text>
       <Body soft>Different government systems describe the same request with different field names, casing and status words. See the real normalization mechanism, live - this is the actual technical answer to fragmented service delivery.</Body>
       {error ? <ErrorBanner message={error} /> : null}
 

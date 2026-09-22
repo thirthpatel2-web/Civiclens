@@ -24,6 +24,9 @@ export function createEndpoints(api: ApiClient) {
     login: (email: string, password: string, otp?: string) => api.post<T.LoginResponse>('/auth/mobile/login', { email, password, otp: otp || null }, { auth: false }),
     logout: () => api.post<{ ok: boolean }>('/auth/logout'),
     me: () => api.get<{ user: T.SessionUser; mfa_verified: boolean }>('/auth/me'),
+    mfaEnroll: () => api.post<{ provisioning_uri: string; secret: string }>('/auth/mfa/enroll'),
+    mfaConfirm: (otp: string) => api.post<{ backup_codes: string[] }>('/auth/mfa/confirm', { otp }),
+    mfaDisable: (password: string, otp: string) => api.post<{ ok: boolean }>('/auth/mfa/disable', { password, otp }),
     forgotPassword: (email: string) => api.post<{ message: string }>('/auth/password/forgot', { email }, { auth: false }),
 
     listComplaints: (filter = 'all') => api.get<{ items: T.Complaint[] }>('/complaints', { filter }),

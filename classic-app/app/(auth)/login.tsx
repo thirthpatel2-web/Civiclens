@@ -45,6 +45,16 @@ export default function Login() {
         <H1>{t('brand')}</H1>
         <Body soft style={{ textAlign: 'center' }}>{t('appTagline')}</Body>
       </View>
+
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'center' }}>
+        {[{ icon: '📝', title: 'Statutory Letters' }, { icon: '🏛️', title: 'Precision RTI 2005' }, { icon: '⚖️', title: 'Verified Precedents' }, { icon: '🎤', title: 'Voice, any language' }].map((f) => (
+          <View key={f.title} style={{ width: '47%', flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, paddingHorizontal: 10, paddingVertical: 8 }}>
+            <Text style={{ fontSize: 16 }}>{f.icon}</Text>
+            <Text style={{ fontSize: 11, fontWeight: '700', color: colors.textSoft, flex: 1 }}>{f.title}</Text>
+          </View>
+        ))}
+      </View>
+
       {!IS_CONFIGURED ? <InfoBanner tone="warn" message="No server address configured (EXPO_PUBLIC_API_URL)." /> : null}
       {IS_INSECURE ? <InfoBanner tone="warn" message="This server address is not HTTPS. Your session token would be sent unencrypted." /> : null}
 

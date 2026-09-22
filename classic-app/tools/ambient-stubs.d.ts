@@ -12,7 +12,7 @@ declare module 'react' {
   export function useContext<T>(c: { Provider: any; __t?: T }): T;
   const React: any; export default React;
 }
-declare module 'react-native' { export const View: any, Text: any, TextInput: any, ScrollView: any, Pressable: any, Image: any, Switch: any, ActivityIndicator: any, Modal: any, StyleSheet: { create<T>(x: T): T }, Linking: any, AppState: any, Platform: any, Appearance: any; export type TextInputProps = any; export type ViewStyle = any; }
+declare module 'react-native' { export const View: any, Text: any, TextInput: any, ScrollView: any, Pressable: any, Image: any, Switch: any, ActivityIndicator: any, Modal: any, Alert: any, Dimensions: any, KeyboardAvoidingView: any, StyleSheet: { create<T>(x: T): T }, Linking: any, AppState: any, Platform: any, Appearance: any; export type TextInputProps = any; export type ViewStyle = any; }
 declare module 'react-native-maps' { const M: any; export default M; export const Circle: any, Marker: any; }
 declare module 'expo-router' { export const Slot: any, Link: any, Redirect: any, Tabs: any; export function useRouter(): any; export function useSegments(): string[]; export function useLocalSearchParams<T>(): T; }
 declare module 'expo-status-bar' { export const StatusBar: any; }

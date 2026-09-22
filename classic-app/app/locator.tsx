@@ -1,17 +1,21 @@
+// Ported from legacy-prototype/src/screens/CivicLocatorScreen.js (location banner + office cards
+// with a distance badge and a Directions action). The zip's per-office phone/hours/officer/services
+// fields were invented placeholder data; our real office records only have name/address/coordinates,
+// so the card shows exactly that plus a real, computed distance - nothing fabricated.
 import React, { useEffect, useMemo, useState } from 'react';
 import { Linking, Platform, Text, View } from 'react-native';
-import { AppButton, Body, Card, Chip, EmptyState, ErrorBanner, H1, Loading, Screen } from '../src/components/ui.tsx';
+import { Ionicons } from '@expo/vector-icons';
+import { AppButton, Body, Card, Chip, EmptyState, ErrorBanner, Loading, Screen } from '../src/components/ui.tsx';
 import { endpoints } from '../src/api/instance.ts';
 import type { DirectoryData } from '../src/api/types.ts';
 import { useDeviceLocation } from '../src/hooks/useDeviceLocation.ts';
 import { useI18n } from '../src/i18n/I18nContext.tsx';
 import { useTheme } from '../src/theme/ThemeContext.tsx';
+import { fontFamily, radius, shadow, spacing } from '../src/theme.ts';
 
-// Same formula the backend uses for "nearby" matching (app.services.location_service.haversine_m) -
-// distance is shown for real, computed from your actual device coordinates, never invented.
 function haversineMeters(lat1: number, lng1: number, lat2: number, lng2: number): number {
   const R = 6371000;
-  const toRad = (d: number) => (d * Math.PI) / 180;
+  const toRad = (dv: number) => (dv * Math.PI) / 180;
   const dLat = toRad(lat2 - lat1), dLng = toRad(lng2 - lng1);
   const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
   return 2 * R * Math.asin(Math.sqrt(a));
@@ -46,17 +50,27 @@ export default function CivicLocator() {
 
   return (
     <Screen>
-      <H1>{t('nav.locator')}</H1>
+      <Text style={{ fontFamily: fontFamily.displayBold, fontSize: 20, color: colors.text }}>📍 {t('nav.locator')}</Text>
       <Body soft>The nearest real government offices, sorted by your actual device location.</Body>
       {error ? <ErrorBanner message={error} /> : null}
 
-      {loc.state.kind === 'none' || loc.state.kind === 'locating' ? (
-        <Card><Body soft>{loc.state.kind === 'locating' ? 'Finding your location…' : 'Location not available yet.'}</Body><AppButton label="Use my location" kind="secondary" onPress={loc.request} busy={loc.state.kind === 'locating'} /></Card>
-      ) : loc.state.kind === 'denied' ? (
-        <Card><Body soft>Location permission was denied - offices are shown unsorted. You can still open any office in Maps.</Body><AppButton label="Try again" kind="secondary" onPress={loc.request} /></Card>
-      ) : loc.state.kind === 'error' ? (
-        <ErrorBanner message={loc.state.message} onRetry={loc.request} />
-      ) : null}
+      <View style={[{ flexDirection: 'row', alignItems: 'center', padding: 12, borderRadius: radius.md, borderWidth: 1, gap: 10, backgroundColor: colors.primaryGlow, borderColor: colors.primary }]}>
+        <Ionicons name="navigate-circle" size={22} color={colors.primaryLight} />
+        <View style={{ flex: 1 }}>
+          {loc.state.kind === 'ok' ? (
+            <>
+              <Text style={{ fontSize: 13, fontWeight: '800', color: colors.text }}>{loc.state.address?.city ?? 'Location locked'}{loc.state.address?.state ? `, ${loc.state.address.state}` : ''}</Text>
+              <Text style={{ fontSize: 11, marginTop: 2, color: colors.textSoft }}>{loc.state.address?.area ?? `${loc.state.lat.toFixed(4)}, ${loc.state.lng.toFixed(4)}`}</Text>
+            </>
+          ) : (
+            <>
+              <Text style={{ fontSize: 13, fontWeight: '800', color: colors.text }}>{loc.state.kind === 'locating' ? 'Finding your location…' : 'Location not available yet'}</Text>
+              <AppButton label="Use my location" kind="secondary" onPress={loc.request} busy={loc.state.kind === 'locating'} />
+            </>
+          )}
+        </View>
+      </View>
+      {loc.state.kind === 'denied' ? <ErrorBanner message="Location permission was denied - offices are shown unsorted. You can still open any office in Maps." onRetry={loc.request} /> : null}
 
       {d ? (
         <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
@@ -65,24 +79,34 @@ export default function CivicLocator() {
         </View>
       ) : null}
 
+      <Text style={{ fontSize: 12, fontWeight: '800', textTransform: 'uppercase', color: colors.text }}>Closest Administrative Centers</Text>
       {!d ? <Loading label={t('msg.loading')} /> : offices.length === 0 ? <EmptyState message={t('msg.no_data')} /> : offices.map((o) => (
-        <Card key={o.id}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <View key={o.id} style={[{ borderRadius: radius.lg, padding: spacing.md, borderWidth: 1, backgroundColor: colors.card, borderColor: colors.border, gap: 8 }, shadow.sm]}>
+          <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10 }}>
+            <Text style={{ fontSize: 24 }}>🏛️</Text>
             <View style={{ flex: 1 }}>
-              <Text style={{ fontWeight: '700', color: colors.text }}>{o.name}</Text>
-              {o.address ? <Body soft>{o.address}</Body> : null}
-              <Body soft>{o.department_code ?? 'general'}</Body>
-            </View>
-            {o.distanceM != null ? (
-              <View style={{ backgroundColor: colors.primaryGlow, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4 }}>
-                <Text style={{ color: colors.primary, fontWeight: '700', fontSize: 12 }}>
-                  {o.distanceM < 1000 ? `${Math.round(o.distanceM)} m` : `${(o.distanceM / 1000).toFixed(1)} km`}
-                </Text>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Text style={{ fontSize: 11, fontWeight: '800', color: colors.primaryLight }}>{o.department_code ?? 'GENERAL'}</Text>
+                {o.distanceM != null ? (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 6, paddingVertical: 2, borderRadius: radius.full, backgroundColor: colors.surfaceElevated }}>
+                    <Ionicons name="walk-outline" size={12} color={colors.accentEmerald} />
+                    <Text style={{ fontSize: 10, fontWeight: '800', color: colors.accentEmerald }}>{o.distanceM < 1000 ? `${Math.round(o.distanceM)} m` : `${(o.distanceM / 1000).toFixed(1)} km`}</Text>
+                  </View>
+                ) : null}
               </View>
-            ) : null}
+              <Text style={{ fontSize: 14, fontWeight: '800', color: colors.text }}>{o.name}</Text>
+            </View>
           </View>
-          <AppButton label="Open in Maps" kind="secondary" onPress={() => openInMaps(o.lat, o.lng, o.name)} />
-        </Card>
+          {o.address ? (
+            <View style={{ borderRadius: radius.md, padding: 10, backgroundColor: colors.surfaceElevated }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Ionicons name="location-outline" size={14} color={colors.accentRose} />
+                <Text style={{ fontSize: 11, flex: 1, color: colors.textSoft }}>{o.address}</Text>
+              </View>
+            </View>
+          ) : null}
+          <AppButton label="Directions" icon="🧭" onPress={() => openInMaps(o.lat, o.lng, o.name)} />
+        </View>
       ))}
     </Screen>
   );

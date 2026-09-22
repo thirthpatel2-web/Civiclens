@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { View } from 'react-native';
+import { Text, View } from 'react-native';
 import MapView, { Circle, Marker } from 'react-native-maps';
-import { Body, EmptyState, ErrorBanner, H1, InfoBanner, Loading, Screen } from '../src/components/ui.tsx';
+import { Body, EmptyState, ErrorBanner, InfoBanner, Loading, Screen } from '../src/components/ui.tsx';
 import { endpoints } from '../src/api/instance.ts';
 import type { RadarResponse } from '../src/api/types.ts';
 import { useI18n } from '../src/i18n/I18nContext.tsx';
-import { withAlpha } from '../src/theme.ts';
+import { fontFamily, withAlpha } from '../src/theme.ts';
 import { useTheme } from '../src/theme/ThemeContext.tsx';
 
 export default function CivicMap() {
@@ -17,7 +17,7 @@ export default function CivicMap() {
   const first = r?.hotspots[0] ?? r?.offices[0];
   return (
     <Screen scroll={false}>
-      <H1>{t('nav.gis')}</H1>
+      <Text style={{ fontFamily: fontFamily.displayBold, fontSize: 20, color: colors.text }}>🗺️ {t('nav.gis')}</Text>
       {error ? <ErrorBanner message={error} /> : !r ? <Loading /> : !first ? <EmptyState message={t('msg.no_data')} /> : (
         <>
           <Body soft>{r.mappable} of {r.total_complaints} complaints have coordinates.</Body>
