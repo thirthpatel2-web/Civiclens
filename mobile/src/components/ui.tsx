@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import type { TextInputProps, ViewStyle } from 'react-native';
-import { MIN_TOUCH, spacing, withAlpha } from '../theme.ts';
+import { MIN_TOUCH, shadow, spacing, withAlpha } from '../theme.ts';
 import type { ThemeColors } from '../theme.ts';
 import { useTheme } from '../theme/ThemeContext.tsx';
 
@@ -13,7 +13,7 @@ export function Screen({ children, scroll = true, style }: { children: React.Rea
 
 export const Card = ({ children, style }: { children: React.ReactNode; style?: ViewStyle }) => {
   const { colors } = useTheme();
-  return <View style={[{ backgroundColor: colors.card, borderRadius: 12, borderWidth: 1, borderColor: colors.border, padding: spacing.lg, gap: spacing.sm }, style]}>{children}</View>;
+  return <View style={[{ backgroundColor: colors.card, borderRadius: 12, borderWidth: 1, borderColor: colors.border, padding: spacing.lg, gap: spacing.sm }, shadow.sm, style]}>{children}</View>;
 };
 
 export const H1 = ({ children }: { children: React.ReactNode }) => {
@@ -36,6 +36,8 @@ export function AppButton({ label, onPress, kind = 'primary', disabled, busy, ic
       style={({ pressed }: { pressed: boolean }) => [
         { minHeight: MIN_TOUCH, borderRadius: 10, alignItems: 'center' as const, justifyContent: 'center' as const, paddingHorizontal: spacing.lg },
         { backgroundColor: bg, borderColor: accent, borderWidth: kind === 'secondary' ? 1.5 : 0, opacity: disabled ? 0.5 : pressed ? 0.85 : 1 },
+        kind === 'primary' && !disabled ? shadow.sm : null,
+        pressed ? { transform: [{ scale: 0.98 }] } : null,
       ]}>
       {busy ? <ActivityIndicator color={fg} /> : <Text style={{ color: fg, fontWeight: '600', fontSize: 16 }}>{icon ? `${icon}  ` : ''}{label}</Text>}
     </Pressable>

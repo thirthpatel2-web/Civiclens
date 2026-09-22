@@ -9,40 +9,42 @@ import type { Complaint } from '../../src/api/types.ts';
 import { useAuth } from '../../src/auth/AuthContext.tsx';
 import { useI18n } from '../../src/i18n/I18nContext.tsx';
 import { useSync } from '../../src/offline/SyncContext.tsx';
-import { radius, withAlpha } from '../../src/theme.ts';
+import { radius, shadow, withAlpha } from '../../src/theme.ts';
 import type { ThemeColors } from '../../src/theme.ts';
 import { useTheme } from '../../src/theme/ThemeContext.tsx';
 
-type Pillar = { icon: keyof typeof Ionicons.glyphMap; title: string; sub: string; tag: string; color: string; tint: string; href: string };
+type Pillar = { icon: keyof typeof Ionicons.glyphMap; titleKey: string; sub: string; tag: string; color: string; tint: string; href: string };
 function buildPillars(colors: ThemeColors): Pillar[] {
   return [
-    { icon: 'add-circle', title: 'Report an Issue', sub: 'AI-classified civic complaint, routed to the right department', tag: 'Grievance', color: colors.primary, tint: withAlpha(colors.primary, 0.12), href: '/(tabs)/report' },
-    { icon: 'business', title: 'RTI Drafter', sub: 'Section 6(1)/7(1) application with a precise questionnaire', tag: 'RTI Act 2005', color: colors.accentSaffron, tint: withAlpha(colors.accentSaffron, 0.12), href: '/rti' },
-    { icon: 'scale', title: 'Case Analyzer', sub: 'Legal concepts, precedents & disposal outcomes', tag: 'Precedents', color: colors.accentPurple, tint: withAlpha(colors.accentPurple, 0.12), href: '/legal' },
-    { icon: 'map', title: 'Civic GIS Radar', sub: 'Real complaint hotspots near you, privacy-thresholded', tag: 'Live map', color: colors.accentEmerald, tint: withAlpha(colors.accentEmerald, 0.12), href: '/map' },
-    { icon: 'business-outline', title: 'Department Directory', sub: 'Real departments, offices & services for this deployment', tag: 'Directory', color: colors.primaryLight, tint: withAlpha(colors.primaryLight, 0.12), href: '/directory' },
-    { icon: 'navigate', title: 'Civic Locator', sub: 'Nearest real government offices, sorted by your location', tag: 'Nearby', color: colors.ok, tint: withAlpha(colors.ok, 0.12), href: '/locator' },
-    { icon: 'chatbubbles', title: 'Civic Saathi', sub: 'Ask about your complaints, RTI deadlines or documents', tag: 'AI Assistant', color: colors.accent, tint: withAlpha(colors.accent, 0.12), href: '/copilot' },
-    { icon: 'git-network', title: 'Interoperability Lab', sub: 'See real government data formats normalize into one schema', tag: 'Golden Record', color: colors.accentPurple, tint: withAlpha(colors.accentPurple, 0.12), href: '/interop' },
-    { icon: 'scan', title: 'Scan a Document', sub: 'Camera-scan a notice or receipt so Civic Saathi can cite it', tag: 'Documents', color: colors.accentRose, tint: withAlpha(colors.accentRose, 0.12), href: '/documents' },
-    { icon: 'medkit', title: 'Emergency Hub', sub: 'Verified helplines - never use this form for emergencies', tag: 'Helplines', color: colors.info, tint: withAlpha(colors.info, 0.12), href: '/emergency' },
-    { icon: 'settings', title: 'Settings & Privacy', sub: 'Language, consent, linked IDs and two-factor security', tag: 'Account', color: colors.muted, tint: withAlpha(colors.muted, 0.12), href: '/settings' },
+    { icon: 'add-circle', titleKey: 'nav.report', sub: 'AI-classified civic complaint, routed to the right department', tag: 'Grievance', color: colors.primary, tint: withAlpha(colors.primary, 0.12), href: '/(tabs)/report' },
+    { icon: 'business', titleKey: 'nav.rti', sub: 'Section 6(1)/7(1) application with a precise questionnaire', tag: 'RTI Act 2005', color: colors.accentSaffron, tint: withAlpha(colors.accentSaffron, 0.12), href: '/rti' },
+    { icon: 'scale', titleKey: 'nav.legal', sub: 'Legal concepts, precedents & disposal outcomes', tag: 'Precedents', color: colors.accentPurple, tint: withAlpha(colors.accentPurple, 0.12), href: '/legal' },
+    { icon: 'map', titleKey: 'nav.gis', sub: 'Real complaint hotspots near you, privacy-thresholded', tag: 'Live map', color: colors.accentEmerald, tint: withAlpha(colors.accentEmerald, 0.12), href: '/map' },
+    { icon: 'business-outline', titleKey: 'nav.departments', sub: 'Real departments, offices & services for this deployment', tag: 'Directory', color: colors.primaryLight, tint: withAlpha(colors.primaryLight, 0.12), href: '/directory' },
+    { icon: 'navigate', titleKey: 'nav.locator', sub: 'Nearest real government offices, sorted by your location', tag: 'Nearby', color: colors.ok, tint: withAlpha(colors.ok, 0.12), href: '/locator' },
+    { icon: 'chatbubbles', titleKey: 'nav.copilot', sub: 'Ask about your complaints, RTI deadlines or documents', tag: 'AI Assistant', color: colors.accent, tint: withAlpha(colors.accent, 0.12), href: '/copilot' },
+    { icon: 'git-network', titleKey: 'nav.interop', sub: 'See real government data formats normalize into one schema', tag: 'Golden Record', color: colors.accentPurple, tint: withAlpha(colors.accentPurple, 0.12), href: '/interop' },
+    { icon: 'scan', titleKey: 'nav.documents', sub: 'Camera-scan a notice or receipt so Civic Saathi can cite it', tag: 'Documents', color: colors.accentRose, tint: withAlpha(colors.accentRose, 0.12), href: '/documents' },
+    { icon: 'medkit', titleKey: 'nav.emergency', sub: 'Verified helplines - never use this form for emergencies', tag: 'Helplines', color: colors.info, tint: withAlpha(colors.info, 0.12), href: '/emergency' },
+    { icon: 'settings', titleKey: 'nav.settings', sub: 'Language, consent, linked IDs and two-factor security', tag: 'Account', color: colors.muted, tint: withAlpha(colors.muted, 0.12), href: '/settings' },
   ];
 }
 
-function PillarCard({ p, onPress, colors }: { p: Pillar; onPress: () => void; colors: ThemeColors }) {
+function PillarCard({ p, onPress, colors, title }: { p: Pillar; onPress: () => void; colors: ThemeColors; title: string }) {
   return (
     <Pressable accessibilityRole="button" onPress={onPress} style={{ flex: 1, minWidth: '46%' }}>
-      <View style={{ backgroundColor: colors.card, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, padding: 14, gap: 8, minHeight: 148 }}>
-        <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: p.tint, alignItems: 'center', justifyContent: 'center' }}>
-          <Ionicons name={p.icon} size={20} color={p.color} />
+      {({ pressed }: { pressed: boolean }) => (
+        <View style={[{ backgroundColor: colors.card, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, padding: 14, gap: 8, minHeight: 148 }, shadow.sm, pressed ? { transform: [{ scale: 0.97 }], opacity: 0.92 } : null]}>
+          <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: p.tint, alignItems: 'center', justifyContent: 'center' }}>
+            <Ionicons name={p.icon} size={20} color={p.color} />
+          </View>
+          <Text style={{ fontWeight: '800', color: colors.text, fontSize: 14 }}>{title}</Text>
+          <Text style={{ color: colors.textSoft, fontSize: 12, lineHeight: 16 }} numberOfLines={2}>{p.sub}</Text>
+          <View style={{ alignSelf: 'flex-start', backgroundColor: p.tint, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3 }}>
+            <Text style={{ color: p.color, fontSize: 10, fontWeight: '700' }}>{p.tag}</Text>
+          </View>
         </View>
-        <Text style={{ fontWeight: '800', color: colors.text, fontSize: 14 }}>{p.title}</Text>
-        <Text style={{ color: colors.textSoft, fontSize: 12, lineHeight: 16 }} numberOfLines={2}>{p.sub}</Text>
-        <View style={{ alignSelf: 'flex-start', backgroundColor: p.tint, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3 }}>
-          <Text style={{ color: p.color, fontSize: 10, fontWeight: '700' }}>{p.tag}</Text>
-        </View>
-      </View>
+      )}
     </Pressable>
   );
 }
@@ -73,7 +75,7 @@ export default function Home() {
 
   return (
     <Screen>
-      <View style={{ backgroundColor: colors.primary, borderRadius: radius.lg, padding: 18, gap: 10 }}>
+      <View style={[{ backgroundColor: colors.primary, borderRadius: radius.lg, padding: 18, gap: 10 }, shadow.md]}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
           <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.16)', alignItems: 'center', justifyContent: 'center' }}>
             <Ionicons name="shield-checkmark" size={22} color="#fff" />
@@ -99,7 +101,7 @@ export default function Home() {
 
       <Text style={{ fontWeight: '800', color: colors.text, fontSize: 15, marginTop: 4 }}>Everything a citizen needs</Text>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
-        {pillars.map((p) => <PillarCard key={p.title} p={p} colors={colors} onPress={() => router.push(p.href as any)} />)}
+        {pillars.map((p) => <PillarCard key={p.titleKey} p={p} colors={colors} title={t(p.titleKey)} onPress={() => router.push(p.href as any)} />)}
       </View>
 
       <Text style={{ fontWeight: '800', color: colors.text, fontSize: 15, marginTop: 4 }}>{t('nav.grievances')}</Text>

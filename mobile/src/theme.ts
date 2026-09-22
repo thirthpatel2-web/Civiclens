@@ -35,6 +35,14 @@ export const spacing = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24 };
 export const radius = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, full: 9999 };
 export const MIN_TOUCH = 48; // accessible touch target
 
+// Cross-platform elevation (shadow* for iOS/web, elevation for Android) - shared so cards, the hero
+// banner and dashboard tiles all read as lifted surfaces instead of flat, bordered rectangles.
+export const shadow = {
+  sm: { shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 3, elevation: 2 },
+  md: { shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 10, elevation: 4 },
+  lg: { shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.16, shadowRadius: 20, elevation: 10 },
+} as const;
+
 const STATUS_LIGHT: Record<string, string> = {
   submitted: '#79735A', ai_routed: '#654A96', assigned: '#3547A8', under_review: '#9C7025', inspection_scheduled: '#A85A30',
   in_progress: '#28728A', resolved: '#1F7A4C', closed: '#1D2760', rejected: '#B23A3A',

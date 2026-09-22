@@ -7,7 +7,7 @@ import React, { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, Text, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { radius, withAlpha } from '../theme.ts';
+import { radius, shadow, withAlpha } from '../theme.ts';
 import { useTheme } from '../theme/ThemeContext.tsx';
 import { useI18n } from '../i18n/I18nContext.tsx';
 import { useVoiceInput } from '../hooks/useVoiceInput.ts';
@@ -69,7 +69,7 @@ export function AssistantBar() {
   const cls = result?.classification;
 
   return (
-    <View style={{ backgroundColor: colors.card, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, padding: 16, gap: 10 }}>
+    <View style={[{ backgroundColor: colors.card, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, padding: 16, gap: 10 }, shadow.md]}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
         <View style={{ width: 30, height: 30, borderRadius: 15, backgroundColor: withAlpha(colors.accentPurple, 0.15), alignItems: 'center', justifyContent: 'center' }}>
           <Ionicons name="sparkles" size={16} color={colors.accentPurple} />
