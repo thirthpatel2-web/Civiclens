@@ -9,8 +9,8 @@ from fastapi import APIRouter, Depends
 from app.api.serialize import to_jsonable
 from app.container import AppContainer
 from app.core.authorization import AuthContext, Permission
-from app.core.dependencies import get_container, guard
-from app.core.exceptions import NotConfigured
+from app.core.dependencies import get_container, guard, limited
+from app.core.exceptions import NotConfigured, ValidationFailed
 from app.core.transactions import run_in_uow
 from app.schemas.api import ConsentBody, DeviceBody, PrefsBody, ProfileBody
 
@@ -18,6 +18,7 @@ notifications = APIRouter(prefix="/notifications", tags=["notifications"])
 profiles = APIRouter(prefix="/profiles", tags=["profiles"])
 consent = APIRouter(prefix="/consent", tags=["consent"])
 gis = APIRouter(prefix="/gis", tags=["gis"])
+location = APIRouter(prefix="/location", tags=["location"])
 dashboards = APIRouter(prefix="/dashboards", tags=["dashboards"])
 analytics = APIRouter(prefix="/analytics", tags=["analytics"])
 integrations = APIRouter(prefix="/integrations", tags=["integrations"])
@@ -107,6 +108,14 @@ def directory_listing(ctx: AuthContext = Depends(guard(Permission.GIS_VIEW)), c:
         }
 
     return run_in_uow(c, op)
+
+
+# ---- location (reverse geocoding - real results only, see app.providers.geocoding)
+@location.get("/reverse")
+def reverse_geocode(lat: float, lng: float, ctx: AuthContext = Depends(guard(Permission.COMPLAINT_CREATE)), c: AppContainer = Depends(get_container), _: None = Depends(limited("expensive"))) -> dict:
+    if not (-90 <= lat <= 90 and -180 <= lng <= 180):
+        raise ValidationFailed("Coordinates are outside the valid range.", details={"field": "location"})
+    return {"result": to_jsonable(c.geocoding.reverse(lat, lng))}
 
 
 # ---- gis

@@ -17,7 +17,7 @@ from app.services.ports import ConsentRecord, DraftRecord, ProfileRecord
 from app.services.uow import UowFactory
 
 POLICY_VERSION = "2026-09"
-CONSENT_PURPOSES = ("ai_processing", "data_sharing_government", "document_storage", "notifications_email")
+CONSENT_PURPOSES = ("privacy_policy", "ai_processing", "data_sharing_government", "document_storage", "notifications_email")
 _PHONE = re.compile(r"^\+?[0-9]{10,13}$")
 
 

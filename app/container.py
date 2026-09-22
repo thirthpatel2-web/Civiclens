@@ -22,6 +22,7 @@ from app.integrations.adapters import build_adapters
 from app.integrations.health import IntegrationHealthService
 from app.legal.analysis import LegalAnalysisService
 from app.legal.precedents import PrecedentIndex
+from app.providers.geocoding import NominatimProvider
 from app.providers.push import ExpoPushSender
 from app.providers.speech import BHASHINI_DEFAULT_LANGUAGES, BhashiniConfig, BhashiniProvider
 from app.providers.stt import SpeechToTextProvider, TranslationProvider, WhisperProvider
@@ -147,12 +148,15 @@ class AppContainer:
     admin_setup_token: str = ""
     public_base_url: str = ""
     judgment_search: Any | None = None  # JudgmentSearchPort; real full-text case-law semantic search when configured
+    geocoding: Any = None  # always constructed in __post_init__ (NominatimProvider by default); injectable for tests
 
     def __post_init__(self) -> None:
         s = self.settings
         self.login_throttle, self.mfa_throttle = FailureThrottle(), FailureThrottle()
         self.limiters = {"expensive": SlidingWindowLimiter(30, 60), "upload": SlidingWindowLimiter(20, 60)}
         self.translator = Translator.from_files()
+        if self.geocoding is None:
+            self.geocoding = NominatimProvider()
         from app.i18n.ui_text import UiText
 
         self.ui_text = UiText.load()

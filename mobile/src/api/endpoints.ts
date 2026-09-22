@@ -44,6 +44,7 @@ export function createEndpoints(api: ApiClient) {
     registerPushDevice: (token: string, platform: string) => api.post('/notifications/devices', { token, platform }),
     helplines: (lang: string) => api.get<{ notice: string; items: T.Helpline[]; configured: boolean }>('/emergency/helplines', { lang }),
     radar: (q: { category?: string; ward?: string } = {}) => api.get<T.RadarResponse>('/gis/radar', q),
+    reverseGeocode: (lat: number, lng: number) => api.get<{ result: T.ReverseGeocodeResult | null }>('/location/reverse', { lat, lng }),
     createRti: (body: { subject: string; public_authority: string; questions: string[]; applicant_name: string; applicant_address: string; language?: string }) => api.post<T.RtiApplication>('/rti', body),
     generateRti: (id: string) => api.post<T.RtiApplication>(`/rti/${id}/generate`),
     fileRti: (id: string) => api.post<T.RtiApplication>(`/rti/${id}/file`, {}),

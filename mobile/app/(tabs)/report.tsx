@@ -167,8 +167,20 @@ export default function Report() {
 
       <Card>
         <Text style={{ fontWeight: '600', color: colors.text }}>📍 {t('lbl.location')}</Text>
-        {loc.state.kind === 'ok' ? <Body>{loc.state.lat.toFixed(5)}, {loc.state.lng.toFixed(5)}{loc.state.accuracy ? ` (±${Math.round(loc.state.accuracy)} m)` : ''}</Body>
-          : loc.state.kind === 'denied' ? <InfoBanner tone="warn" message="Location permission was denied. You can still submit without a location." />
+        {loc.state.kind === 'ok' ? (
+          <View style={{ gap: 4 }}>
+            {loc.state.addressLoading ? <Body soft>Looking up the address…</Body>
+              : loc.state.address ? (
+                <View style={{ gap: 2 }}>
+                  {loc.state.address.area ? <Body>{loc.state.address.area}</Body> : null}
+                  <Body soft>
+                    {[loc.state.address.city, loc.state.address.state, loc.state.address.pincode].filter(Boolean).join(', ') || loc.state.address.display_name}
+                  </Body>
+                </View>
+              ) : <Body soft>Address lookup unavailable - the exact coordinates below are still attached.</Body>}
+            <Text style={{ color: colors.textMuted, fontSize: 11 }}>{loc.state.lat.toFixed(5)}, {loc.state.lng.toFixed(5)}{loc.state.accuracy ? ` · accuracy ±${Math.round(loc.state.accuracy)} m` : ''}</Text>
+          </View>
+        ) : loc.state.kind === 'denied' ? <InfoBanner tone="warn" message="Location permission was denied. You can still submit without a location." />
           : loc.state.kind === 'error' ? <ErrorBanner message={loc.state.message} /> : <Body soft>No location attached.</Body>}
         {explainLoc ? <Body soft>Your location is read once, only now, and attached to this complaint so officials can find the problem.</Body> : null}
         <AppButton label="Use my location" kind="secondary" busy={loc.state.kind === 'locating'} onPress={() => { setExplainLoc(true); loc.request(); }} />

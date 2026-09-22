@@ -35,6 +35,7 @@ export interface NotificationItem { id: string; kind: string; title: string; bod
 export interface Helpline { code: string; number: string; name: string; description: string; tel_uri: string; translated: boolean }
 export interface Hotspot { lat: number; lng: number; count: number; severity_score: number; categories: Record<string, number> }
 export interface RadarResponse { total_complaints: number; mappable: number; not_mappable: number; hotspots: Hotspot[]; offices: Array<{ id: string; name: string; lat: number; lng: number }>; privacy: string | null }
+export interface ReverseGeocodeResult { display_name: string | null; area: string | null; city: string | null; state: string | null; pincode: string | null; country: string | null }
 export interface RtiApplication { id: string; reference: string | null; status: string; generated_text: string | null; due_at: string | null; draft: { subject: string; public_authority: string } }
 export interface RtiCategory { code: string; default_records: string[] }
 export interface RtiQuestionsPreview { questions: string[]; records_used: string[] }
