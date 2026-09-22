@@ -73,7 +73,12 @@ def government_panel(c: AppContainer, ctx: Any, complaint_id: str) -> None:
                     if st["last_error"]:
                         ui.label(st["last_error"]).classes("text-xs").style("color: var(--cl-warning);")
                 if st["state"] in ("not_started", "consent_required", "not_configured", "failed"):
-                    ui.button(tr(c, "gov.request_submission"), on_click=lambda p=st["platform"]: (c.government.request(ctx, complaint_id, p), ui.navigate.reload())).props("outline dense")
+
+                    def _request_submission(p: str = st["platform"]) -> None:
+                        c.government.request(ctx, complaint_id, p)
+                        ui.navigate.reload()
+
+                    ui.button(tr(c, "gov.request_submission"), on_click=_request_submission).props("outline dense")
 
 
 def _timeline(c: AppContainer, steps: list[Any]) -> None:
@@ -511,6 +516,10 @@ def register(c: AppContainer) -> None:
                     section_title(tr(c, "lbl.evidence"))
                     ev_list = ui.row().classes("gap-2 flex-wrap w-full")
 
+                    def _drop_evidence(rid: str) -> None:
+                        evidence_records.pop(rid, None)
+                        redraw_evidence()
+
                     def redraw_evidence() -> None:
                         ev_list.clear()
                         with ev_list:
@@ -518,7 +527,7 @@ def register(c: AppContainer) -> None:
                                 with ui.row().classes("cl-badge cl-badge-info items-center gap-2"):
                                     ui.icon("description").classes("text-[14px]")
                                     ui.label(f"{rec.name} · {rec.analysis_status}")
-                                    ui.icon("close").classes("text-[14px] cursor-pointer").on("click", lambda i=rid: (evidence_records.pop(i, None), redraw_evidence()))
+                                    ui.icon("close").classes("text-[14px] cursor-pointer").on("click", lambda i=rid: _drop_evidence(i))
 
                     def on_upload(e: Any) -> None:
                         try:
@@ -624,7 +633,11 @@ def register(c: AppContainer) -> None:
                 data_table([("ref", tr(c, "lbl.reference")), ("title", tr(c, "lbl.title")), ("status", tr(c, "lbl.status")), ("dept", tr(c, "lbl.department")), ("created", tr(c, "lbl.created"))], rows,
                            on_row=lambda r: ui.navigate.to(f"/grievances/{r['id']}"), empty=tr(c, "msg.empty_complaints"))
 
-        with ui.tabs(on_change=lambda e: (state.__setitem__("f", e.value), draw())).props("dense no-caps active-color=primary indicator-color=primary").classes("w-full") as tabs:
+        def _on_filter_change(e: Any) -> None:
+            state["f"] = e.value
+            draw()
+
+        with ui.tabs(on_change=_on_filter_change).props("dense no-caps active-color=primary indicator-color=primary").classes("w-full") as tabs:
             for f in TRACKER_FILTERS:
                 ui.tab(f, label=tr(c, f"filter.{f}"))
         tabs.set_value("all")
@@ -782,11 +795,19 @@ def register(c: AppContainer) -> None:
                         if cd.state != "not_started":
                             tone = {"breached": "danger", "at_risk": "warning"}.get(cd.state, "success")
                             chip(f"Deadline {cd.due_at:%d %b %Y} · {cd.days_remaining} day(s)" + (" (est.)" if cd.is_estimate else ""), color=tone)
+                        def _mark_filed() -> None:
+                            run_in_uow(c, lambda uow: c.rti_for(uow).mark_filed(user.ctx, app_id))
+                            show(app_id)
+
+                        def _mark_answered() -> None:
+                            run_in_uow(c, lambda uow: c.rti_for(uow).mark_responded(user.ctx, app_id))
+                            show(app_id)
+
                         with ui.row().classes("gap-2 flex-wrap"):
                             if a.status.value == "generated":
-                                ui.button(tr(c, "rti.mark_filed"), on_click=lambda: (run_in_uow(c, lambda uow: c.rti_for(uow).mark_filed(user.ctx, app_id)), show(app_id))).props("outline dense")
+                                ui.button(tr(c, "rti.mark_filed"), on_click=_mark_filed).props("outline dense")
                             if a.status.value == "filed":
-                                ui.button(tr(c, "rti.mark_answered"), on_click=lambda: (run_in_uow(c, lambda uow: c.rti_for(uow).mark_responded(user.ctx, app_id)), show(app_id))).props("outline dense")
+                                ui.button(tr(c, "rti.mark_answered"), on_click=_mark_answered).props("outline dense")
                             ui.button(tr(c, "act.download") + " PDF", icon="download", on_click=lambda: download_pdf(app_id)).props("outline dense")
 
                 def download_pdf(app_id: str) -> None:
@@ -993,9 +1014,20 @@ def register(c: AppContainer) -> None:
                 r = await run_with_loading(send_btn, c.assistant.ask, user.ctx, text, conversation_id=state["cid"], language={"en": "English", "hi": "Hindi", "mr": "Marathi", "bn": "Bengali", "ta": "Tamil", "te": "Telugu", "kn": "Kannada"}[lang()])
             except CivicLensError as exc:
                 spinner_row.delete()
+
+                async def _retry() -> None:
+                    # NiceGUI awaits a handler's *return value* when it is directly Awaitable
+                    # (see nicegui.events.handle_event); `lambda: (setattr(...), send())` returned
+                    # a tuple containing the coroutine, not the coroutine itself, so it was never
+                    # detected or awaited - the retry button reset the input and silently did
+                    # nothing else. An async function whose body actually awaits send() fixes both
+                    # the mypy complaint and the real bug behind it.
+                    box.value = text
+                    await send()
+
                 with log:
                     error_banner(exc.message)
-                    ui.button(tr(c, "act.retry"), on_click=lambda: (setattr(box, "value", text), send())).props("flat dense")
+                    ui.button(tr(c, "act.retry"), on_click=_retry).props("flat dense")
                 return
             spinner_row.delete()
             state["cid"] = r["conversation_id"]
@@ -1102,12 +1134,20 @@ def register(c: AppContainer) -> None:
                                 if o["lat"] and o["lng"]:
                                     ui.link(tr(c, "loc.directions"), f"https://www.google.com/maps/dir/?api=1&destination={quote(f'{o['lat']},{o['lng']}')}").classes("text-xs").props("target=_blank")
 
+        def _on_city_change(e: Any) -> None:
+            state["city"] = e.value or ""
+            draw()
+
+        def _on_dept_change(e: Any) -> None:
+            state["dept"] = e.value or ""
+            draw()
+
         ref = c.gis.locator(user.ctx)
         with controls:
             city = ui.select({"": tr(c, "filter.all"), **{x["code"]: x["name"] for x in ref["cities"]}}, value="", label=tr(c, "col.city")).props("outlined dense").classes("w-56")
             dept = ui.select({"": tr(c, "filter.all"), **{d["code"]: d["name"] for d in ref["departments"]}}, value="", label=tr(c, "lbl.department")).props("outlined dense").classes("w-56")
-            city.on_value_change(lambda e: (state.__setitem__("city", e.value or ""), draw()))
-            dept.on_value_change(lambda e: (state.__setitem__("dept", e.value or ""), draw()))
+            city.on_value_change(_on_city_change)
+            dept.on_value_change(_on_dept_change)
         draw()
 
     @page(c, "/interop", "nav.interop")
@@ -1230,18 +1270,28 @@ def register(c: AppContainer) -> None:
             with ui.column().classes("cl-card gap-3 w-full"):
                 section_title(tr(c, "set.privacy_ai"), tr(c, "set.privacy_ai_sub"))
                 consents = c.profiles.consents(user.ctx)
+
+                def _on_consent_change(e: Any, p: str) -> None:
+                    c.profiles.set_consent(user.ctx, p, bool(e.value))
+                    ui.notify(tr(c, "msg.saved"), type="positive")
+
                 for purpose, cstate in consents.items():
-                    ui.switch(purpose.replace("_", " ").capitalize(), value=cstate["granted"], on_change=lambda e, p=purpose: (c.profiles.set_consent(user.ctx, p, bool(e.value)), ui.notify(tr(c, "msg.saved"), type="positive"))).props("color=primary")
+                    ui.switch(purpose.replace("_", " ").capitalize(), value=cstate["granted"], on_change=lambda e, p=purpose: _on_consent_change(e, p)).props("color=primary")
                 divider()
                 ui.label(tr(c, "set.gov_sharing")).classes("text-xs").style("color: var(--cl-fg-subtle);")
                 with ui.row().classes("gap-2 flex-wrap"):
                     for _platform, a in c.adapters.items():
                         chip(f"{a.display_name}: {a.state.value}", color="muted", outline=True)
 
+            def _on_language_change(e: Any) -> None:
+                app.storage.user["lang"] = e.value
+                c.profiles.update(user.ctx, language=e.value)
+                ui.navigate.reload()
+
             with ui.column().classes("cl-card gap-3 w-full"):
                 section_title(tr(c, "set.appearance_language"))
                 ui.select({k: k.upper() for k in c.ui_text.languages}, value=lang(), label=tr(c, "appLanguage"),
-                          on_change=lambda e: (app.storage.user.__setitem__("lang", e.value), c.profiles.update(user.ctx, language=e.value), ui.navigate.reload())).props("outlined dense").classes("w-56")
+                          on_change=_on_language_change).props("outlined dense").classes("w-56")
                 field_hint(tr(c, "set.theme_hint"))
 
             with ui.column().classes("cl-card gap-3 w-full"):
@@ -1253,6 +1303,10 @@ def register(c: AppContainer) -> None:
                 section_title(tr(c, "set.linked_ids"), tr(c, "set.linked_ids_sub"))
                 ids_list = ui.column().classes("gap-2 w-full")
 
+                def _unlink_id(i: str) -> None:
+                    c.master_data.unlink(user.ctx, i)
+                    draw_ids()
+
                 def draw_ids() -> None:
                     ids_list.clear()
                     items = c.master_data.list_mine(user.ctx)
@@ -1262,7 +1316,7 @@ def register(c: AppContainer) -> None:
                         for rec in items:
                             with ui.row().classes("items-center justify-between w-full"):
                                 ui.label(f"{rec.id_type.replace('_', ' ').upper()} · ···{rec.last4 or '----'}").classes("text-sm cl-mono").style("color: var(--cl-fg);")
-                                ui.button(icon="delete_outline", on_click=lambda i=rec.id: (c.master_data.unlink(user.ctx, i), draw_ids())).props("flat dense round color=negative")
+                                ui.button(icon="delete_outline", on_click=lambda i=rec.id: _unlink_id(i)).props("flat dense round color=negative")
 
                 draw_ids()
                 divider()
@@ -1288,6 +1342,10 @@ def register(c: AppContainer) -> None:
                 section_title(tr(c, "set.other_portals"), tr(c, "set.other_portals_sub"))
                 links_list = ui.column().classes("gap-2 w-full")
 
+                def _remove_link(i: str) -> None:
+                    c.external_links.remove(user.ctx, i)
+                    draw_links()
+
                 def draw_links() -> None:
                     links_list.clear()
                     items = c.external_links.list_mine(user.ctx)
@@ -1299,7 +1357,7 @@ def register(c: AppContainer) -> None:
                                 with ui.column().classes("gap-0"):
                                     ui.label(f"{rec.platform} · {rec.external_reference}").classes("text-sm font-medium cl-mono").style("color: var(--cl-fg);")
                                     ui.label(rec.title + (f" — {rec.status_note}" if rec.status_note else "")).classes("text-xs").style("color: var(--cl-fg-muted);")
-                                ui.button(icon="delete_outline", on_click=lambda i=rec.id: (c.external_links.remove(user.ctx, i), draw_links())).props("flat dense round color=negative")
+                                ui.button(icon="delete_outline", on_click=lambda i=rec.id: _remove_link(i)).props("flat dense round color=negative")
 
                 draw_links()
                 divider()
@@ -1322,11 +1380,26 @@ def register(c: AppContainer) -> None:
 
     @page(c, "/notifications", "nav.notifications")
     def notifications(c: AppContainer, user: UiUser) -> None:
-        page_header(tr(c, "nav.notifications"), icon="notifications",
-                    actions=lambda: ui.button(tr(c, "notif.mark_all_read"), on_click=lambda: (run_in_uow(c, lambda uow: c.notifications.mark_all_read(user.ctx, uow.notifications)), ui.navigate.reload())).props("outline dense"))
+        def _mark_all_read() -> None:
+            run_in_uow(c, lambda uow: c.notifications.mark_all_read(user.ctx, uow.notifications))
+            ui.navigate.reload()
+
+        def _render_actions() -> None:
+            # page_header's `actions` is Callable[[], None]: it is called only to build widgets as
+            # a side effect (see the `actions()` call inside `with ui.row(): ...` in
+            # app/ui/components), and previously did `actions=lambda: ui.button(...)`, whose value
+            # is the Button itself, not None.
+            ui.button(tr(c, "notif.mark_all_read"), on_click=_mark_all_read).props("outline dense")
+
+        page_header(tr(c, "nav.notifications"), icon="notifications", actions=_render_actions)
         items = run_in_uow(c, lambda uow: c.notifications.list_for(user.ctx, uow.notifications, limit=100))
         if not items:
             state_panel(icon="notifications_none", title=tr(c, "msg.no_data"))
+
+        def _mark_read(i: str) -> None:
+            run_in_uow(c, lambda uow: c.notifications.mark_read(user.ctx, uow.notifications, i))
+            ui.navigate.reload()
+
         with ui.column().classes("gap-2 w-full"):
             for n in items:
                 with ui.row().classes("cl-card w-full items-start justify-between gap-3").style("" if n.read_at else "background: var(--cl-info-soft); border-color: transparent;"):
@@ -1335,7 +1408,7 @@ def register(c: AppContainer) -> None:
                         ui.label(n.body).classes("text-sm").style("color: var(--cl-fg-muted);")
                         ui.label(n.created_at.strftime("%d %b %Y %H:%M")).classes("text-xs").style("color: var(--cl-fg-subtle);")
                     if not n.read_at:
-                        ui.button(tr(c, "notif.mark_read"), on_click=lambda i=n.id: (run_in_uow(c, lambda uow: c.notifications.mark_read(user.ctx, uow.notifications, i)), ui.navigate.reload())).props("flat dense")
+                        ui.button(tr(c, "notif.mark_read"), on_click=lambda i=n.id: _mark_read(i)).props("flat dense")
 
     @page(c, "/documents", "nav.documents")
     def documents(c: AppContainer, user: UiUser) -> None:
@@ -1365,8 +1438,13 @@ def register(c: AppContainer) -> None:
                 section_title(tr(c, "doc.mine"))
                 data_table([("name", tr(c, "col.name")), ("status", tr(c, "lbl.status")), ("chunks", tr(c, "col.chunks")), ("err", tr(c, "col.error"))], [{"id": d.id, "name": d.name, "status": str(d.status), "chunks": d.chunk_count, "err": d.error or ""} for d in docs])
             failed = [d for d in docs if str(d.status) == "failed"]
+
+            def _retry_ingest(i: str) -> None:
+                run_in_uow(c, lambda uow: c.jobs.enqueue(uow, "document.ingest", {"document_id": i}, f"ingest-retry:{i}:{int(c.clock().timestamp())}"))
+                ui.navigate.reload()
+
             for d in failed:
-                ui.button(f"{tr(c, 'act.retry')} {d.name}", on_click=lambda i=d.id: (run_in_uow(c, lambda uow: c.jobs.enqueue(uow, "document.ingest", {"document_id": i}, f"ingest-retry:{i}:{int(c.clock().timestamp())}")), ui.navigate.reload())).props("outline dense")
+                ui.button(f"{tr(c, 'act.retry')} {d.name}", on_click=lambda i=d.id: _retry_ingest(i)).props("outline dense")
         section_title(tr(c, "doc.search"))
         with ui.row().classes("gap-2 w-full max-w-xl items-center"):
             q = ui.input(tr(c, "doc.search")).props("outlined dense").classes("flex-1")
