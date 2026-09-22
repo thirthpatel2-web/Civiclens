@@ -122,6 +122,11 @@ class AskBody(Strict):
     language: str = "en"  # language code (e.g. "kn"); the answer is composed in that language where the model supports it
 
 
+class RouteBody(Strict):
+    text: str = Field(min_length=1, max_length=2000)
+    ward: str | None = None
+
+
 class SearchBody(Strict):
     query: str = Field(min_length=1, max_length=1000)
 

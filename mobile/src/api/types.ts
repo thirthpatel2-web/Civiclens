@@ -69,6 +69,18 @@ export interface ClassifyPreview {
   routing_explanation: string; needs_manual_triage: boolean;
 }
 
+// ---- the voice/text triage assistant: "which screen does this belong to" -----------------------
+export type AssistantDestination = 'complaint' | 'rti' | 'legal' | 'track' | 'document' | 'map' | 'locator' | 'emergency';
+export interface AssistantRouteResult {
+  destination: AssistantDestination;
+  confidence: number;
+  certain: boolean; // exactly one destination keyword matched - safe to auto-navigate; otherwise show alternatives
+  matched: string[];
+  explanation: string;
+  alternatives: AssistantDestination[];
+  classification?: ClassifyPreview; // present only when destination === 'complaint'
+}
+
 // ---- interoperability layer --------------------------------------------------------------------
 export interface InteropSystem { code: string; label: string }
 export interface FragmentationDiagnostic {

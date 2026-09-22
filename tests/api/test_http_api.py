@@ -153,6 +153,28 @@ class HttpApiTests(unittest.TestCase):
         self.assertEqual(r.status_code, 200, r.text)
         self.assertEqual((r.json()["status"], r.json()["citations"]), ("insufficient_evidence", []))
 
+    def test_assistant_route_sends_an_rti_mention_to_rti_and_a_complaint_to_its_department(self):
+        # This is mobile's only door to IntentRouter/ClassificationService: the web UI calls both
+        # in-process (NiceGUI pages run server-side Python), so a REST client had no route to reach
+        # either at all until this endpoint existed.
+        h = self.signup()
+        rti = self.client.post("/api/v1/assistant/route", json={"text": "I filed an RTI and got no response from the PIO"}, headers=h)
+        self.assertEqual(rti.status_code, 200, rti.text)
+        self.assertEqual(rti.json()["destination"], "rti")
+        self.assertNotIn("classification", rti.json())  # only computed for the complaint destination
+
+        pothole = self.client.post("/api/v1/assistant/route", json={"text": "Big pothole on MG Road near the bus stop"}, headers=h)
+        self.assertEqual(pothole.status_code, 200, pothole.text)
+        body = pothole.json()
+        self.assertEqual(body["destination"], "complaint")
+        self.assertEqual(body["classification"]["category"], "roads")
+        self.assertEqual(body["classification"]["department_code"], "roads")
+
+    def test_assistant_route_requires_auth_and_rejects_empty_text(self):
+        self.assertEqual(self.client.post("/api/v1/assistant/route", json={"text": "pothole"}).status_code, 401)
+        h = self.signup()
+        self.assertEqual(self.client.post("/api/v1/assistant/route", json={"text": ""}, headers=h).status_code, 422)
+
     def test_legal_analyzer_reports_metadata_only_limits(self):
         h = self.signup()
         r = self.client.post("/api/v1/legal/analyze", json={"problem": "Eldeco Housing versus buyer possession delay"}, headers=h)

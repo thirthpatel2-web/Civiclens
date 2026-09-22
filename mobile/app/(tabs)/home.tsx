@@ -3,6 +3,7 @@ import { Pressable, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { AppButton, Body, Card, EmptyState, ErrorBanner, Loading, Screen, StatusBadge } from '../../src/components/ui.tsx';
+import { AssistantBar } from '../../src/components/AssistantBar.tsx';
 import { endpoints } from '../../src/api/instance.ts';
 import type { Complaint } from '../../src/api/types.ts';
 import { useAuth } from '../../src/auth/AuthContext.tsx';
@@ -93,6 +94,8 @@ export default function Home() {
 
       {!online ? <ErrorBanner message="You are offline. Drafts are kept on this device and sent when you reconnect." /> : null}
       {pending + needsAttention > 0 ? (<Card><Body>{pending} waiting to send · {needsAttention} need your attention</Body><AppButton label={t('act.sync')} kind="secondary" onPress={syncNow} busy={syncing} disabled={!online} /></Card>) : null}
+
+      <AssistantBar />
 
       <Text style={{ fontWeight: '800', color: colors.text, fontSize: 15, marginTop: 4 }}>Everything a citizen needs</Text>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>

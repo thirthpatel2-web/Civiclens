@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import type { TextInputProps, ViewStyle } from 'react-native';
 import { MIN_TOUCH, spacing, withAlpha } from '../theme.ts';
@@ -119,6 +119,20 @@ export function StepProgress({ step, total, label }: { step: number; total: numb
         {Array.from({ length: total }).map((_, i) => <View key={i} style={{ flex: 1, height: 5, borderRadius: 3, backgroundColor: i < step ? colors.primary : colors.border }} />)}
       </View>
       <Text style={{ color: colors.textSoft, fontSize: 12, fontWeight: '600' }}>{label}</Text>
+    </View>
+  );
+}
+
+/** A collapsed-by-default "more options" section, so advanced/optional fields don't crowd the primary flow. */
+export function Disclosure({ label, children, defaultOpen }: { label: string; children: React.ReactNode; defaultOpen?: boolean }) {
+  const { colors } = useTheme();
+  const [open, setOpen] = useState(!!defaultOpen);
+  return (
+    <View style={{ gap: 8 }}>
+      <Pressable accessibilityRole="button" accessibilityState={{ expanded: open }} onPress={() => setOpen((o) => !o)} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 32 }}>
+        <Text style={{ color: colors.primary, fontWeight: '700', fontSize: 13 }}>{open ? '▾' : '▸'} {label}</Text>
+      </Pressable>
+      {open ? children : null}
     </View>
   );
 }

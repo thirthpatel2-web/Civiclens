@@ -30,6 +30,7 @@ export function createEndpoints(api: ApiClient) {
     transcribe: (file: T.LocalFile, language: LanguageCode | 'auto') => api.request<T.VoiceResult>('POST', '/voice/transcribe', { form: fileForm('audio', file, { language }), timeoutMs: 120000 }),
 
     ask: (question: string, language: LanguageCode, conversationId?: string | null) => api.post<T.AskResponse>('/assistant/ask', { question, language, conversation_id: conversationId ?? null }),
+    assistantRoute: (text: string, ward?: string | null) => api.post<T.AssistantRouteResult>('/assistant/route', { text, ward: ward ?? null }),
     notifications: () => api.get<{ items: T.NotificationItem[]; unread: number }>('/notifications'),
     markRead: (id: string) => api.post(`/notifications/${id}/read`),
     registerPushDevice: (token: string, platform: string) => api.post('/notifications/devices', { token, platform }),

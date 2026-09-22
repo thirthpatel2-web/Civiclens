@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Linking, Text, View } from 'react-native';
-import { AppButton, Body, Card, EmptyState, ErrorBanner, Field, H1, InfoBanner, Screen } from '../src/components/ui.tsx';
+import { AppButton, Body, Card, EmptyState, ErrorBanner, H1, InfoBanner, Screen } from '../src/components/ui.tsx';
+import { VoiceField } from '../src/components/VoiceField.tsx';
 import { endpoints } from '../src/api/instance.ts';
 import type { LegalAnalysis } from '../src/api/types.ts';
 import { useI18n } from '../src/i18n/I18nContext.tsx';
@@ -29,7 +30,7 @@ export default function Legal() {
     <Screen>
       <H1>{t('nav.legal')}</H1>
       <InfoBanner tone="warn" message={t('msg.metadata_only')} />
-      <Field label={t('caseInputLabel')} value={text} onChangeText={setText} multiline placeholder={t('caseInputPlaceholder')} />
+      <VoiceField label={t('caseInputLabel')} value={text} onChangeText={setText} multiline placeholder={t('caseInputPlaceholder')} />
       <View style={{ flexDirection: 'row', gap: 8 }}>
         <AppButton label={t('act.submit')} onPress={run} busy={busy} disabled={text.trim().length < 5} />
         <AppButton
