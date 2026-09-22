@@ -110,8 +110,14 @@ def main() -> int:
     try:
         import pytesseract
 
+        # The app runs tesseract with `--tessdata-dir <TESSDATA_DIR>`, so the languages that
+        # actually matter live there - not in the binary's default tessdata. Querying without it
+        # reported only the stock "eng, osd" and made a correctly configured install look broken.
+        if tessdata := os.environ.get("TESSDATA_DIR", ""):
+            os.environ.setdefault("TESSDATA_PREFIX", tessdata)
         langs = pytesseract.get_languages()
-        rows.append(Row("OCR engine (tesseract)", "PASS", f"v{pytesseract.get_tesseract_version()} languages: {', '.join(langs)}"))
+        where = f" from {tessdata}" if tessdata else " (default tessdata)"
+        rows.append(Row("OCR engine (tesseract)", "PASS", f"v{pytesseract.get_tesseract_version()} languages: {', '.join(langs)}{where}"))
     except Exception:
         rows.append(Row("OCR engine (tesseract)", "MISSING", "pytesseract/tesseract binary not found (OCR_PROVIDER=tesseract will be NOT_CONFIGURED)"))
     try:

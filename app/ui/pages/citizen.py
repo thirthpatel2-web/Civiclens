@@ -328,7 +328,7 @@ def register(c: AppContainer) -> None:
     def report(c: AppContainer, user: UiUser) -> None:
         crid = uuid.uuid4().hex
         evidence_records: dict[str, Any] = {}
-        qp = ui.context.client.request.query_params if ui.context.client.request else {}  # type: ignore[union-attr]
+        qp = ui.context.client.request.query_params if ui.context.client.request else {}
         pre_text = (qp.get("text") or "")[:1500]
         pre_voice = qp.get("voice") or None
 
@@ -416,6 +416,10 @@ def register(c: AppContainer) -> None:
                 ui.on("cl_geo_error", on_geo_error)
                 q_files = ui.row().classes("gap-2 flex-wrap w-full")
 
+                def _drop_evidence(rid: str) -> None:
+                    evidence_records.pop(rid, None)
+                    q_redraw()
+
                 def q_redraw() -> None:
                     q_files.clear()
                     with q_files:
@@ -423,7 +427,7 @@ def register(c: AppContainer) -> None:
                             with ui.row().classes("cl-badge cl-badge-info items-center gap-2"):
                                 ui.icon("description").classes("text-[14px]")
                                 ui.label(rec.name)
-                                ui.icon("close").classes("text-[14px] cursor-pointer").on("click", lambda i=rid: (evidence_records.pop(i, None), q_redraw()))
+                                ui.icon("close").classes("text-[14px] cursor-pointer").on("click", lambda i=rid: _drop_evidence(i))
 
                 def q_upload(e: Any) -> None:
                     try:
@@ -806,7 +810,7 @@ def register(c: AppContainer) -> None:
 
         page_header(tr(c, "nav.legal"), icon="balance")
         info_banner(tr(c, "msg.metadata_only"), "orange")
-        _qp = ui.context.client.request.query_params if ui.context.client.request else {}  # type: ignore[union-attr]
+        _qp = ui.context.client.request.query_params if ui.context.client.request else {}
         state: dict[str, Any] = {"recording": False}
         caps = c.voice.capabilities()
 
@@ -896,7 +900,7 @@ def register(c: AppContainer) -> None:
             rec = await run_with_loading(analyze_btn, c.legal.analyze, user.ctx, text)  # persisted + audited
             render(SimpleNamespace(**rec.result))
 
-        opened = ui.context.client.request.query_params.get("open") if ui.context.client.request else None  # type: ignore[union-attr]
+        opened = ui.context.client.request.query_params.get("open") if ui.context.client.request else None
         if opened:
             render(SimpleNamespace(**c.legal.get_mine(user.ctx, opened).result))
 
@@ -967,7 +971,7 @@ def register(c: AppContainer) -> None:
             with ui.row().classes("q-pa-sm gap-2 items-center w-full cl-hairline"):
                 box = ui.input(placeholder=tr(c, "chatbotPlaceholder")).props("outlined dense rounded").classes("flex-1")
                 send_btn = ui.button(icon="send", on_click=lambda: send()).props("round unelevated color=primary")
-        q0 = ui.context.client.request.query_params.get("q") if ui.context.client.request else None  # type: ignore[union-attr]
+        q0 = ui.context.client.request.query_params.get("q") if ui.context.client.request else None
         if q0:
             box.value = q0
 
@@ -1290,7 +1294,7 @@ def register(c: AppContainer) -> None:
                 ui.notify(tr(c, "doc.not_configured"), type="negative")
                 return
             try:
-                def op(uow):  # type: ignore[no-untyped-def]
+                def op(uow):
                     doc = c.ingestor_factory(uow).upload(user.ctx.user_id, e.name, e.content.read(), max_bytes=c.settings.max_upload_bytes, declared_mime=e.type)
                     job, _ = c.jobs.enqueue(uow, "document.ingest", {"document_id": doc.id}, f"ingest:{doc.id}")
                     return job
