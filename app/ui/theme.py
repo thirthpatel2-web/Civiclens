@@ -12,102 +12,113 @@ the palette is retuned later every call site updates itself.
 
 from __future__ import annotations
 
-FONT_STACK = "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
+# Typography follows the mobile app's design system (mobile/legacy-prototype/src/constants/theme.js):
+# Fraunces, an editorial serif with real character, carries headlines and hero moments - the weight
+# you'd expect on a statute or a formal notice - and Manrope carries all UI/body text. The previous
+# Inter-on-slate combination was the generic SaaS default and gave the product no identity of its own.
+FONT_STACK = "'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
+FONT_DISPLAY = "'Fraunces', 'Iowan Old Style', Georgia, 'Times New Roman', serif"
 FONT_MONO = "'JetBrains Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace"
 
 # ---------------------------------------------------------------------------------------------
 # Colour tokens
 # ---------------------------------------------------------------------------------------------
 
+# "Rajmudra" palette, shared with the mobile app's design system: the deep indigo of an official
+# seal and judicial robes, the warm sandstone/terracotta of government buildings, and turmeric ochre
+# from official ceremony - rather than the blue-on-slate kit every admin dashboard ships with.
+# Backgrounds and text are warm (ledger paper), never clinical cool grey.
 LIGHT: dict[str, str] = {
-    "bg": "#F5F7FA",
+    "bg": "#FAF7EF",
     "surface": "#FFFFFF",
-    "surface-alt": "#EEF1F6",
-    "surface-hover": "#E7EBF2",
-    "fg": "#121826",
-    "fg-muted": "#5B6472",
-    "fg-subtle": "#8A93A3",
-    "border": "#E2E6ED",
-    "border-strong": "#C7CEDA",
-    "primary": "#1E3A5F",
-    "primary-strong": "#12233B",
-    "primary-soft": "#E8EEF5",
+    "surface-alt": "#F3EEE1",
+    "surface-hover": "#EAE3D2",
+    "fg": "#201E13",
+    "fg-muted": "#4A4632",
+    "fg-subtle": "#79735A",
+    "border": "#E7DFC9",
+    "border-strong": "#D6CCAE",
+    "primary": "#2A3785",
+    "primary-strong": "#1D2760",
+    "primary-soft": "#E7E9F5",
     "primary-fg": "#FFFFFF",
-    "secondary": "#0E7C86",
-    "secondary-soft": "#E3F3F3",
-    "success": "#1B8A57",
-    "success-soft": "#E5F5EC",
-    "warning": "#96630F",
-    "warning-soft": "#FBF0DD",
-    "danger": "#B3261E",
-    "danger-soft": "#FBE8E7",
-    "info": "#2563AA",
-    "info-soft": "#E7F0FA",
-    "ai": "#5B4FD6",
-    "ai-soft": "#EFEDFC",
-    "emergency": "#C22A1B",
-    "emergency-soft": "#FBE7E4",
-    "muted": "#667085",
-    "muted-soft": "#EEF0F3",
-    "sidebar": "#0F1B2E",
-    "sidebar-fg": "#C7D0DE",
-    "sidebar-fg-muted": "#8592A6",
-    "sidebar-hover": "#182A45",
-    "sidebar-active": "#1E3A5F",
-    "sidebar-border": "rgba(255,255,255,0.08)",
-    "glow-primary": "rgba(30,58,95,.38)",
-    "glow-ai": "rgba(91,79,214,.32)",
-    "glass-bg": "rgba(255,255,255,.66)",
-    "glass-border": "rgba(255,255,255,.5)",
+    "secondary": "#1F7A6D",
+    "secondary-soft": "#E2F0ED",
+    "success": "#1F7A4C",
+    "success-soft": "#E3F1E8",
+    "warning": "#9C7025",
+    "warning-soft": "#F7EEDC",
+    "danger": "#B23A3A",
+    "danger-soft": "#F9E7E5",
+    "info": "#28728A",
+    "info-soft": "#E3EFF3",
+    "ai": "#654A96",
+    "ai-soft": "#EDE8F5",
+    "emergency": "#9C3A50",
+    "emergency-soft": "#F8E6E9",
+    "muted": "#79735A",
+    "muted-soft": "#F0EADB",
+    "sidebar": "#1D2760",
+    "sidebar-fg": "#D8D3C2",
+    "sidebar-fg-muted": "#9C9683",
+    "sidebar-hover": "#28336F",
+    "sidebar-active": "#3547A8",
+    "sidebar-border": "rgba(242,239,230,0.10)",
+    "glow-primary": "rgba(42,55,133,.30)",
+    "glow-ai": "rgba(101,74,150,.30)",
+    "glass-bg": "rgba(255,255,255,.70)",
+    "glass-border": "rgba(255,255,255,.60)",
 }
 
+# Dark mode is indigo-charcoal, not neutral slate, and text stays warm off-white (ledger paper).
 DARK: dict[str, str] = {
-    "bg": "#0C121C",
-    "surface": "#141C2B",
-    "surface-alt": "#1B2536",
-    "surface-hover": "#233047",
-    "fg": "#E7EAF1",
-    "fg-muted": "#9AA5B4",
-    "fg-subtle": "#6B7688",
-    "border": "rgba(255,255,255,0.09)",
-    "border-strong": "rgba(255,255,255,0.17)",
-    "primary": "#5F90C7",
-    "primary-strong": "#7DA8D8",
-    "primary-soft": "#1C2E45",
-    "primary-fg": "#0A1220",
-    "secondary": "#3FBAC2",
-    "secondary-soft": "#123336",
-    "success": "#49C48C",
-    "success-soft": "#123626",
-    "warning": "#E3AE49",
-    "warning-soft": "#3A2C11",
-    "danger": "#E5695D",
-    "danger-soft": "#3B1D1A",
-    "info": "#6BA8E0",
-    "info-soft": "#152A3E",
-    "ai": "#9A8CFF",
-    "ai-soft": "#231F3F",
-    "emergency": "#E5715F",
-    "emergency-soft": "#3A1E19",
-    "muted": "#8B96A8",
-    "muted-soft": "#1D2635",
-    "sidebar": "#080D16",
-    "sidebar-fg": "#B7C1D1",
-    "sidebar-fg-muted": "#6E7A8D",
-    "sidebar-hover": "#131E30",
-    "sidebar-active": "#20385A",
-    "sidebar-border": "rgba(255,255,255,0.06)",
-    "glow-primary": "rgba(95,144,199,.5)",
-    "glow-ai": "rgba(154,140,255,.55)",
-    "glass-bg": "rgba(20,28,43,.62)",
-    "glass-border": "rgba(255,255,255,.10)",
+    "bg": "#0B0E1A",
+    "surface": "#12162A",
+    "surface-alt": "#1B2140",
+    "surface-hover": "#262E52",
+    "fg": "#F2EFE6",
+    "fg-muted": "#C7C2AF",
+    "fg-subtle": "#8D8874",
+    "border": "rgba(242,239,230,0.10)",
+    "border-strong": "rgba(242,239,230,0.20)",
+    "primary": "#5568D6",
+    "primary-strong": "#7C8CE8",
+    "primary-soft": "#1E2542",
+    "primary-fg": "#0B0E1A",
+    "secondary": "#2E9E8F",
+    "secondary-soft": "#10322F",
+    "success": "#2E9E63",
+    "success-soft": "#11301F",
+    "warning": "#BE8A2E",
+    "warning-soft": "#33260D",
+    "danger": "#C24545",
+    "danger-soft": "#34191A",
+    "info": "#3B8FA8",
+    "info-soft": "#122C34",
+    "ai": "#9B7FD4",
+    "ai-soft": "#221A36",
+    "emergency": "#B0435C",
+    "emergency-soft": "#331620",
+    "muted": "#8D8874",
+    "muted-soft": "#1B2140",
+    "sidebar": "#080B14",
+    "sidebar-fg": "#D3CEBD",
+    "sidebar-fg-muted": "#8D8874",
+    "sidebar-hover": "#141A33",
+    "sidebar-active": "#2A3785",
+    "sidebar-border": "rgba(242,239,230,0.07)",
+    "glow-primary": "rgba(85,104,214,.45)",
+    "glow-ai": "rgba(155,127,212,.50)",
+    "glass-bg": "rgba(18,22,42,.66)",
+    "glass-border": "rgba(242,239,230,.10)",
 }
 
 RADIUS = {"xs": "6px", "sm": "8px", "md": "12px", "lg": "16px", "xl": "22px", "pill": "999px"}
 
+# Shadows are tinted with the warm ink colour, not cold blue-grey, so cards sit on paper.
 SHADOW = {
-    "light-soft": "0 1px 2px rgba(16,24,40,.05), 0 6px 16px -8px rgba(16,24,40,.12)",
-    "light-lift": "0 2px 8px rgba(16,24,40,.08), 0 20px 36px -18px rgba(16,24,40,.22)",
+    "light-soft": "0 1px 2px rgba(32,30,19,.05), 0 6px 16px -8px rgba(32,30,19,.14)",
+    "light-lift": "0 2px 8px rgba(32,30,19,.09), 0 20px 36px -18px rgba(32,30,19,.24)",
     "dark-soft": "0 1px 2px rgba(0,0,0,.35), 0 6px 18px -8px rgba(0,0,0,.5)",
     "dark-lift": "0 2px 10px rgba(0,0,0,.4), 0 22px 40px -18px rgba(0,0,0,.6)",
 }
@@ -173,7 +184,7 @@ def _quasar_colors(mode: str) -> str:
     return "\n".join(f"  --q-{name}: {value}{bang};" for name, value in pairs.items())
 
 
-FONT_IMPORT = "@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');"
+FONT_IMPORT = "@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');"
 
 CSS = f"""
 {FONT_IMPORT}
@@ -184,6 +195,7 @@ CSS = f"""
   --cl-shadow-soft: {SHADOW["light-soft"]};
   --cl-shadow-lift: {SHADOW["light-lift"]};
   --cl-font: {FONT_STACK};
+  --cl-font-display: {FONT_DISPLAY};
   --cl-font-mono: {FONT_MONO};
   --cl-gradient-brand: linear-gradient(135deg, var(--cl-primary-strong) 0%, var(--cl-primary) 45%, var(--cl-ai) 100%);
   --cl-gradient-ai: linear-gradient(135deg, var(--cl-ai) 0%, var(--cl-secondary) 100%);
@@ -197,21 +209,51 @@ body.body--dark {{
 {_vars(DARK, important=True)}
   --cl-shadow-soft: {SHADOW["dark-soft"]} !important;
   --cl-shadow-lift: {SHADOW["dark-lift"]} !important;
+  /* On near-black the light-mode brand ramp reads as muddy indigo, so the dark ramp starts from
+     brighter stops - the hero wordmark is gradient-clipped text and needs the extra luminance. */
+  --cl-gradient-brand: linear-gradient(135deg, #9FB0FF 0%, #7C8CE8 45%, #C2A6F5 100%) !important;
 {_quasar_colors("dark")}
 }}
 
 /* ---- base ------------------------------------------------------------------------------- */
 * {{ box-sizing: border-box; }}
-html, body {{ background: var(--cl-bg); }}
+/* ``html`` carries the base colour and ``body`` stays transparent on purpose: a negative-z-index
+   element paints *behind* its parent's own background, so an opaque body would hide ``.cl-aurora``
+   (z-index -1) entirely - which is what kept the gradient mesh and blobs invisible. With the colour
+   on ``html`` it propagates to the canvas and the aurora paints above it, still below all content. */
+html {{ background: {LIGHT["bg"]}; }}
+/* Quasar toggles ``body--dark`` on <body>, which ``html`` can never match with a descendant
+   selector, so the canvas colour is switched explicitly - via :has() for an in-app theme toggle and
+   via the media query for a dark OS on first paint. Without this the canvas stays cream while the
+   content renders dark, and the aurora shows through as a light background under dark cards. */
+html:has(body.body--dark) {{ background: {DARK["bg"]}; }}
+@media (prefers-color-scheme: dark) {{ html {{ background: {DARK["bg"]}; }} }}
+@media (prefers-color-scheme: dark) {{ html:has(body:not(.body--dark)) {{ background: {LIGHT["bg"]}; }} }}
 body {{
-  background: var(--cl-bg) !important;
+  background: transparent !important;
   color: var(--cl-fg) !important;
   font-family: var(--cl-font);
   -webkit-font-smoothing: antialiased;
   transition: background-color .16s ease, color .16s ease;
 }}
-.q-page {{ background: var(--cl-bg); }}
-a {{ color: var(--cl-primary); }}
+/* These must stay transparent: ``.cl-aurora`` is a fixed layer at z-index -1, so any opaque
+   background on the page wrapper paints straight over the gradient mesh and blobs and the whole
+   decorative background silently disappears. ``body`` keeps the solid colour as the base layer. */
+.q-page, .q-page-container, .q-layout {{ background: transparent; }}
+/* Default browser link styling (pure blue + permanent underline) is one of the strongest "unstyled
+   page" tells. Quasar's stylesheet is injected after this one, so plain ``a`` rules lose the
+   cascade - hence the raised specificity and !important. ``.q-btn``/``.q-item`` are excluded because
+   Quasar renders some buttons and nav rows as anchors and they must keep their own styling. */
+body a:not(.q-btn):not(.q-item):not(.q-tab) {{
+  color: var(--cl-primary) !important; text-decoration: none !important; transition: color .15s ease;
+}}
+body a:not(.q-btn):not(.q-item):not(.q-tab):hover, body a:not(.q-btn):not(.q-item):not(.q-tab):focus-visible {{
+  text-decoration: underline !important; text-underline-offset: 3px;
+}}
+body.body--dark a:not(.q-btn):not(.q-item):not(.q-tab) {{ color: var(--cl-primary-strong) !important; }}
+/* Editorial serif for titles and headline numbers only; all UI/body text stays in Manrope, which
+   is far more legible at small sizes. ``cl-title`` is applied by page_header/section_title. */
+.cl-title, .cl-hero-title, .cl-hero-stat-n, .cl-stat-value {{ font-family: var(--cl-font-display); font-weight: 600; letter-spacing: -.015em; }}
 ::selection {{ background: var(--cl-primary-soft); color: var(--cl-primary-strong); }}
 .cl-mono {{ font-family: var(--cl-font-mono); }}
 
@@ -340,7 +382,7 @@ CSS += """
 
 /* ---- animated gradient-mesh background (auth pages, landing) --------------------------------- */
 .cl-aurora {
-  position: fixed; inset: 0; z-index: -1; overflow: hidden; background: var(--cl-bg);
+  position: fixed; inset: 0; z-index: -1; overflow: hidden; background: transparent;
 }
 .cl-aurora::after {
   content: ""; position: absolute; inset: -10%;
@@ -436,8 +478,8 @@ body.body--dark .cl-blob { filter: blur(80px); opacity: .55; }
 body.body--dark .cl-segment-item.cl-on.cl-official { background: linear-gradient(135deg, var(--cl-warning) 0%, var(--cl-emergency) 100%); }
 
 /* ---- hero (landing) -------------------------------------------------------------------------- */
-.cl-hero { text-align: center; padding: 64px 20px 28px; }
-.cl-hero-title { font-size: clamp(2.5rem, 7vw, 4.25rem); font-weight: 800; letter-spacing: -.04em; line-height: 1.02; }
+.cl-hero { text-align: center; padding: 40px 20px 20px; }
+.cl-hero-title { font-size: clamp(2.5rem, 7vw, 4.25rem); font-weight: 700; letter-spacing: -.03em; line-height: 1.04; }
 .cl-hero-sub { font-size: clamp(1rem, 2.2vw, 1.18rem); line-height: 1.6; color: var(--cl-fg-muted); max-width: 58ch; }
 .cl-eyebrow {
   display: inline-flex; align-items: center; gap: 8px; padding: 6px 14px; border-radius: var(--cl-radius-pill);
@@ -445,7 +487,7 @@ body.body--dark .cl-segment-item.cl-on.cl-official { background: linear-gradient
   background: var(--cl-ai-soft); color: var(--cl-ai); border: 1px solid color-mix(in srgb, var(--cl-ai) 24%, transparent);
 }
 .cl-hero-strip { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px 28px; }
-.cl-hero-stat-n { font-size: 1.6rem; font-weight: 800; letter-spacing: -.02em; color: var(--cl-fg); line-height: 1.1; }
+.cl-hero-stat-n { font-size: 1.75rem; font-weight: 700; letter-spacing: -.02em; color: var(--cl-fg); line-height: 1.1; }
 .cl-hero-stat-l { font-size: .74rem; font-weight: 500; color: var(--cl-fg-subtle); text-transform: uppercase; letter-spacing: .07em; }
 
 /* ---- feature tiles (landing + assistant) ------------------------------------------------------ */

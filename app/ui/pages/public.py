@@ -45,7 +45,10 @@ def _login_form(c: AppContainer, *, privileged: bool, allowed: tuple[Role, ...] 
             chip_style = "width:52px; height:52px;" + (f" background: {accent};" if accent else "")
             with ui.element("div").classes("cl-brand-chip").style(chip_style):
                 ui.icon(icon or ("admin_panel_settings" if privileged else "account_balance")).classes("text-[26px]")
-            ui.label(heading or tr(c, "brand")).classes("text-lg font-bold q-mt-sm cl-gradient-text")
+            # An accented door (the officer/admin desks) paints its heading in that accent; painting
+            # it with the citizen brand ramp would make the two portals read as the same desk.
+            head = ui.label(heading or tr(c, "brand")).classes("text-lg font-bold q-mt-sm cl-title")
+            head.classes("cl-gradient-text") if not accent else head.style("background: " + accent + "; -webkit-background-clip: text; background-clip: text; color: transparent;")
             ui.label(subheading or (tr(c, "nav.administration") if privileged else tr(c, "appTagline"))).classes("text-xs text-center").style("color: var(--cl-fg-muted); max-width: 34ch;")
         divider()
         with ui.column().classes("w-full gap-3 q-mt-md"):
@@ -124,6 +127,15 @@ def _portal_switcher(c: AppContainer, current: str) -> None:
                 el.on("click", lambda r=route: ui.navigate.to(r))
 
 
+def _landing_heading(title: str, subtitle: str | None = None) -> None:
+    """Centred section heading for the landing page. ``section_title`` renders a small left-aligned
+    uppercase label, which reads as a stray micro-label next to centred content on a wide hero page."""
+    with ui.column().classes("items-center gap-1 w-full"):
+        ui.label(title).classes("cl-title text-center").style("font-size: clamp(1.4rem, 3vw, 1.9rem); color: var(--cl-fg);")
+        if subtitle:
+            ui.label(subtitle).classes("text-sm text-center").style("color: var(--cl-fg-muted); max-width: 52ch;")
+
+
 def _tile(icon: str, title: str, body: str, *, route: str | None = None) -> None:
     col = ui.column().classes("cl-glass cl-tile" + (" cl-card-hover" if route else ""))
     with col:
@@ -158,22 +170,24 @@ def register(c: AppContainer) -> None:
                         ui.label(value).classes("cl-hero-stat-n")
                         ui.label(tr(c, label_key)).classes("cl-hero-stat-l")
 
-        with ui.column().classes("cl-page q-py-xl gap-4 items-center"):
-            section_title(tr(c, "land.how"))
-            with ui.row().classes("gap-3 w-full flex-wrap justify-center q-mt-sm items-stretch"):
+        with ui.column().classes("cl-page q-py-lg gap-4 items-center"):
+            _landing_heading(tr(c, "land.how"))
+            with ui.row().classes("gap-3 w-full flex-wrap justify-center items-stretch"):
                 steps = [("edit_note", "land.step_report"), ("smart_toy", "land.step_analyse"), ("alt_route", "land.step_route"), ("task_alt", "land.step_resolve")]
                 for i, (icon, key) in enumerate(steps):
                     with ui.row().classes("items-center gap-3"):
-                        with ui.column().classes("cl-glass items-center gap-2").style("width: 168px; padding: 18px;"):
+                        with ui.column().classes("cl-glass items-center justify-center gap-2").style("width: 172px; min-height: 130px; padding: 18px;"):
                             with ui.element("div").classes("cl-brand-chip").style("width:40px; height:40px;"):
                                 ui.icon(icon).classes("text-[20px]")
                             ui.label(tr(c, key)).classes("text-sm font-medium text-center").style("color: var(--cl-fg);")
                         if i < len(steps) - 1:
                             ui.icon("arrow_forward").classes("gt-xs").style("color: var(--cl-fg-subtle);")
 
-        with ui.column().classes("cl-page q-py-xl gap-4 items-center"):
-            section_title(tr(c, "land.everything"))
-            with ui.row().classes("gap-4 justify-center flex-wrap q-mt-sm items-stretch"):
+        # The tile rows are width-capped so they break 3-per-row instead of leaving a single
+        # orphaned tile centred on a second line.
+        with ui.column().classes("cl-page q-py-lg gap-4 items-center"):
+            _landing_heading(tr(c, "land.everything"))
+            with ui.row().classes("gap-4 justify-center flex-wrap items-stretch").style("max-width: 720px;"):
                 _tile("record_voice_over", tr(c, "nav.assistant"), tr(c, "land.t_assistant"), route="/login")
                 _tile("add_circle", tr(c, "nav.report"), tr(c, "land.t_report"), route="/login")
                 _tile("gavel", tr(c, "nav.rti"), tr(c, "land.t_rti"), route="/login")
@@ -181,13 +195,13 @@ def register(c: AppContainer) -> None:
                 _tile("map", tr(c, "nav.gis"), tr(c, "land.t_gis"), route="/login")
                 _tile("hub", tr(c, "nav.interop"), tr(c, "land.t_interop"), route="/login")
 
-        with ui.column().classes("cl-page q-py-xl gap-4 items-center q-mb-xl"):
-            section_title(tr(c, "land.for_officials"), tr(c, "land.for_officials_sub"))
-            with ui.row().classes("gap-4 justify-center flex-wrap q-mt-sm items-stretch"):
+        with ui.column().classes("cl-page q-py-lg gap-4 items-center q-mb-lg"):
+            _landing_heading(tr(c, "land.for_officials"), tr(c, "land.for_officials_sub"))
+            with ui.row().classes("gap-4 justify-center flex-wrap items-stretch").style("max-width: 720px;"):
                 _tile("inbox", tr(c, "nav.officer_queue"), tr(c, "land.t_queue"))
                 _tile("timer", tr(c, "nav.sla"), tr(c, "land.t_sla"))
                 _tile("search", tr(c, "nav.investigations"), tr(c, "land.t_investigations"))
-            ui.button(tr(c, "portal.official_cta"), icon="account_balance", on_click=lambda: ui.navigate.to("/officer/login")).props("outline size=lg q-mt-md").style("color: var(--cl-warning);")
+            ui.button(tr(c, "portal.official_cta"), icon="account_balance", on_click=lambda: ui.navigate.to("/officer/login")).props("outline size=lg").classes("q-mt-sm").style("color: var(--cl-warning);")
 
     @page(c, "/login", "act.sign_in", public=True, shell_on=False)
     def login(c: AppContainer, user: UiUser | None) -> None:

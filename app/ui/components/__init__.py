@@ -40,7 +40,7 @@ def page_header(title: str, subtitle: str | None = None, *, icon: str | None = N
                 with ui.element("div").classes("cl-stat-icon bg-primary-soft").style("background: var(--cl-primary-soft); color: var(--cl-primary);"):
                     ui.icon(icon).classes("text-[20px]")
             with ui.column().classes("gap-0"):
-                ui.label(title).classes("text-xl font-semibold").style("color: var(--cl-fg); letter-spacing: -.01em;")
+                ui.label(title).classes("text-xl font-semibold cl-title").style("color: var(--cl-fg);")
                 if subtitle:
                     ui.label(subtitle).classes("text-sm").style("color: var(--cl-fg-muted); max-width: 60ch;")
         if actions:
