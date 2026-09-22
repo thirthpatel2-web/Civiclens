@@ -7,7 +7,7 @@ import { useAuth } from '../../src/auth/AuthContext.tsx';
 import { ApiError, NetworkError } from '../../src/api/errors.ts';
 import { IS_CONFIGURED, IS_INSECURE } from '../../src/config.ts';
 import { useI18n } from '../../src/i18n/I18nContext.tsx';
-import { radius, spacing, withAlpha } from '../../src/theme.ts';
+import { radius, shadow, spacing, withAlpha } from '../../src/theme.ts';
 import { useTheme } from '../../src/theme/ThemeContext.tsx';
 
 type Portal = 'citizen' | 'official';
@@ -39,7 +39,7 @@ export default function Login() {
   return (
     <Screen>
       <View style={{ alignItems: 'center', gap: 4, marginBottom: spacing.sm }}>
-        <View style={{ width: 60, height: 60, borderRadius: 30, backgroundColor: colors.card, borderWidth: 2, borderColor: colors.primary, alignItems: 'center', justifyContent: 'center' }}>
+        <View style={[{ width: 60, height: 60, borderRadius: 30, backgroundColor: colors.card, borderWidth: 2, borderColor: colors.primary, alignItems: 'center', justifyContent: 'center' }, shadow.sm]}>
           <Ionicons name="shield-checkmark" size={30} color={colors.primary} />
         </View>
         <H1>{t('brand')}</H1>
@@ -50,7 +50,7 @@ export default function Login() {
 
       {/* Dual portal switcher: same real backend underneath both tabs - the server (not this tab)
           decides your account's actual role and where you land after sign-in. */}
-      <View style={{ flexDirection: 'row', backgroundColor: colors.card, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, padding: 4, gap: 4 }}>
+      <View style={[{ flexDirection: 'row', backgroundColor: colors.card, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, padding: 4, gap: 4 }, shadow.sm]}>
         {(['citizen', 'official'] as Portal[]).map((p) => {
           const sel = portal === p;
           const c = p === 'citizen' ? colors.primary : colors.accentSaffron;
