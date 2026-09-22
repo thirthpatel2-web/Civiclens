@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import builtins
 import re
 import uuid
 from collections.abc import Callable
@@ -154,8 +155,16 @@ class DraftService:
                 return d
             payload, crid = dict(d.payload), d.client_request_id
         try:
-            allowed = {k: payload.get(k) for k in ("title", "description", "language", "category", "complaint_type", "ward", "lat", "lng", "address", "city") if payload.get(k) not in (None, "")}
-            result = self._complaints.create(ctx, ComplaintInput(client_request_id=crid, evidence_ids=list(payload.get("evidence_ids") or []), **allowed))
+            # title/description are ComplaintInput's only required (non-Optional, no-default)
+            # fields, so they are pulled out and validated explicitly rather than folded into the
+            # **allowed unpack below: a draft saved before either was typed in would otherwise
+            # reach ComplaintInput(**allowed) missing a required argument and crash with an
+            # unhandled TypeError instead of the ValidationFailed this method already handles.
+            title, description = str(payload.get("title") or "").strip(), str(payload.get("description") or "").strip()
+            if not title or not description:
+                raise ValidationFailed("A draft needs both a title and a description before it can be submitted.")
+            allowed: dict[str, Any] = {k: payload[k] for k in ("language", "category", "complaint_type", "ward", "lat", "lng", "address", "city") if payload.get(k) not in (None, "")}
+            result = self._complaints.create(ctx, ComplaintInput(title=title, description=description, client_request_id=crid, evidence_ids=list(payload.get("evidence_ids") or []), **allowed))
             status, error, ref = "synced", None, result.complaint.reference
         except ValidationFailed as exc:
             status, error, ref = "failed", exc.message + (f" {exc.details}" if exc.details else ""), None
@@ -166,7 +175,13 @@ class DraftService:
             uow.commit()
         return d
 
-    def sync_all(self, ctx: AuthContext) -> list[DraftRecord]:
+    def sync_all(self, ctx: AuthContext) -> builtins.list[DraftRecord]:
+        # `builtins.list`, not `list`: this class defines its own method named `list` above, and
+        # with `from __future__ import annotations` mypy resolves the bare name in a later method's
+        # annotation against the class's own namespace first, so it saw the method, not the type.
+        # The `def list(...) -> list[...]` naming convention itself is deliberate and used the same
+        # way across most services in this codebase, so it stays; only this one annotation needs
+        # the qualified name.
         return [self.sync(ctx, d.id) for d in self.list(ctx) if d.status == "pending_sync"]
 
     def discard(self, ctx: AuthContext, draft_id: str) -> None:

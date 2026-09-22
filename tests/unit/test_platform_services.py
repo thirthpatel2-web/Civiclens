@@ -508,6 +508,20 @@ class ProfileAndDraftTests(unittest.TestCase):
         self.assertEqual(fixed.status, "draft")
         self.assertEqual(self.drafts.sync(CIT, fixed.id).status, "synced")
 
+    def test_sync_of_a_draft_missing_a_required_field_fails_gracefully_not_a_crash(self):
+        # A draft is free-form (saved as the citizen types), so title/description need not be
+        # present yet. ComplaintInput requires both with no default; syncing before either exists
+        # must report the same "failed" status as any other validation problem, not raise an
+        # unhandled TypeError from a missing constructor argument.
+        no_description = self.drafts.save(CIT, "complaint", {"title": "Pothole on MG Road"}, "client-req-0005")
+        r = self.drafts.sync(CIT, no_description.id)
+        self.assertEqual(r.status, "failed")
+        self.assertIn("title and a description", r.error)
+        no_title = self.drafts.save(CIT, "complaint", {"description": "A big pothole near the bus stop on MG Road"}, "client-req-0006")
+        self.assertEqual(self.drafts.sync(CIT, no_title.id).status, "failed")
+        empty = self.drafts.save(CIT, "complaint", {}, "client-req-0007")
+        self.assertEqual(self.drafts.sync(CIT, empty.id).status, "failed")
+
     def test_draft_ownership_and_validation(self):
         d = self.drafts.save(CIT, "complaint", {"title": "t"}, "client-req-0003")
         with self.assertRaises(NotFound):

@@ -12,6 +12,7 @@ import math
 import statistics
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
+from typing import Any
 
 
 @dataclass(frozen=True)
@@ -30,7 +31,10 @@ class AnomalyEvent:
     score: float
     severity: str  # "warning" | "critical"
     explanation: str
-    details: dict[str, float] = field(default_factory=dict)
+    # Any, not float: most callers do put plain numbers here, but the ward/category cluster
+    # detector stores a category list, and this flows straight into AnomalyRecord.details, which
+    # is already dict[str, Any] - a free-form JSON-ish bag, not a strictly numeric one.
+    details: dict[str, Any] = field(default_factory=dict)
 
 
 def _robust_z(history: Sequence[float], value: float) -> tuple[float, float]:

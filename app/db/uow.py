@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Self
 
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -53,7 +53,12 @@ class SqlUnitOfWork:
         self.session: Session | None = None
         self.extras: dict[str, Any] = {}
 
-    def __enter__(self) -> SqlUnitOfWork:
+    def __enter__(self) -> Self:
+        # `Self`, not `SqlUnitOfWork`: the `UnitOfWork` Protocol declares `__enter__(self) ->
+        # UnitOfWork`, and returning the concrete class name here makes structural matching against
+        # that Protocol ask "is SqlUnitOfWork assignable to UnitOfWork?" recursively while it is
+        # still deciding that very question, which mypy resolves by failing the match. `Self` is
+        # exactly the annotation this "context manager returns itself" pattern exists for.
         s = self._factory()
         self.session = s
         self.complaints, self.officers = SqlComplaintRepository(s), SqlOfficerDirectory(s)

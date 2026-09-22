@@ -61,7 +61,7 @@ class SqlComplaintRepository:
         return _rec(m) if m else None
 
     def reference_exists(self, reference: str) -> bool:
-        return self.s.scalar(select(func.count()).select_from(ComplaintModel).where(ComplaintModel.reference == reference)) > 0
+        return int(self.s.scalar(select(func.count()).select_from(ComplaintModel).where(ComplaintModel.reference == reference)) or 0) > 0
 
     def update(self, c: ComplaintRecord) -> None:
         m = self.s.get(ComplaintModel, c.id)
@@ -107,7 +107,10 @@ class SqlComplaintRepository:
             q = q.where(ComplaintModel.department_code == department_code)
         if since:
             q = q.where(ComplaintModel.created_at >= since)
-        return [ComplaintRow(r[0], r[1], ComplaintStatus(r[2]), *r[3:17], r[17], bool(r[18])) for r in self.s.execute(q)]
+        # Spelled out rather than `*r[3:17]`: a slice of a SQLAlchemy Row types as Sequence[Any],
+        # whose length mypy cannot verify statically, so unpacking it mid-call (with two more
+        # positional args after it) made every one of ComplaintRow's 19 fields look ambiguous.
+        return [ComplaintRow(r[0], r[1], ComplaintStatus(r[2]), r[3], r[4], r[5], r[6], r[7], r[8], r[9], r[10], r[11], r[12], r[13], r[14], r[15], r[16], r[17], bool(r[18])) for r in self.s.execute(q)]  # fmt: skip
 
     # ---- events / evidence / feedback
     def add_event(self, e: ComplaintEvent) -> None:

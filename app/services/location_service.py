@@ -142,8 +142,8 @@ def aggregate_hotspots(
     for members in groups.values():
         if len(members) < min_count:
             continue
-        key = min(str(m.get("id")) for m in members)
-        h = Hotspot(key, sum(m["lat"] for m in members) / len(members), sum(m["lng"] for m in members) / len(members))
+        hotspot_key = min(str(m.get("id")) for m in members)  # not `key`: that name is the (int, int) grid bucket above
+        h = Hotspot(hotspot_key, sum(m["lat"] for m in members) / len(members), sum(m["lng"] for m in members) / len(members))
         for m in members:
             h.count += 1
             h.severity_score += SEVERITY_WEIGHT.get(str(m.get("severity", "medium")), 2)

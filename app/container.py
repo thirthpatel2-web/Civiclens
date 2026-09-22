@@ -11,7 +11,7 @@ import logging
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
-from typing import Any
+from typing import Any, NoReturn
 
 from app.core.config import Settings
 from app.core.exceptions import DependencyUnavailable
@@ -82,7 +82,7 @@ class UnavailableQueueBackend:
     """Used when Redis is not configured: every call reports the dependency as unavailable, so jobs stay
     ``pending`` in PostgreSQL and the admin monitor shows it. Nothing pretends to be queued."""
 
-    def _down(self) -> Any:
+    def _down(self) -> NoReturn:
         raise DependencyUnavailable("Redis is not configured.")
 
     def push(self, *a: Any) -> None: self._down()
@@ -329,7 +329,7 @@ def build_container(settings: Settings) -> AppContainer:
         from app.services.notification_service import SmtpEmailSender
 
         mailer = SmtpEmailSender(_env("SMTP_HOST"), int(_env("SMTP_PORT") or 587), _env("SMTP_SENDER"), _env("SMTP_USERNAME"), _env("SMTP_PASSWORD"))
-    container = AppContainer(settings, uow, Argon2Hasher(), SecretBox(settings.app_secret_key or "dev-only-secret-key-not-for-prod"), PyOtpEngine(), storage, backend, bus, ws,
+    container = AppContainer(settings, uow, Argon2Hasher(), SecretBox(settings.app_secret_key or "dev-only-secret-key-not-for-prod"), PyOtpEngine(), storage, backend, bus, ws,  # type: ignore[arg-type]
                              llm=llm, embedder=embedder, vision=vision, speech=speech, translator_provider=translator_provider, ollama=ollama, vector_index=vector,
                              scheduler_state=SqlSchedulerState(sf) if redis_client is None else state, lock=lock, health_repo=SqlIntegrationHealthRepository(sf), qr_renderer=render_qr_png, mailer=mailer,
                              admin_setup_token=_env("ADMIN_SETUP_TOKEN"), public_base_url=_env("PUBLIC_BASE_URL"), judgment_search=judgment_search)  # fmt: skip
@@ -341,7 +341,7 @@ def build_container(settings: Settings) -> AppContainer:
             ResilientThrottle,
         )
 
-        container.limiters = {n: ResilientLimiter(RedisFixedWindowLimiter(redis_client, n, lim, 60), container.limiters[n]) for n, lim in (("expensive", 30), ("upload", 20))}
+        container.limiters = {n: ResilientLimiter(RedisFixedWindowLimiter(redis_client, n, lim, 60), container.limiters[n]) for n, lim in (("expensive", 30), ("upload", 20))}  # type: ignore[misc]
         container.login_throttle = ResilientThrottle(RedisFailureThrottle(redis_client, "login"), container.login_throttle)  # type: ignore[assignment]
         container.mfa_throttle = ResilientThrottle(RedisFailureThrottle(redis_client, "mfa"), container.mfa_throttle)  # type: ignore[assignment]
     _attach_documents(container, sf, embedder, settings, SqlChunkStore)

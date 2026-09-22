@@ -77,8 +77,8 @@ class AnomalyDetectionJob:
                 take(detect_sla_failure_rate(dept, breached, len(subjects)), f"sla {dept}", dept)
 
             created = 0
-            for ev, dept in found:
-                rec = AnomalyRecord(str(uuid.uuid4()), ev.kind, ev.subject, ev.severity, float(ev.score) if ev.score != float("inf") else 9999.0, ev.explanation, now, dept, details={**ev.details, "observed": ev.observed, "expected": ev.expected},
+            for ev, event_dept in found:  # not `dept`: that name is str (a dict key) above; this is str | None
+                rec = AnomalyRecord(str(uuid.uuid4()), ev.kind, ev.subject, ev.severity, float(ev.score) if ev.score != float("inf") else 9999.0, ev.explanation, now, event_dept, details={**ev.details, "observed": ev.observed, "expected": ev.expected},
                                     dedupe_key=f"{ev.kind}:{ev.subject}:{now.date().isoformat()}")  # fmt: skip
                 if uow.anomalies.add_if_new(rec):
                     created += 1
