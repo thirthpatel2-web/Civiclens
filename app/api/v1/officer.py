@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends
 
-from app.api.serialize import to_jsonable
+from app.api.serialize import complaint_json, to_jsonable
 from app.container import AppContainer
 from app.core.authorization import AuthContext, Permission
 from app.core.dependencies import get_container, guard
@@ -43,12 +43,16 @@ def queue(mine_only: bool = False, status: str | None = None, limit: int = 50, o
         statuses = [ComplaintStatus(status)] if status else None
     except ValueError:
         raise ValidationFailed("Unknown status.") from None
-    return {"items": to_jsonable(c.officer.queue(ctx, mine_only=mine_only, statuses=statuses, limit=min(limit, 100), offset=max(offset, 0)))}
+    items = c.officer.queue(ctx, mine_only=mine_only, statuses=statuses, limit=min(limit, 100), offset=max(offset, 0))
+    return {"items": [complaint_json(x) for x in items]}
 
 
 @router.get("/complaints/{cid}")
 def detail(cid: str, ctx: AuthContext = READ, c: AppContainer = Depends(get_container)) -> dict:
-    return to_jsonable(c.officer.detail(ctx, cid))
+    d = c.officer.detail(ctx, cid)
+    out = to_jsonable({k: v for k, v in d.items() if k != "complaint"})
+    out["complaint"] = complaint_json(d["complaint"])
+    return out
 
 
 @router.post("/complaints/{cid}/status")

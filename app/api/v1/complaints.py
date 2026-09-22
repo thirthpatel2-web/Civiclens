@@ -37,7 +37,8 @@ def classify_preview(body: ClassifyPreviewBody, ctx: AuthContext = Depends(guard
 
 @router.get("")
 def list_mine(filter: str = "all", limit: int = 50, offset: int = 0, ctx: AuthContext = CITIZEN, c: AppContainer = Depends(get_container)) -> dict:
-    return {"items": to_jsonable(c.complaints.list_mine(ctx, filter_name=filter, limit=min(limit, 100), offset=max(offset, 0)))}
+    items = c.complaints.list_mine(ctx, filter_name=filter, limit=min(limit, 100), offset=max(offset, 0))
+    return {"items": [complaint_json(x) for x in items]}
 
 
 @router.post("/evidence", status_code=201)
