@@ -38,7 +38,7 @@ class SqlJudgmentSearch:
     no N+1 lookups. Degrades to an empty result (never raises into the caller) if the embedder or
     database is unavailable, so a Legal Analyzer request never fails just because this extra was down."""
 
-    def __init__(self, session_factory, embedder) -> None:  # type: ignore[no-untyped-def]
+    def __init__(self, session_factory, embedder) -> None:
         self._sf, self._embedder = session_factory, embedder
 
     def search(self, query: str, top_k: int = 3) -> list[JudgmentExcerpt]:

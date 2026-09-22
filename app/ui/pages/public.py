@@ -72,7 +72,7 @@ def _login_form(c: AppContainer, *, privileged: bool, allowed: tuple[Role, ...] 
                 err.classes(add="hidden")
                 client_key = str(ui.context.client.id)  # must be read on the UI event loop, before run_with_loading moves work to a thread
 
-                def op(uow):  # type: ignore[no-untyped-def]
+                def op(uow):
                     auth = c.auth_for(uow)
                     res = auth.login(email.value or "", pw.value or "", otp=(otp.value or None), client_key=client_key)
                     if allowed is not None and res.context.role not in allowed:
@@ -261,7 +261,7 @@ def register(c: AppContainer) -> None:
 
     @page(c, "/reset-password", "page.forgot", public=True, shell_on=False)
     def reset(c: AppContainer, user: UiUser | None) -> None:
-        token = ui.context.client.request.query_params.get("token") if ui.context.client.request else None  # type: ignore[union-attr]
+        token = ui.context.client.request.query_params.get("token") if ui.context.client.request else None
         with ui.column().classes("cl-glass w-full max-w-md q-mx-auto gap-3").style("padding: 28px;"):
             if token:
                 ui.label(tr(c, "auth.choose_new_password")).classes("text-lg font-bold cl-gradient-text")
@@ -372,7 +372,7 @@ def register(c: AppContainer) -> None:
                 code = ui.input(tr(c, "lbl.otp")).props("outlined dense").classes("w-full")
 
                 def disable() -> None:
-                    def op(uow):  # type: ignore[no-untyped-def]
+                    def op(uow):
                         ok = c.auth_for(uow).verify_password(user.ctx.user_id, pw.value or "")
                         c.mfa_for(uow).disable(user.ctx.user_id, code.value or "", reauthenticated=ok)
 
@@ -414,7 +414,7 @@ def register(c: AppContainer) -> None:
                     code = ui.input(tr(c, "lbl.otp")).props("outlined dense").classes("w-full")
 
                     def confirm() -> None:
-                        def op(uow):  # type: ignore[no-untyped-def]
+                        def op(uow):
                             codes = c.mfa_for(uow).confirm_enrollment(user.ctx.user_id, code.value or "")
                             c.auth_for(uow).mark_session_mfa_verified(user.token)
                             return codes

@@ -17,7 +17,7 @@ class DuplicateReviewApp:
     def __init__(self, uow_factory: UowFactory, effects: ComplaintEffects) -> None:
         self._uow, self._fx = uow_factory, effects
 
-    def _load(self, uow: Any, ctx: AuthContext, complaint_id: str):  # type: ignore[no-untyped-def]
+    def _load(self, uow: Any, ctx: AuthContext, complaint_id: str):
         c = uow.complaints.get(complaint_id)
         if c is None or not can_access_complaint(ctx, owner_id=c.citizen_id, department_id=c.department_code):
             raise NotFound("Complaint not found.")
@@ -32,10 +32,12 @@ class DuplicateReviewApp:
             out = []
             for d in c.duplicates:
                 other = uow.complaints.get(d["complaint_id"])
-                visible = other is not None and can_access_complaint(ctx, owner_id=other.citizen_id, department_id=other.department_code)
+                # Bind the *narrowed* record rather than a separate boolean, so "may this caller see
+                # it" and "read its fields" can never drift apart.
+                visible_other = other if (other is not None and can_access_complaint(ctx, owner_id=other.citizen_id, department_id=other.department_code)) else None
                 r = latest.get(d["complaint_id"])
                 out.append({"complaint_id": d["complaint_id"], "reference": d["reference"], "score": d["score"], "verdict": d["verdict"], "explanation": d["explanation"],
-                            "other_status": str(other.status) if visible else None, "other_title": other.title if visible else None,
+                            "other_status": str(visible_other.status) if visible_other else None, "other_title": visible_other.title if visible_other else None,
                             "review": None if r is None else {"decision": r.decision, "reviewer_id": r.reviewer_id, "note": r.note, "at": r.at}})  # fmt: skip
         return out
 

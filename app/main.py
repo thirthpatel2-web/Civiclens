@@ -98,7 +98,7 @@ def create_app(container: AppContainer | None = None, *, with_ui: bool = True) -
         auth = websocket.headers.get("authorization", "")
         token = auth[7:].strip() if auth[:7].lower() == "bearer " else websocket.cookies.get(SESSION_COOKIE)  # mobile sends a Bearer header
 
-        def authenticate():  # type: ignore[no-untyped-def]
+        def authenticate():
             with c.uow_factory() as uow:
                 ctx = c.auth_for(uow).authenticate(token)
                 uow.commit()
@@ -145,7 +145,7 @@ class _LazyContainer:
     def __init__(self, app: FastAPI) -> None:
         self._app = app
 
-    def __getattr__(self, name: str):  # type: ignore[no-untyped-def]
+    def __getattr__(self, name: str):
         c = getattr(self._app.state, "container", None)
         if c is None:
             raise RuntimeError("application container is not ready")

@@ -26,13 +26,13 @@ def _draft(b: RtiBody) -> RtiDraft:
 
 
 @router.get("/categories")
-def categories(ctx: AuthContext = OWNER) -> dict:  # type: ignore[type-arg]
+def categories(ctx: AuthContext = OWNER) -> dict:
     """The same statutory-records checklist the web app's RTI drafter offers, keyed by civic category."""
     return {"categories": [{"code": code, "default_records": list(records)} for code, records in RTI_CATEGORY_RECORDS.items()]}
 
 
 @router.post("/questions/preview")
-def preview_questions(body: RtiQuestionsPreviewBody, ctx: AuthContext = OWNER) -> dict:  # type: ignore[type-arg]
+def preview_questions(body: RtiQuestionsPreviewBody, ctx: AuthContext = OWNER) -> dict:
     """Composes precise statutory RTI questions from a category + record checklist, without saving anything."""
     records = tuple(body.records_requested) or default_records_for_category(body.category)
     qs = build_rti_questions(
@@ -47,39 +47,39 @@ def preview_questions(body: RtiQuestionsPreviewBody, ctx: AuthContext = OWNER) -
 
 
 @router.post("", status_code=201)
-def create(body: RtiBody, ctx: AuthContext = OWNER, c: AppContainer = Depends(get_container)) -> dict:  # type: ignore[type-arg]
-    return to_jsonable(run_in_uow(c, lambda uow: c.rti_for(uow).create(ctx, _draft(body))))  # type: ignore[no-any-return]
+def create(body: RtiBody, ctx: AuthContext = OWNER, c: AppContainer = Depends(get_container)) -> dict:
+    return to_jsonable(run_in_uow(c, lambda uow: c.rti_for(uow).create(ctx, _draft(body))))
 
 
 @router.get("")
-def list_mine(ctx: AuthContext = OWNER, c: AppContainer = Depends(get_container)) -> dict:  # type: ignore[type-arg]
+def list_mine(ctx: AuthContext = OWNER, c: AppContainer = Depends(get_container)) -> dict:
     return {"items": to_jsonable(run_in_uow(c, lambda uow: uow.rti.list_for_owner(ctx.user_id)))}
 
 
 @router.get("/{app_id}")
-def track(app_id: str, ctx: AuthContext = OWNER, c: AppContainer = Depends(get_container)) -> dict:  # type: ignore[type-arg]
+def track(app_id: str, ctx: AuthContext = OWNER, c: AppContainer = Depends(get_container)) -> dict:
     app, cd = run_in_uow(c, lambda uow: c.rti_for(uow).track(ctx, app_id))
     return {"application": to_jsonable(app), "countdown": to_jsonable(cd)}
 
 
 @router.put("/{app_id}")
-def update(app_id: str, body: RtiBody, ctx: AuthContext = OWNER, c: AppContainer = Depends(get_container)) -> dict:  # type: ignore[type-arg]
-    return to_jsonable(run_in_uow(c, lambda uow: c.rti_for(uow).update_draft(ctx, app_id, _draft(body))))  # type: ignore[no-any-return]
+def update(app_id: str, body: RtiBody, ctx: AuthContext = OWNER, c: AppContainer = Depends(get_container)) -> dict:
+    return to_jsonable(run_in_uow(c, lambda uow: c.rti_for(uow).update_draft(ctx, app_id, _draft(body))))
 
 
 @router.post("/{app_id}/generate")
-def generate(app_id: str, ctx: AuthContext = OWNER, c: AppContainer = Depends(get_container)) -> dict:  # type: ignore[type-arg]
-    return to_jsonable(run_in_uow(c, lambda uow: c.rti_for(uow).generate(ctx, app_id)))  # type: ignore[no-any-return]
+def generate(app_id: str, ctx: AuthContext = OWNER, c: AppContainer = Depends(get_container)) -> dict:
+    return to_jsonable(run_in_uow(c, lambda uow: c.rti_for(uow).generate(ctx, app_id)))
 
 
 @router.post("/{app_id}/file")
-def mark_filed(app_id: str, body: RtiFileBody, ctx: AuthContext = OWNER, c: AppContainer = Depends(get_container)) -> dict:  # type: ignore[type-arg]
-    return to_jsonable(run_in_uow(c, lambda uow: c.rti_for(uow).mark_filed(ctx, app_id, received_at=body.received_at)))  # type: ignore[no-any-return]
+def mark_filed(app_id: str, body: RtiFileBody, ctx: AuthContext = OWNER, c: AppContainer = Depends(get_container)) -> dict:
+    return to_jsonable(run_in_uow(c, lambda uow: c.rti_for(uow).mark_filed(ctx, app_id, received_at=body.received_at)))
 
 
 @router.post("/{app_id}/responded")
-def responded(app_id: str, ctx: AuthContext = OWNER, c: AppContainer = Depends(get_container)) -> dict:  # type: ignore[type-arg]
-    return to_jsonable(run_in_uow(c, lambda uow: c.rti_for(uow).mark_responded(ctx, app_id)))  # type: ignore[no-any-return]
+def responded(app_id: str, ctx: AuthContext = OWNER, c: AppContainer = Depends(get_container)) -> dict:
+    return to_jsonable(run_in_uow(c, lambda uow: c.rti_for(uow).mark_responded(ctx, app_id)))
 
 
 @router.get("/{app_id}/pdf")

@@ -30,4 +30,4 @@ def complaint_json(c: Any) -> dict[str, Any]:
     """API view of a complaint: ``original_*`` make explicit that the citizen's text/language are never rewritten."""
     d = to_jsonable(c)
     d["original_text"], d["original_language"] = d.get("description"), d.get("language")
-    return d  # type: ignore[no-any-return]
+    return d

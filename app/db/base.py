@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal, overload
 
 from sqlalchemy import DateTime, MetaData, Uuid, func
 from sqlalchemy.dialects.postgresql import JSONB
@@ -26,7 +26,22 @@ def created_at() -> Mapped[datetime]:
     return mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
 
-def tstz(nullable: bool = True) -> Mapped[datetime | None]:
+@overload
+def tstz(nullable: Literal[False]) -> Mapped[datetime]: ...
+
+
+@overload
+def tstz(nullable: Literal[True] = ...) -> Mapped[datetime | None]: ...
+
+
+def tstz(nullable: bool = True) -> Any:
+    """A timezone-aware timestamp column whose declared type follows its nullability.
+
+    The single signature this replaced always returned ``Mapped[datetime | None]``, so every
+    ``x: Mapped[datetime] = tstz(False)`` - the NOT NULL case, which is most of them - looked like
+    an Optional being assigned to a non-Optional. The overloads make ``tstz(False)`` non-optional,
+    which is what the column actually is.
+    """
     return mapped_column(DateTime(timezone=True), nullable=nullable)
 
 

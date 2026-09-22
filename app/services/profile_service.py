@@ -46,7 +46,10 @@ class ProfileService:
         if errors:
             raise ValidationFailed("The profile has errors.", details=errors)
         with self._uow() as uow:
-            p = uow.profiles.get(ctx.user_id) or ProfileRecord(ctx.user_id, (uow.users.get_by_id(ctx.user_id).full_name if uow.users.get_by_id(ctx.user_id) else ""))
+            # One lookup, not two: this previously called get_by_id twice - once for the guard and
+            # again for the attribute - so creating a profile cost an extra query every time.
+            user = uow.users.get_by_id(ctx.user_id)
+            p = uow.profiles.get(ctx.user_id) or ProfileRecord(ctx.user_id, user.full_name if user else "")
             if full_name is not None:
                 p.full_name = full_name.strip()
             if phone is not None:

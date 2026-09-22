@@ -107,7 +107,7 @@ class SqlComplaintRepository:
             q = q.where(ComplaintModel.department_code == department_code)
         if since:
             q = q.where(ComplaintModel.created_at >= since)
-        return [ComplaintRow(r[0], r[1], ComplaintStatus(r[2]), *r[3:17], r[17], bool(r[18])) for r in self.s.execute(q)]  # type: ignore[arg-type]
+        return [ComplaintRow(r[0], r[1], ComplaintStatus(r[2]), *r[3:17], r[17], bool(r[18])) for r in self.s.execute(q)]
 
     # ---- events / evidence / feedback
     def add_event(self, e: ComplaintEvent) -> None:

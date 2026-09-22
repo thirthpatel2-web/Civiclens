@@ -16,12 +16,12 @@ USE = Depends(guard(Permission.ASSISTANT_USE))
 
 
 @router.post("/query")
-def query(body: AskBody, ctx: AuthContext = USE, c: AppContainer = Depends(get_container), _: None = Depends(limited("expensive"))) -> dict:  # type: ignore[type-arg]
+def query(body: AskBody, ctx: AuthContext = USE, c: AppContainer = Depends(get_container), _: None = Depends(limited("expensive"))) -> dict:
     r = c.rag.ask(body.question, ctx, language=body.language)
-    return to_jsonable({"status": r.status, "answer": r.answer, "citations": r.citations, "database_facts": r.database_facts, "database_query": r.database_query, "warnings": r.warnings, "quarantined": r.quarantined, "route": r.route, "timings_ms": r.timings_ms, "retrieval_stats": r.retrieval_stats})  # type: ignore[no-any-return]
+    return to_jsonable({"status": r.status, "answer": r.answer, "citations": r.citations, "database_facts": r.database_facts, "database_query": r.database_query, "warnings": r.warnings, "quarantined": r.quarantined, "route": r.route, "timings_ms": r.timings_ms, "retrieval_stats": r.retrieval_stats})
 
 
 @router.post("/retrieve")
-def retrieve(body: SearchBody, ctx: AuthContext = USE, c: AppContainer = Depends(get_container), _: None = Depends(limited("expensive"))) -> dict:  # type: ignore[type-arg]
+def retrieve(body: SearchBody, ctx: AuthContext = USE, c: AppContainer = Depends(get_container), _: None = Depends(limited("expensive"))) -> dict:
     res = c.rag.retrieve(body.query, ctx)
     return {"citations": [x.to_dict() for x in build_citations(res.chunks)], "warnings": res.warnings, "stats": res.stats}

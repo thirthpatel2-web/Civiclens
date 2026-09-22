@@ -28,7 +28,7 @@ class InvestigationService:
     def _audit(self, uow: Any) -> AuditService:
         return AuditService(uow.audit, self._clock)
 
-    def _complaint(self, uow: Any, ctx: AuthContext, cid: str):  # type: ignore[no-untyped-def]
+    def _complaint(self, uow: Any, ctx: AuthContext, cid: str):
         c = uow.complaints.get(cid)
         if c is None or not can_access_complaint(ctx, owner_id=c.citizen_id, department_id=c.department_code):
             raise NotFound("Complaint not found.")

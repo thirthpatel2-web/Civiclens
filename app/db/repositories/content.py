@@ -24,11 +24,11 @@ from app.services.ports import ConversationMessage, ConversationRecord
 from app.services.rti_service import RtiApplication, RtiDraft, RtiStatus
 
 
-def _draft_to_json(d: RtiDraft) -> dict:  # type: ignore[type-arg]
+def _draft_to_json(d: RtiDraft) -> dict:
     return {k: (list(v) if isinstance(v, tuple) else v) for k, v in dataclasses.asdict(d).items()}
 
 
-def _draft_from_json(j: dict) -> RtiDraft:  # type: ignore[type-arg]
+def _draft_from_json(j: dict) -> RtiDraft:
     return RtiDraft(**{**j, "questions": tuple(j.get("questions", ())), "attachments": tuple(j.get("attachments", ()))})
 
 
@@ -132,14 +132,14 @@ class PgVectorSearcher:
     outrank the visible ones; raise ``oversample`` for corpora with many private documents.
     """
 
-    def __init__(self, session_factory, chunk_loader, oversample: int = 8) -> None:  # type: ignore[no-untyped-def]
+    def __init__(self, session_factory, chunk_loader, oversample: int = 8) -> None:
         self._sf, self._load, self._over = session_factory, chunk_loader, oversample
 
     def __len__(self) -> int:
         with self._sf() as s:
             return int(s.scalar(select(func.count()).select_from(DocumentChunkModel).where(DocumentChunkModel.embedding.is_not(None))) or 0)
 
-    def search(self, query_vector, top_k: int = 20, *, min_similarity: float = -1.0, visible=None):  # type: ignore[no-untyped-def]
+    def search(self, query_vector, top_k: int = 20, *, min_similarity: float = -1.0, visible=None):
         from app.rag.vector_search import VectorHit
 
         with self._sf() as s:

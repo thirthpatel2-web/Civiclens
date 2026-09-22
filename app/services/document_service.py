@@ -310,7 +310,7 @@ class DocumentIngestor:
         return self.process(doc_id)
 
 
-def document_access_filter(ctx, chunk: Chunk) -> bool:  # type: ignore[no-untyped-def]
+def document_access_filter(ctx, chunk: Chunk) -> bool:
     """Who may retrieve a chunk: owner (private), same department (department), anyone (public)."""
     from app.core.authorization import Role
 

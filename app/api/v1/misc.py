@@ -31,29 +31,29 @@ PROF = Depends(guard(Permission.PROFILE_MANAGE))
 
 # ---- notifications
 @notifications.get("")
-def list_notifications(unread_only: bool = False, limit: int = 50, ctx: AuthContext = NOTE, c: AppContainer = Depends(get_container)) -> dict:  # type: ignore[type-arg]
+def list_notifications(unread_only: bool = False, limit: int = 50, ctx: AuthContext = NOTE, c: AppContainer = Depends(get_container)) -> dict:
     items = run_in_uow(c, lambda uow: (c.notifications.list_for(ctx, uow.notifications, unread_only=unread_only, limit=min(limit, 100)), uow.notifications.unread_count(ctx.user_id)))
     return {"items": to_jsonable(items[0]), "unread": items[1]}
 
 
 @notifications.post("/{notification_id}/read")
-def mark_read(notification_id: str, ctx: AuthContext = NOTE, c: AppContainer = Depends(get_container)) -> dict:  # type: ignore[type-arg]
-    return to_jsonable(run_in_uow(c, lambda uow: c.notifications.mark_read(ctx, uow.notifications, notification_id)))  # type: ignore[no-any-return]
+def mark_read(notification_id: str, ctx: AuthContext = NOTE, c: AppContainer = Depends(get_container)) -> dict:
+    return to_jsonable(run_in_uow(c, lambda uow: c.notifications.mark_read(ctx, uow.notifications, notification_id)))
 
 
 @notifications.post("/read-all")
-def read_all(ctx: AuthContext = NOTE, c: AppContainer = Depends(get_container)) -> dict:  # type: ignore[type-arg]
+def read_all(ctx: AuthContext = NOTE, c: AppContainer = Depends(get_container)) -> dict:
     return {"marked": run_in_uow(c, lambda uow: c.notifications.mark_all_read(ctx, uow.notifications))}
 
 
 @notifications.get("/preferences")
-def get_prefs(ctx: AuthContext = NOTE, c: AppContainer = Depends(get_container)) -> dict:  # type: ignore[type-arg]
-    return to_jsonable(run_in_uow(c, lambda uow: c.notifications.preferences(ctx, uow.notifications)))  # type: ignore[no-any-return]
+def get_prefs(ctx: AuthContext = NOTE, c: AppContainer = Depends(get_container)) -> dict:
+    return to_jsonable(run_in_uow(c, lambda uow: c.notifications.preferences(ctx, uow.notifications)))
 
 
 @notifications.put("/preferences")
-def put_prefs(body: PrefsBody, ctx: AuthContext = NOTE, c: AppContainer = Depends(get_container)) -> dict:  # type: ignore[type-arg]
-    return to_jsonable(run_in_uow(c, lambda uow: c.notifications.save_preferences(ctx, uow.notifications, in_app=body.in_app, email=body.email, muted_kinds=body.muted_kinds)))  # type: ignore[no-any-return]
+def put_prefs(body: PrefsBody, ctx: AuthContext = NOTE, c: AppContainer = Depends(get_container)) -> dict:
+    return to_jsonable(run_in_uow(c, lambda uow: c.notifications.save_preferences(ctx, uow.notifications, in_app=body.in_app, email=body.email, muted_kinds=body.muted_kinds)))
 
 
 @notifications.post("/devices", status_code=204)
@@ -69,35 +69,35 @@ def unregister_device(token: str, ctx: AuthContext = NOTE, c: AppContainer = Dep
 
 # ---- emergency (public: people must reach it without an account)
 @emergency.get("/helplines")
-def helplines(lang: str | None = None, city: str | None = None, c: AppContainer = Depends(get_container)) -> dict:  # type: ignore[type-arg]
+def helplines(lang: str | None = None, city: str | None = None, c: AppContainer = Depends(get_container)) -> dict:
     return c.emergency.list(lang, city)
 
 
 # ---- profiles & consent
 @profiles.get("/me")
-def get_profile(ctx: AuthContext = PROF, c: AppContainer = Depends(get_container)) -> dict:  # type: ignore[type-arg]
-    return to_jsonable(c.profiles.get(ctx))  # type: ignore[no-any-return]
+def get_profile(ctx: AuthContext = PROF, c: AppContainer = Depends(get_container)) -> dict:
+    return to_jsonable(c.profiles.get(ctx))
 
 
 @profiles.put("/me")
-def put_profile(body: ProfileBody, ctx: AuthContext = PROF, c: AppContainer = Depends(get_container)) -> dict:  # type: ignore[type-arg]
-    return to_jsonable(c.profiles.update(ctx, **body.model_dump()))  # type: ignore[no-any-return]
+def put_profile(body: ProfileBody, ctx: AuthContext = PROF, c: AppContainer = Depends(get_container)) -> dict:
+    return to_jsonable(c.profiles.update(ctx, **body.model_dump()))
 
 
 @consent.get("")
-def get_consents(ctx: AuthContext = PROF, c: AppContainer = Depends(get_container)) -> dict:  # type: ignore[type-arg]
-    return to_jsonable(c.profiles.consents(ctx))  # type: ignore[no-any-return]
+def get_consents(ctx: AuthContext = PROF, c: AppContainer = Depends(get_container)) -> dict:
+    return to_jsonable(c.profiles.consents(ctx))
 
 
 @consent.put("/{purpose}")
-def put_consent(purpose: str, body: ConsentBody, ctx: AuthContext = PROF, c: AppContainer = Depends(get_container)) -> dict:  # type: ignore[type-arg]
-    return to_jsonable(c.profiles.set_consent(ctx, purpose, body.granted))  # type: ignore[no-any-return]
+def put_consent(purpose: str, body: ConsentBody, ctx: AuthContext = PROF, c: AppContainer = Depends(get_container)) -> dict:
+    return to_jsonable(c.profiles.set_consent(ctx, purpose, body.granted))
 
 
 # ---- reference / directory (read-only, non-sensitive: department, city and ward names/codes)
 @directory.get("/directory")
-def directory_listing(ctx: AuthContext = Depends(guard(Permission.GIS_VIEW)), c: AppContainer = Depends(get_container)) -> dict:  # type: ignore[type-arg]
-    def op(uow):  # type: ignore[no-untyped-def]
+def directory_listing(ctx: AuthContext = Depends(guard(Permission.GIS_VIEW)), c: AppContainer = Depends(get_container)) -> dict:
+    def op(uow):
         return {
             "departments": [{"code": d.code, "name": d.name} for d in uow.config.departments() if d.active],
             "cities": [{"code": x.code, "name": x.name, "state": x.state, "lat": x.lat, "lng": x.lng} for x in uow.config.cities()],
@@ -111,59 +111,59 @@ def directory_listing(ctx: AuthContext = Depends(guard(Permission.GIS_VIEW)), c:
 
 # ---- gis
 @gis.get("/radar")
-def radar(category: str | None = None, ward: str | None = None, min_severity: str | None = None, days: int = 90, ctx: AuthContext = Depends(guard(Permission.GIS_VIEW)), c: AppContainer = Depends(get_container)) -> dict:  # type: ignore[type-arg]
-    return to_jsonable(c.gis.radar(ctx, category=category, ward=ward, min_severity=min_severity, days=days))  # type: ignore[no-any-return]
+def radar(category: str | None = None, ward: str | None = None, min_severity: str | None = None, days: int = 90, ctx: AuthContext = Depends(guard(Permission.GIS_VIEW)), c: AppContainer = Depends(get_container)) -> dict:
+    return to_jsonable(c.gis.radar(ctx, category=category, ward=ward, min_severity=min_severity, days=days))
 
 
 # ---- dashboards / analytics
 @dashboards.get("/citizen")
-def citizen_dashboard(ctx: AuthContext = Depends(guard(Permission.COMPLAINT_READ_OWN)), c: AppContainer = Depends(get_container)) -> dict:  # type: ignore[type-arg]
-    return to_jsonable(c.dashboards.citizen(ctx))  # type: ignore[no-any-return]
+def citizen_dashboard(ctx: AuthContext = Depends(guard(Permission.COMPLAINT_READ_OWN)), c: AppContainer = Depends(get_container)) -> dict:
+    return to_jsonable(c.dashboards.citizen(ctx))
 
 
 @dashboards.get("/department")
-def department_dashboard(department_code: str | None = None, ctx: AuthContext = Depends(guard(Permission.DASHBOARD_DEPARTMENT)), c: AppContainer = Depends(get_container)) -> dict:  # type: ignore[type-arg]
-    return to_jsonable(c.dashboards.department(ctx, department_code=department_code))  # type: ignore[no-any-return]
+def department_dashboard(department_code: str | None = None, ctx: AuthContext = Depends(guard(Permission.DASHBOARD_DEPARTMENT)), c: AppContainer = Depends(get_container)) -> dict:
+    return to_jsonable(c.dashboards.department(ctx, department_code=department_code))
 
 
 @dashboards.get("/admin")
-def admin_dashboard(ctx: AuthContext = Depends(guard(Permission.ADMIN_DASHBOARD)), c: AppContainer = Depends(get_container)) -> dict:  # type: ignore[type-arg]
-    return to_jsonable(c.dashboards.admin(ctx))  # type: ignore[no-any-return]
+def admin_dashboard(ctx: AuthContext = Depends(guard(Permission.ADMIN_DASHBOARD)), c: AppContainer = Depends(get_container)) -> dict:
+    return to_jsonable(c.dashboards.admin(ctx))
 
 
 @analytics.get("/summary")
-def summary(ctx: AuthContext = Depends(guard(Permission.ANALYTICS_VIEW)), c: AppContainer = Depends(get_container)) -> dict:  # type: ignore[type-arg]
-    return to_jsonable(c.dashboards.admin(ctx))  # type: ignore[no-any-return]
+def summary(ctx: AuthContext = Depends(guard(Permission.ANALYTICS_VIEW)), c: AppContainer = Depends(get_container)) -> dict:
+    return to_jsonable(c.dashboards.admin(ctx))
 
 
 @analytics.get("/forecast")
-def forecast(horizon: int = 7, ctx: AuthContext = Depends(guard(Permission.ANALYTICS_VIEW)), c: AppContainer = Depends(get_container)) -> dict:  # type: ignore[type-arg]
+def forecast(horizon: int = 7, ctx: AuthContext = Depends(guard(Permission.ANALYTICS_VIEW)), c: AppContainer = Depends(get_container)) -> dict:
     from app.services.analytics_service import InsufficientData, forecast_linear
 
     d = c.dashboards.admin(ctx)
     series = [x["count"] for x in d["trend_daily"]]
     f = forecast_linear(series, max(1, min(horizon, 30)))
-    return {"insufficient_data": True, "needed": f.needed, "have": f.have} if isinstance(f, InsufficientData) else to_jsonable(f)  # type: ignore[no-any-return]
+    return {"insufficient_data": True, "needed": f.needed, "have": f.have} if isinstance(f, InsufficientData) else to_jsonable(f)
 
 
 @analytics.get("/history")
-def analytics_history(days: int = 30, ctx: AuthContext = Depends(guard(Permission.ANALYTICS_VIEW)), c: AppContainer = Depends(get_container)) -> dict:  # type: ignore[type-arg]
-    return to_jsonable(c.dashboards.history(ctx, days=days))  # type: ignore[no-any-return]
+def analytics_history(days: int = 30, ctx: AuthContext = Depends(guard(Permission.ANALYTICS_VIEW)), c: AppContainer = Depends(get_container)) -> dict:
+    return to_jsonable(c.dashboards.history(ctx, days=days))
 
 
 @analytics.post("/anomalies/run")
-def run_anomalies(ctx: AuthContext = Depends(guard(Permission.ADMIN_MONITORING)), c: AppContainer = Depends(get_container)) -> dict:  # type: ignore[type-arg]
+def run_anomalies(ctx: AuthContext = Depends(guard(Permission.ADMIN_MONITORING)), c: AppContainer = Depends(get_container)) -> dict:
     return c.anomaly_job.run(c.clock())
 
 
 # ---- integrations
 @integrations.get("")
-def integration_status(ctx: AuthContext = Depends(guard(Permission.ADMIN_INTEGRATIONS)), c: AppContainer = Depends(get_container)) -> dict:  # type: ignore[type-arg]
+def integration_status(ctx: AuthContext = Depends(guard(Permission.ADMIN_INTEGRATIONS)), c: AppContainer = Depends(get_container)) -> dict:
     return {"items": [to_jsonable(a.health_snapshot("not probed since start" if a.is_configured() else "missing: " + ", ".join(a.config.missing()))) | {"display_name": a.display_name, "configured": a.is_configured()} for a in c.adapters.values()]}
 
 
 @integrations.post("/check")
-def integration_check(ctx: AuthContext = Depends(guard(Permission.ADMIN_INTEGRATIONS)), c: AppContainer = Depends(get_container)) -> dict:  # type: ignore[type-arg]
+def integration_check(ctx: AuthContext = Depends(guard(Permission.ADMIN_INTEGRATIONS)), c: AppContainer = Depends(get_container)) -> dict:
     if c.health is None:
         raise NotConfigured("Integration health persistence is not configured.")
     return {"items": to_jsonable(c.health.check_all(c.adapters))}
@@ -174,15 +174,15 @@ _STARTED = time.time()
 
 
 @monitoring.get("/health")
-def health() -> dict:  # type: ignore[type-arg]
+def health() -> dict:
     """Liveness: the process is up (no dependency checks; see /ready)."""
     return {"status": "ok", "uptime_seconds": int(time.time() - _STARTED)}
 
 
 @monitoring.get("/ready")
-def ready(c: AppContainer = Depends(get_container)) -> dict:  # type: ignore[type-arg]
+def ready(c: AppContainer = Depends(get_container)) -> dict:
     """Readiness: actually probes each configured dependency."""
-    checks: dict[str, dict] = {}  # type: ignore[type-arg]
+    checks: dict[str, dict] = {}
     try:
         run_in_uow(c, lambda uow: uow.config.departments())
         checks["database"] = {"status": "ok"}
@@ -199,7 +199,7 @@ def ready(c: AppContainer = Depends(get_container)) -> dict:  # type: ignore[typ
     try:
         from app.db.schema_check import check as migrations_check
 
-        checks["migrations"] = run_in_uow(c, lambda uow: migrations_check(uow.session))  # type: ignore[attr-defined]
+        checks["migrations"] = run_in_uow(c, lambda uow: migrations_check(uow.session))
     except Exception as exc:
         checks["migrations"] = {"status": "unknown", "detail": type(exc).__name__}
     ok_all = checks["database"]["status"] == "ok" and checks["migrations"].get("status") in ("ok", "unknown")
@@ -207,31 +207,31 @@ def ready(c: AppContainer = Depends(get_container)) -> dict:  # type: ignore[typ
 
 
 @monitoring.get("/queue")
-def queue_status(ctx: AuthContext = Depends(guard(Permission.ADMIN_MONITORING)), c: AppContainer = Depends(get_container)) -> dict:  # type: ignore[type-arg]
+def queue_status(ctx: AuthContext = Depends(guard(Permission.ADMIN_MONITORING)), c: AppContainer = Depends(get_container)) -> dict:
     return c.jobs.stats()
 
 
 @monitoring.get("/notifications")
-def notification_status(ctx: AuthContext = Depends(guard(Permission.ADMIN_MONITORING)), c: AppContainer = Depends(get_container)) -> dict:  # type: ignore[type-arg]
+def notification_status(ctx: AuthContext = Depends(guard(Permission.ADMIN_MONITORING)), c: AppContainer = Depends(get_container)) -> dict:
     """Delivery state counts per channel: queued / sending / delivered / failed / not_configured."""
     return {"by_channel": run_in_uow(c, lambda uow: uow.notifications.status_counts()), "email_configured": c.mailer is not None, "push_configured": c.push_sender is not None}
 
 
 @monitoring.get("/jobs")
-def jobs(status: str | None = None, limit: int = 50, ctx: AuthContext = Depends(guard(Permission.ADMIN_MONITORING)), c: AppContainer = Depends(get_container)) -> dict:  # type: ignore[type-arg]
+def jobs(status: str | None = None, limit: int = 50, ctx: AuthContext = Depends(guard(Permission.ADMIN_MONITORING)), c: AppContainer = Depends(get_container)) -> dict:
     return {"items": to_jsonable(run_in_uow(c, lambda uow: uow.jobs.list_recent(min(limit, 200), status))), "stats": c.jobs.stats()}
 
 
 @monitoring.post("/jobs/{job_id}/retry")
-def retry_job(job_id: str, ctx: AuthContext = Depends(guard(Permission.ADMIN_MONITORING)), c: AppContainer = Depends(get_container)) -> dict:  # type: ignore[type-arg]
-    return to_jsonable(c.jobs.retry_dead(job_id))  # type: ignore[no-any-return]
+def retry_job(job_id: str, ctx: AuthContext = Depends(guard(Permission.ADMIN_MONITORING)), c: AppContainer = Depends(get_container)) -> dict:
+    return to_jsonable(c.jobs.retry_dead(job_id))
 
 
 @monitoring.get("/government")
-def government_status(ctx: AuthContext = Depends(guard(Permission.ADMIN_INTEGRATIONS)), c: AppContainer = Depends(get_container)) -> dict:  # type: ignore[type-arg]
+def government_status(ctx: AuthContext = Depends(guard(Permission.ADMIN_INTEGRATIONS)), c: AppContainer = Depends(get_container)) -> dict:
     return {"submissions_by_state": run_in_uow(c, lambda uow: uow.government.counts_by_state()), "adapters": {p: a.state.value for p, a in c.adapters.items()}}
 
 
 @monitoring.get("/system")
-def system(ctx: AuthContext = Depends(guard(Permission.ADMIN_MONITORING)), c: AppContainer = Depends(get_container)) -> dict:  # type: ignore[type-arg]
-    return to_jsonable(c.system_status())  # type: ignore[no-any-return]
+def system(ctx: AuthContext = Depends(guard(Permission.ADMIN_MONITORING)), c: AppContainer = Depends(get_container)) -> dict:
+    return to_jsonable(c.system_status())

@@ -24,8 +24,8 @@ return r[1]
 """
 
 
-def _wrap(fn):  # type: ignore[no-untyped-def]
-    def inner(*a, **k):  # type: ignore[no-untyped-def]
+def _wrap(fn):
+    def inner(*a, **k):
         try:
             return fn(*a, **k)
         except Exception as exc:

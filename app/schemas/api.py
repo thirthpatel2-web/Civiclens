@@ -324,7 +324,7 @@ class NormalizeDemoBody(Strict):
 class LogExceptionBody(Strict):
     source_system: str = Field(max_length=60)
     reason: str = Field(max_length=300)
-    payload: dict = Field(default_factory=dict)  # type: ignore[type-arg]
+    payload: dict = Field(default_factory=dict)
 
 
 class ResolveExceptionBody(Strict):

@@ -359,7 +359,7 @@ class SqlVoiceRepository:
 
 
 class SqlSchedulerState:
-    def __init__(self, session_factory) -> None:  # type: ignore[no-untyped-def]
+    def __init__(self, session_factory) -> None:
         self._sf = session_factory
 
     def last_run(self, name: str) -> datetime | None:
@@ -374,7 +374,7 @@ class SqlSchedulerState:
 
 
 class SqlIntegrationHealthRepository:
-    def __init__(self, session_factory) -> None:  # type: ignore[no-untyped-def]
+    def __init__(self, session_factory) -> None:
         self._sf = session_factory
 
     def save(self, r: HealthReport) -> None:
@@ -397,15 +397,15 @@ class SqlAnalyticsRepository:
     def __init__(self, s: Session) -> None:
         self.s = s
 
-    def add_snapshot(self, scope: str, taken_at: datetime, metrics: dict) -> None:  # type: ignore[type-arg]
+    def add_snapshot(self, scope: str, taken_at: datetime, metrics: dict) -> None:
         self.s.add(AnalyticsSnapshotModel(id=str(uuid.uuid4()), scope=scope, taken_at=taken_at, metrics=metrics))
         self.s.flush()
 
-    def list_snapshots(self, scope: str, since: datetime, limit: int = 500) -> list[tuple[datetime, dict]]:  # type: ignore[type-arg]
+    def list_snapshots(self, scope: str, since: datetime, limit: int = 500) -> list[tuple[datetime, dict]]:
         q = select(AnalyticsSnapshotModel).where(AnalyticsSnapshotModel.scope == scope, AnalyticsSnapshotModel.taken_at >= since).order_by(AnalyticsSnapshotModel.taken_at).limit(limit)
         return [(m.taken_at, m.metrics) for m in self.s.scalars(q)]
 
-    def latest_snapshot(self, scope: str) -> dict | None:  # type: ignore[type-arg]
+    def latest_snapshot(self, scope: str) -> dict | None:
         m = self.s.scalars(select(AnalyticsSnapshotModel).where(AnalyticsSnapshotModel.scope == scope).order_by(AnalyticsSnapshotModel.taken_at.desc()).limit(1)).first()
         return m.metrics if m else None
 

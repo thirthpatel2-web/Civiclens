@@ -284,7 +284,7 @@ def build_container(settings: Settings) -> AppContainer:
     sf = make_session_factory(engine)
     ws = WebSocketManager()
     bus: EventBus = LocalEventBus(ws)
-    backend: QueueBackend = UnavailableQueueBackend()  # type: ignore[assignment]
+    backend: QueueBackend = UnavailableQueueBackend()
     lock: LockProvider = LocalLock()
     state: SchedulerState = LocalSchedulerState()
     redis_client = None
@@ -299,8 +299,8 @@ def build_container(settings: Settings) -> AppContainer:
         )
 
         redis_client = redis.Redis.from_url(settings.redis_url, socket_timeout=3, socket_connect_timeout=3)
-        backend, lock, state = RedisQueueBackend(redis_client), RedisLock(redis_client), RedisSchedulerState(redis_client)  # type: ignore[assignment]
-        bus = RedisEventBus(redis_client)  # type: ignore[assignment]
+        backend, lock, state = RedisQueueBackend(redis_client), RedisLock(redis_client), RedisSchedulerState(redis_client)
+        bus = RedisEventBus(redis_client)
     ollama = OllamaClient(settings.ollama_base_url, timeout=90) if settings.ollama_base_url and (settings.ollama_model or settings.ollama_embedding_model or settings.ollama_vision_model) else None
     llm = OllamaChatProvider(ollama, settings.ollama_model) if ollama and settings.ollama_model else None
     embedder = OllamaEmbeddingProvider(ollama, settings.ollama_embedding_model, settings.embedding_dimensions) if ollama and settings.ollama_embedding_model else None
@@ -341,7 +341,7 @@ def build_container(settings: Settings) -> AppContainer:
             ResilientThrottle,
         )
 
-        container.limiters = {n: ResilientLimiter(RedisFixedWindowLimiter(redis_client, n, lim, 60), container.limiters[n]) for n, lim in (("expensive", 30), ("upload", 20))}  # type: ignore[assignment]
+        container.limiters = {n: ResilientLimiter(RedisFixedWindowLimiter(redis_client, n, lim, 60), container.limiters[n]) for n, lim in (("expensive", 30), ("upload", 20))}
         container.login_throttle = ResilientThrottle(RedisFailureThrottle(redis_client, "login"), container.login_throttle)  # type: ignore[assignment]
         container.mfa_throttle = ResilientThrottle(RedisFailureThrottle(redis_client, "mfa"), container.mfa_throttle)  # type: ignore[assignment]
     _attach_documents(container, sf, embedder, settings, SqlChunkStore)

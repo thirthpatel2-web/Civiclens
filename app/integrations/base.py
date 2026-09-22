@@ -95,7 +95,7 @@ class Transport(Protocol):
 
 
 class _NoRedirect(urllib.request.HTTPRedirectHandler):
-    def redirect_request(self, *a: Any, **k: Any) -> None:  # type: ignore[override]
+    def redirect_request(self, *a: Any, **k: Any) -> None:
         return None  # a redirect could bounce the request to an internal address (SSRF)
 
 

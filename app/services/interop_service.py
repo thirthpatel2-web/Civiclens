@@ -73,7 +73,7 @@ class ExceptionService:
     def __init__(self, uow_factory: UowFactory, clock: Callable[[], datetime] | None = None) -> None:
         self._uow, self._clock = uow_factory, clock or (lambda: datetime.now(UTC))
 
-    def log(self, *, source_system: str, reason: str, payload: dict) -> IntegrationExceptionRecord:  # type: ignore[type-arg]
+    def log(self, *, source_system: str, reason: str, payload: dict) -> IntegrationExceptionRecord:
         record = IntegrationExceptionRecord(str(uuid.uuid4()), source_system, reason, payload, self._clock())
         with self._uow() as uow:
             uow.exceptions.add(record)

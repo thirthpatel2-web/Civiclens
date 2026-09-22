@@ -138,7 +138,7 @@ class GrievanceWorker:
         if self._gov is None:
             raise PermanentJobError("government submission is not wired")
         try:
-            return self._gov.execute(payload.get("complaint_id", ""), payload.get("platform", ""))  # type: ignore[no-any-return]
+            return self._gov.execute(payload.get("complaint_id", ""), payload.get("platform", ""))
         except ValueError as exc:
             raise PermanentJobError(str(exc)) from exc  # missing record/unknown platform: retrying cannot help
 

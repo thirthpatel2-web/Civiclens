@@ -31,7 +31,7 @@ class MyGovAdapter(GovernmentAdapter):
 ADAPTER_CLASSES: tuple[type[GovernmentAdapter], ...] = (CPGRAMSAdapter, UMANGAdapter, SwachhataAdapter, BBMPSahaayaAdapter, MyGovAdapter)
 
 
-def build_adapters(env: Mapping[str, str], **kwargs) -> dict[str, GovernmentAdapter]:  # type: ignore[no-untyped-def]
+def build_adapters(env: Mapping[str, str], **kwargs) -> dict[str, GovernmentAdapter]:
     timeout = float(env.get("GOV_ADAPTER_TIMEOUT_SECONDS", "10") or 10)
     retries = int(env.get("GOV_ADAPTER_MAX_RETRIES", "2") or 2)
     return {cls.platform: cls(AdapterConfig.from_env(cls.env_prefix, env, timeout=timeout, retries=retries), **kwargs) for cls in ADAPTER_CLASSES}  # type: ignore[attr-defined]

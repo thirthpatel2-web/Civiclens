@@ -23,7 +23,7 @@ from app.services.uow import UowFactory
 HISTORY_DAYS = 28
 
 
-def _daily(rows: list[ComplaintRow], today: datetime, key=lambda r: True) -> tuple[list[int], int]:  # type: ignore[no-untyped-def]
+def _daily(rows: list[ComplaintRow], today: datetime, key=lambda r: True) -> tuple[list[int], int]:
     counts = Counter(r.created_at.date() for r in rows if key(r))
     hist = [counts.get(today.date() - timedelta(days=i), 0) for i in range(HISTORY_DAYS, 0, -1)]
     return hist, counts.get(today.date(), 0)
@@ -64,9 +64,9 @@ class AnomalyDetectionJob:
                     found.append((AnomalyEvent(r.kind, r.subject, r.observed, r.expected, r.score, r.severity, r.explanation, {"categories": [cat]}), None))
 
             by_dept: dict[str, list[ComplaintRow]] = defaultdict(list)
-            for r in rows:
-                if r.department_code:
-                    by_dept[r.department_code].append(r)
+            for row in rows:  # not `r`: that name already holds a detector result in this scope
+                if row.department_code:
+                    by_dept[row.department_code].append(row)
             for dept, drows in sorted(by_dept.items()):
                 open_n = sum(1 for r in drows if r.status not in FINISHED)
                 closed_7d = sum(1 for r in drows if r.resolved_at and r.resolved_at >= now - timedelta(days=7))

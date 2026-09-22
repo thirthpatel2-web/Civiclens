@@ -97,5 +97,5 @@ class GoogleDriveStorageProvider:
 
 def build_storage(settings: Settings, drive_folder_id: str = "") -> Storage:
     if settings.google_drive_enabled:
-        return GoogleDriveStorageProvider(settings.google_credentials_file, drive_folder_id)  # type: ignore[return-value]
+        return GoogleDriveStorageProvider(settings.google_credentials_file, drive_folder_id)
     return LocalStorageProvider(settings.upload_dir)

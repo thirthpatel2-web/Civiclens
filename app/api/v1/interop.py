@@ -38,12 +38,12 @@ ANY = Depends(guard(Permission.ASSISTANT_USE))  # every role (citizen/officer/ad
 
 
 @router.get("/systems")
-def systems(ctx: AuthContext = ANY) -> dict:  # type: ignore[type-arg]
+def systems(ctx: AuthContext = ANY) -> dict:
     return {"items": [{"code": k, "label": v[0]} for k, v in SYSTEMS.items()]}
 
 
 @router.post("/normalize-demo")
-def normalize_demo(body: NormalizeDemoBody, ctx: AuthContext = ANY) -> dict:  # type: ignore[type-arg]
+def normalize_demo(body: NormalizeDemoBody, ctx: AuthContext = ANY) -> dict:
     """Runs a real adapter against its (fixture) payload - the actual technical mechanism, not a mockup."""
     if body.system not in SYSTEMS:
         raise ValidationFailed("Unknown system.", details={"allowed": list(SYSTEMS)})
@@ -60,7 +60,7 @@ def normalize_demo(body: NormalizeDemoBody, ctx: AuthContext = ANY) -> dict:  # 
 
 
 @router.get("/fragmentation")
-def fragmentation(ctx: AuthContext = Depends(guard(Permission.COMPLAINT_READ_OWN)), c: AppContainer = Depends(get_container)) -> dict:  # type: ignore[type-arg]
+def fragmentation(ctx: AuthContext = Depends(guard(Permission.COMPLAINT_READ_OWN)), c: AppContainer = Depends(get_container)) -> dict:
     mine = c.complaints.list_mine(ctx, filter_name="all")
     diag = personal_diagnostic([m.department_code for m in mine])
     return {
@@ -71,35 +71,35 @@ def fragmentation(ctx: AuthContext = Depends(guard(Permission.COMPLAINT_READ_OWN
 
 # ---- integration exceptions (logging is open to any authenticated caller; viewing/resolving is admin-only)
 @router.post("/exceptions", status_code=201)
-def log_exception(body: LogExceptionBody, ctx: AuthContext = ANY, c: AppContainer = Depends(get_container)) -> dict:  # type: ignore[type-arg]
-    return to_jsonable(c.exceptions.log(source_system=body.source_system, reason=body.reason, payload=body.payload))  # type: ignore[no-any-return]
+def log_exception(body: LogExceptionBody, ctx: AuthContext = ANY, c: AppContainer = Depends(get_container)) -> dict:
+    return to_jsonable(c.exceptions.log(source_system=body.source_system, reason=body.reason, payload=body.payload))
 
 
 @router.get("/exceptions")
-def list_exceptions(status: str | None = None, ctx: AuthContext = Depends(guard(Permission.ADMIN_INTEGRATIONS)), c: AppContainer = Depends(get_container)) -> dict:  # type: ignore[type-arg]
+def list_exceptions(status: str | None = None, ctx: AuthContext = Depends(guard(Permission.ADMIN_INTEGRATIONS)), c: AppContainer = Depends(get_container)) -> dict:
     return {"items": to_jsonable(c.exceptions.list(ctx, status=status))}
 
 
 @router.get("/exceptions/counts")
-def exception_counts(ctx: AuthContext = Depends(guard(Permission.ADMIN_INTEGRATIONS)), c: AppContainer = Depends(get_container)) -> dict:  # type: ignore[type-arg]
+def exception_counts(ctx: AuthContext = Depends(guard(Permission.ADMIN_INTEGRATIONS)), c: AppContainer = Depends(get_container)) -> dict:
     return c.exceptions.counts(ctx)
 
 
 @router.post("/exceptions/{exception_id}/resolve")
-def resolve_exception(exception_id: str, body: ResolveExceptionBody, ctx: AuthContext = Depends(guard(Permission.ADMIN_INTEGRATIONS)), c: AppContainer = Depends(get_container)) -> dict:  # type: ignore[type-arg]
+def resolve_exception(exception_id: str, body: ResolveExceptionBody, ctx: AuthContext = Depends(guard(Permission.ADMIN_INTEGRATIONS)), c: AppContainer = Depends(get_container)) -> dict:
     c.exceptions.resolve(ctx, exception_id, note=body.note, ignore=body.ignore)
     return {"ok": True}
 
 
 # ---- Golden Record: link external government IDs to one CivicLens profile (master-data management)
 @router.get("/master-data")
-def list_master_data(ctx: AuthContext = Depends(guard(Permission.PROFILE_MANAGE)), c: AppContainer = Depends(get_container)) -> dict:  # type: ignore[type-arg]
+def list_master_data(ctx: AuthContext = Depends(guard(Permission.PROFILE_MANAGE)), c: AppContainer = Depends(get_container)) -> dict:
     return {"items": to_jsonable(c.master_data.list_mine(ctx))}
 
 
 @router.post("/master-data", status_code=201)
-def link_master_data(body: LinkExternalIdBody, ctx: AuthContext = Depends(guard(Permission.PROFILE_MANAGE)), c: AppContainer = Depends(get_container)) -> dict:  # type: ignore[type-arg]
-    return to_jsonable(c.master_data.link(ctx, body.id_type, body.raw_value))  # type: ignore[no-any-return]
+def link_master_data(body: LinkExternalIdBody, ctx: AuthContext = Depends(guard(Permission.PROFILE_MANAGE)), c: AppContainer = Depends(get_container)) -> dict:
+    return to_jsonable(c.master_data.link(ctx, body.id_type, body.raw_value))
 
 
 @router.delete("/master-data/{record_id}", status_code=204)
@@ -109,17 +109,17 @@ def unlink_master_data(record_id: str, ctx: AuthContext = Depends(guard(Permissi
 
 # ---- honest manual cross-portal tracking (unified application tracking for portals with no API)
 @router.get("/external-links")
-def list_external_links(ctx: AuthContext = Depends(guard(Permission.PROFILE_MANAGE)), c: AppContainer = Depends(get_container)) -> dict:  # type: ignore[type-arg]
+def list_external_links(ctx: AuthContext = Depends(guard(Permission.PROFILE_MANAGE)), c: AppContainer = Depends(get_container)) -> dict:
     return {"items": to_jsonable(c.external_links.list_mine(ctx))}
 
 
 @router.post("/external-links", status_code=201)
-def add_external_link(body: AddExternalLinkBody, ctx: AuthContext = Depends(guard(Permission.PROFILE_MANAGE)), c: AppContainer = Depends(get_container)) -> dict:  # type: ignore[type-arg]
-    return to_jsonable(c.external_links.add(ctx, platform=body.platform, external_reference=body.external_reference, title=body.title, status_note=body.status_note))  # type: ignore[no-any-return]
+def add_external_link(body: AddExternalLinkBody, ctx: AuthContext = Depends(guard(Permission.PROFILE_MANAGE)), c: AppContainer = Depends(get_container)) -> dict:
+    return to_jsonable(c.external_links.add(ctx, platform=body.platform, external_reference=body.external_reference, title=body.title, status_note=body.status_note))
 
 
 @router.put("/external-links/{record_id}")
-def update_external_link(record_id: str, body: UpdateExternalLinkStatusBody, ctx: AuthContext = Depends(guard(Permission.PROFILE_MANAGE)), c: AppContainer = Depends(get_container)) -> dict:  # type: ignore[type-arg]
+def update_external_link(record_id: str, body: UpdateExternalLinkStatusBody, ctx: AuthContext = Depends(guard(Permission.PROFILE_MANAGE)), c: AppContainer = Depends(get_container)) -> dict:
     c.external_links.update_status(ctx, record_id, body.status_note)
     return {"ok": True}
 
