@@ -46,7 +46,7 @@ def register(c: AppContainer) -> None:
             stat_tile(tr(c, "card.overdue"), d["sla"]["breached"], color="danger", icon="report")
             stat_tile(tr(c, "card.at_risk"), d["sla"]["at_risk"], color="warning", icon="schedule")
             stat_tile(tr(c, "card.escalated"), d["escalated"], color="danger", icon="trending_up")
-            stat_tile("Unrouted", d["unrouted"], color="muted", icon="alt_route")
+            stat_tile(tr(c, "col.unrouted"), d["unrouted"], color="muted", icon="alt_route")
         if d["resolution_hours"]:
             with ui.row().classes("cl-card w-full items-center gap-2"):
                 ui.icon("timer").style("color: var(--cl-fg-muted);")
@@ -58,7 +58,7 @@ def register(c: AppContainer) -> None:
             with ui.column().classes("cl-card").style("flex: 1.4; min-width: 380px;"):
                 section_title(tr(c, "of.per_day"))
                 ui.echart({"grid": {"left": 36, "right": 12, "top": 12, "bottom": 24}, "xAxis": {"type": "category", "data": [t["date"][5:] for t in d["trend_daily"]]}, "yAxis": {"type": "value"}, "series": [{"type": "line", "areaStyle": {}, "data": [t["count"] for t in d["trend_daily"]]}]}).classes("w-full h-56")
-        section_title("Workload")
+        section_title(tr(c, "col.workload"))
         data_table([("officer", tr(c, "role.officer")), ("open", tr(c, "card.open"))], [{"id": k, "officer": k[:8], "open": v} for k, v in d["workload"].items()], empty=tr(c, "of.no_work"))
         if d["anomalies"]:
             section_title(tr(c, "of.open_anomalies"))
@@ -119,7 +119,7 @@ def register(c: AppContainer) -> None:
                                 ui.button(tr(c, "of.save_correction"), on_click=_act(lambda: c.officer.correct_category(user.ctx, cid, sel.value))).props("color=primary unelevated")
                             dlg.open()
 
-                        ui.button("Correct", icon="edit", on_click=correct_category_dialog).props("flat dense")
+                        ui.button(tr(c, "act.correct"), icon="edit", on_click=correct_category_dialog).props("flat dense")
                     ui.label(f"Routing: {cm.routing.get('source')} - {cm.routing.get('explanation')}").classes("text-xs").style("color: var(--cl-fg-muted);")
                     if cm.routing.get("ai_disagreement"):
                         ui.label(f"AI disagreed with the rule: {cm.routing['ai_disagreement']}").classes("text-xs").style("color: var(--cl-warning);")
@@ -128,7 +128,7 @@ def register(c: AppContainer) -> None:
                         ui.label(f"SLA due {sla.due_at:%d %b %H:%M} ({sla.remaining.total_seconds() / 3600:.1f} h remaining)").classes("text-xs").style("color: var(--cl-fg-muted);")
 
                 if cm.lat is not None:
-                    section_title("Location")
+                    section_title(tr(c, "lbl.location"))
                     m = ui.leaflet(center=(cm.lat, cm.lng), zoom=15).classes("w-full h-56").style("border-radius: var(--cl-radius-md); overflow: hidden;")
                     m.marker(latlng=(cm.lat, cm.lng))
 
@@ -144,8 +144,8 @@ def register(c: AppContainer) -> None:
                                 if x["review"]:
                                     ui.label(f"Reviewed: {x['review']['decision'].replace('_', ' ')} at {x['review']['at']:%d %b %H:%M}" + (f" - {x['review']['note']}" if x["review"]["note"] else "")).classes("text-xs").style("color: var(--cl-success);")
                                 with ui.row().classes("gap-2 items-end flex-wrap"):
-                                    decision = ui.select(["confirmed_duplicate", "related", "not_duplicate"], value="related", label="Decision").props("outlined dense").classes("w-56")
-                                    note = ui.input("Note").props("outlined dense").classes("w-56")
+                                    decision = ui.select(["confirmed_duplicate", "related", "not_duplicate"], value="related", label=tr(c, "col.decision")).props("outlined dense").classes("w-56")
+                                    note = ui.input(tr(c, "col.note")).props("outlined dense").classes("w-56")
                                     ui.button(tr(c, "of.save_decision"), on_click=_act(lambda o=x["complaint_id"], d=decision, n=note: c.duplicate_reviews.decide(user.ctx, cid, o, d.value, n.value))).props("outline dense")
 
                 section_title(tr(c, "lbl.evidence"))
@@ -169,7 +169,7 @@ def register(c: AppContainer) -> None:
 
                 government_panel(c, user.ctx, cid)
 
-                section_title("Actions")
+                section_title(tr(c, "col.actions"))
                 allowed = sorted(s.value for s in TRANSITIONS[cm.status])
                 with ui.row().classes("cl-card gap-3 items-end w-full flex-wrap"):
                     target = ui.select(allowed, label=tr(c, "of.move_to"), value=allowed[0] if allowed else None).props("outlined dense").classes("w-48")
@@ -183,13 +183,13 @@ def register(c: AppContainer) -> None:
                         ui.button(label, icon=icon, on_click=dlg.open).props(tone + " dense")
 
                     def remark_form(dlg: Any) -> None:
-                        t = ui.textarea("Remark").props("outlined").classes("w-full")
+                        t = ui.textarea(tr(c, "col.remark")).props("outlined").classes("w-full")
                         internal = ui.checkbox("Internal (hidden from citizen)", value=True)
                         ui.button(tr(c, "act.save"), on_click=_act(lambda: c.officer.remark(user.ctx, cid, t.value, internal=internal.value))).props("color=primary unelevated")
 
                     def visit_form(dlg: Any) -> None:
                         when = ui.input(tr(c, "of.scheduled_for")).props("outlined").classes("w-full")
-                        n = ui.textarea("Notes").props("outlined").classes("w-full")
+                        n = ui.textarea(tr(c, "col.notes")).props("outlined").classes("w-full")
 
                         def go() -> None:
                             try:
@@ -202,19 +202,19 @@ def register(c: AppContainer) -> None:
                         ui.button(tr(c, "act.save"), on_click=go).props("color=primary unelevated")
 
                     def inspection_form(dlg: Any) -> None:
-                        f = ui.textarea("Findings").props("outlined").classes("w-full")
+                        f = ui.textarea(tr(c, "col.findings")).props("outlined").classes("w-full")
                         ui.button(tr(c, "act.save"), on_click=_act(lambda: c.officer.inspection(user.ctx, cid, f.value))).props("color=primary unelevated")
 
                     def wo_form(dlg: Any) -> None:
-                        ref, desc, team = ui.input(tr(c, "of.work_order")).props("outlined").classes("w-full"), ui.textarea("Description").props("outlined").classes("w-full"), ui.input("Team").props("outlined").classes("w-full")
+                        ref, desc, team = ui.input(tr(c, "of.work_order")).props("outlined").classes("w-full"), ui.textarea(tr(c, "lbl.description")).props("outlined").classes("w-full"), ui.input(tr(c, "col.team")).props("outlined").classes("w-full")
                         ui.button(tr(c, "act.save"), on_click=_act(lambda: c.officer.work_order(user.ctx, cid, ref.value, desc.value, team.value))).props("color=primary unelevated")
 
                     def coord_form(dlg: Any) -> None:
-                        w, n = ui.input(tr(c, "of.with_team")).props("outlined").classes("w-full"), ui.textarea("Note").props("outlined").classes("w-full")
+                        w, n = ui.input(tr(c, "of.with_team")).props("outlined").classes("w-full"), ui.textarea(tr(c, "col.note")).props("outlined").classes("w-full")
                         ui.button(tr(c, "act.save"), on_click=_act(lambda: c.officer.coordination_note(user.ctx, cid, w.value or "", n.value))).props("color=primary unelevated")
 
                     def progress_form(dlg: Any) -> None:
-                        p, n = ui.slider(min=0, max=100, value=50).props("label-always color=primary"), ui.input("Notes").props("outlined").classes("w-full")
+                        p, n = ui.slider(min=0, max=100, value=50).props("label-always color=primary"), ui.input(tr(c, "col.notes")).props("outlined").classes("w-full")
                         ui.button(tr(c, "act.save"), on_click=_act(lambda: c.officer.progress(user.ctx, cid, int(p.value), n.value))).props("color=primary unelevated")
 
                     def assign_form(dlg: Any) -> None:
@@ -225,12 +225,12 @@ def register(c: AppContainer) -> None:
                         ui.button(tr(c, "act.save"), on_click=_act(lambda: c.officer.assign(user.ctx, cid, sel.value))).props("color=primary unelevated")
 
                     def escalate_form(dlg: Any) -> None:
-                        r = ui.textarea("Reason").props("outlined").classes("w-full")
-                        ui.button("Escalate", on_click=_act(lambda: c.officer.escalate(user.ctx, cid, r.value))).props("color=negative unelevated")
+                        r = ui.textarea(tr(c, "col.reason")).props("outlined").classes("w-full")
+                        ui.button(tr(c, "col.escalate"), on_click=_act(lambda: c.officer.escalate(user.ctx, cid, r.value))).props("color=negative unelevated")
 
                     def resolve_form(dlg: Any) -> None:
                         r = ui.textarea(tr(c, "of.resolution_notes")).props("outlined").classes("w-full")
-                        ui.button("Resolve", on_click=_act(lambda: c.officer.resolve(user.ctx, cid, r.value))).props("color=positive unelevated")
+                        ui.button(tr(c, "col.resolve"), on_click=_act(lambda: c.officer.resolve(user.ctx, cid, r.value))).props("color=positive unelevated")
 
                     for label, icon, form in (("Remark", "chat", remark_form), ("Field visit", "directions_walk", visit_form), ("Inspection", "fact_check", inspection_form), ("Work order", "build", wo_form),
                                                ("Coordination", "groups", coord_form), ("Progress", "trending_up", progress_form), ("Assign / reassign", "person_add", assign_form),
@@ -279,7 +279,7 @@ def register(c: AppContainer) -> None:
                     section_title(tr(c, "gr.status_timeline"))
                     with ui.column().classes("cl-card w-full"):
                         _timeline(c, rep["timeline"])
-        section_title("Notes")
+        section_title(tr(c, "col.notes"))
         with ui.column().classes("cl-card gap-2 w-full max-w-2xl"):
             if not inv.notes:
                 ui.label(tr(c, "of.no_notes")).classes("text-sm").style("color: var(--cl-fg-subtle);")

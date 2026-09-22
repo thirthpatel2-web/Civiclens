@@ -700,7 +700,7 @@ def register(c: AppContainer) -> None:
                 section_title(tr(c, "gr.status_timeline"))
                 with ui.column().classes("cl-card w-full"):
                     _timeline(c, d["timeline"])
-                section_title("History")
+                section_title(tr(c, "col.history"))
                 _events(d["events"])
 
     @page(c, "/rti", "nav.rti", roles=CIT)
@@ -1042,7 +1042,7 @@ def register(c: AppContainer) -> None:
                     for o in r["offices"]:
                         m.marker(latlng=(o["lat"], o["lng"]))
                     with ui.column().classes("cl-card gap-2").style("flex: 1; min-width: 260px;"):
-                        section_title("Hotspots")
+                        section_title(tr(c, "gis.hotspots"))
                         if not r["hotspots"]:
                             ui.label(tr(c, "gis.no_clusters")).classes("text-xs").style("color: var(--cl-fg-subtle);")
                         for h in r["hotspots"][:8]:
@@ -1158,7 +1158,7 @@ def register(c: AppContainer) -> None:
         page_header(tr(c, "settingsTitle"), icon="settings")
         with ui.column().classes("w-full max-w-2xl gap-5"):
             with ui.column().classes("cl-card gap-3 w-full"):
-                section_title("Notifications")
+                section_title(tr(c, "nav.notifications"))
                 prefs = run_in_uow(c, lambda uow: c.notifications.preferences(user.ctx, uow.notifications))
                 in_app = ui.switch("In-app notifications", value=prefs.in_app).props("color=primary")
                 email = ui.switch("E-mail notifications", value=prefs.email).props("color=primary")
@@ -1189,7 +1189,7 @@ def register(c: AppContainer) -> None:
                 field_hint(tr(c, "set.theme_hint"))
 
             with ui.column().classes("cl-card gap-3 w-full"):
-                section_title("Security")
+                section_title(tr(c, "col.security"))
                 ui.label(tr(c, "set.security_hint")).classes("text-sm").style("color: var(--cl-fg-muted);")
                 ui.button(tr(c, "nav.security"), icon="lock", on_click=lambda: ui.navigate.to("/security")).props("outline")
 
@@ -1223,10 +1223,10 @@ def register(c: AppContainer) -> None:
                             ui.notify(exc.message, type="negative")
                             return
                         id_value.value = ""
-                        ui.notify("Linked.", type="positive")
+                        ui.notify(tr(c, "msg.linked"), type="positive")
                         draw_ids()
 
-                    ui.button("Link", icon="add_link", on_click=link_id).props("outline dense")
+                    ui.button(tr(c, "act.link"), icon="add_link", on_click=link_id).props("outline dense")
 
             with ui.column().classes("cl-card gap-3 w-full"):
                 section_title(tr(c, "set.other_portals"), tr(c, "set.other_portals_sub"))
@@ -1259,10 +1259,10 @@ def register(c: AppContainer) -> None:
                             ui.notify(exc.message + (f" {exc.details}" if exc.details else ""), type="negative")
                             return
                         platform_in.value = ref_in.value = title_in.value = ""
-                        ui.notify("Added.", type="positive")
+                        ui.notify(tr(c, "msg.added"), type="positive")
                         draw_links()
 
-                    ui.button("Track", icon="add", on_click=add_link).props("outline dense")
+                    ui.button(tr(c, "nav.track"), icon="add", on_click=add_link).props("outline dense")
 
     @page(c, "/notifications", "nav.notifications")
     def notifications(c: AppContainer, user: UiUser) -> None:

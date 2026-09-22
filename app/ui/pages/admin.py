@@ -26,22 +26,22 @@ from app.ui.components import (
 from app.ui.navigation import ADMINS
 
 
-def _act(fn: Any) -> Any:
+def _act(c: AppContainer, fn: Any) -> Any:
     def run(*a: Any) -> None:
         try:
             fn(*a)
         except (CivicLensError, ValueError) as exc:
             ui.notify(getattr(exc, "message", str(exc)) + (f" {exc.details}" if getattr(exc, "details", None) else ""), type="negative")
             return
-        ui.notify("Saved.", type="positive")
+        ui.notify(tr(c, "msg.saved"), type="positive")
         ui.navigate.reload()
 
     return run
 
 
-def _danger_action(label: str, on_click: Any) -> None:
+def _danger_action(c: AppContainer, label: str, on_click: Any) -> None:
     """A destructive action that must be confirmed before it runs - deletes/deactivations were one click away before."""
-    open_dialog = confirm_dialog(label, "This cannot be undone. Are you sure?", confirm_label=label, danger=True, on_confirm=_act(on_click))
+    open_dialog = confirm_dialog(label, tr(c, "ad.confirm_undone"), confirm_label=label, cancel_label=tr(c, "act.cancel"), danger=True, on_confirm=_act(c, on_click))
     ui.button(label, icon="delete_outline", on_click=open_dialog).props("outline dense color=negative")
 
 
@@ -56,7 +56,7 @@ def register(c: AppContainer) -> None:
             stat_tile(tr(c, "card.overdue"), d["sla"]["breached"], color="danger", icon="report")
             stat_tile(tr(c, "card.at_risk"), d["sla"]["at_risk"], color="warning", icon="schedule")
             stat_tile(tr(c, "card.escalated"), d["escalated"], color="danger", icon="trending_up")
-            stat_tile("Unrouted", d["unrouted"], color="muted", icon="alt_route")
+            stat_tile(tr(c, "col.unrouted"), d["unrouted"], color="muted", icon="alt_route")
         if d["resolution_hours"]:
             with ui.row().classes("cl-card w-full items-center gap-2"):
                 ui.icon("timer").style("color: var(--cl-fg-muted);")
@@ -72,7 +72,7 @@ def register(c: AppContainer) -> None:
                         ui.label(tr(c, "msg.no_data")).classes("text-sm").style("color: var(--cl-fg-subtle);")
             with ui.column().classes("cl-card gap-2").style("flex: 1; min-width: 300px;"):
                 s = d["system"] or {}
-                section_title("System")
+                section_title(tr(c, "col.system"))
                 q = s.get("queue", {})
                 ui.label(f"Queue: {'reachable' if q.get('backend_reachable') else 'NOT reachable / not configured'} · jobs {q.get('by_status')}").classes("text-xs").style("color: var(--cl-fg-muted);")
                 ui.label(f"Workers: {list((q.get('workers') or {}).keys())}").classes("text-xs").style("color: var(--cl-fg-muted);")
@@ -98,15 +98,15 @@ def register(c: AppContainer) -> None:
                     pw = ui.input(tr(c, "lbl.password"), password=True).props("outlined dense").classes("w-full")
                     roles = [Role.OFFICER.value] + ([Role.ADMIN.value, Role.SUPER_ADMIN.value] if user.ctx.role is Role.SUPER_ADMIN else [])
                     role, dept = ui.select(roles, value=roles[0], label=tr(c, "col.role")).props("outlined dense").classes("w-full"), ui.select(depts, label=tr(c, "lbl.department")).props("outlined dense").classes("w-full")
-                    ui.button(tr(c, "act.submit"), icon="person_add", on_click=_act(lambda: c.admin.create_staff(user.ctx, email.value or "", pw.value or "", name.value or "", Role(role.value), dept.value))).props("color=primary unelevated").classes("w-full")
+                    ui.button(tr(c, "act.submit"), icon="person_add", on_click=_act(c, lambda: c.admin.create_staff(user.ctx, email.value or "", pw.value or "", name.value or "", Role(role.value), dept.value))).props("color=primary unelevated").classes("w-full")
                 with ui.column().classes("cl-card gap-2 w-full"):
                     section_title(tr(c, "ad.change_role_deactivate"))
-                    uid = ui.select({u.id: f"{u.email} ({u.role.value})" for u in items}, label="User").props("outlined dense").classes("w-full")
+                    uid = ui.select({u.id: f"{u.email} ({u.role.value})" for u in items}, label=tr(c, "col.user")).props("outlined dense").classes("w-full")
                     new_role, new_dept = ui.select([r.value for r in Role], label=tr(c, "ad.new_role")).props("outlined dense").classes("w-full"), ui.select(depts, label=tr(c, "lbl.department")).props("outlined dense").classes("w-full")
                     with ui.row().classes("gap-2 flex-wrap"):
-                        ui.button(tr(c, "ad.change_role"), on_click=_act(lambda: c.admin.change_role(user.ctx, uid.value, Role(new_role.value), new_dept.value))).props("outline dense")
-                        ui.button("Reactivate", on_click=_act(lambda: c.admin.set_user_active(user.ctx, uid.value, True))).props("outline dense")
-                        _danger_action("Deactivate", lambda: c.admin.set_user_active(user.ctx, uid.value, False))
+                        ui.button(tr(c, "ad.change_role"), on_click=_act(c, lambda: c.admin.change_role(user.ctx, uid.value, Role(new_role.value), new_dept.value))).props("outline dense")
+                        ui.button(tr(c, "act.reactivate"), on_click=_act(c, lambda: c.admin.set_user_active(user.ctx, uid.value, True))).props("outline dense")
+                        _danger_action(c, tr(c, "act.deactivate"), lambda: c.admin.set_user_active(user.ctx, uid.value, False))
                 with ui.column().classes("cl-card gap-2 w-full"):
                     section_title(tr(c, "ad.reset_no_email"))
 
@@ -131,23 +131,23 @@ def register(c: AppContainer) -> None:
         ref = c.admin.reference_data(user.ctx)
         data_table([("code", tr(c, "col.code")), ("name", tr(c, "col.name")), ("active", tr(c, "filter.active"))], [{"id": d.code, "code": d.code, "name": d.name, "active": d.active} for d in ref["departments"]])
         with ui.row().classes("cl-card gap-3 items-end w-full flex-wrap"):
-            code, name, active = ui.input("Code").props("outlined dense"), ui.input("Name").props("outlined dense"), ui.switch("Active", value=True).props("color=primary")
-            ui.button(tr(c, "act.save"), icon="check", on_click=_act(lambda: c.admin.save_department(user.ctx, code.value or "", name.value or "", bool(active.value)))).props("color=primary unelevated")
+            code, name, active = ui.input(tr(c, "col.code")).props("outlined dense"), ui.input(tr(c, "col.name")).props("outlined dense"), ui.switch("Active", value=True).props("color=primary")
+            ui.button(tr(c, "act.save"), icon="check", on_click=_act(c, lambda: c.admin.save_department(user.ctx, code.value or "", name.value or "", bool(active.value)))).props("color=primary unelevated")
 
     @page(c, "/admin/wards", "nav.wards", roles=ADMINS)
     def wards(c: AppContainer, user: UiUser) -> None:
         page_header(tr(c, "nav.wards"), icon="location_city")
         ref = c.admin.reference_data(user.ctx)
-        section_title("Cities")
+        section_title(tr(c, "col.cities"))
         data_table([("code", tr(c, "col.code")), ("name", tr(c, "col.name")), ("state", tr(c, "col.state")), ("lat", "Lat"), ("lng", "Lng")], [{"id": x.code, "code": x.code, "name": x.name, "state": x.state or "-", "lat": x.lat, "lng": x.lng} for x in ref["cities"]], empty=tr(c, "ad.no_cities"))
         with ui.row().classes("cl-card gap-3 items-end w-full flex-wrap"):
-            cc, cn, cs, cla, cln = ui.input(tr(c, "ad.city_code")).props("outlined dense"), ui.input("Name").props("outlined dense"), ui.input("State").props("outlined dense"), ui.number("Lat").props("outlined dense"), ui.number("Lng").props("outlined dense")
-            ui.button(tr(c, "ad.save_city"), icon="check", on_click=_act(lambda: c.admin.save_city(user.ctx, cc.value or "", cn.value or "", cs.value, cla.value, cln.value))).props("color=primary unelevated")
-        section_title("Wards")
+            cc, cn, cs, cla, cln = ui.input(tr(c, "ad.city_code")).props("outlined dense"), ui.input(tr(c, "col.name")).props("outlined dense"), ui.input(tr(c, "col.state")).props("outlined dense"), ui.number(tr(c, "col.lat")).props("outlined dense"), ui.number(tr(c, "col.lng")).props("outlined dense")
+            ui.button(tr(c, "ad.save_city"), icon="check", on_click=_act(c, lambda: c.admin.save_city(user.ctx, cc.value or "", cn.value or "", cs.value, cla.value, cln.value))).props("color=primary unelevated")
+        section_title(tr(c, "col.wards"))
         data_table([("code", tr(c, "col.code")), ("name", tr(c, "col.name")), ("city", tr(c, "col.city"))], [{"id": x.code, "code": x.code, "name": x.name, "city": x.city_code or "-"} for x in ref["wards"]], empty=tr(c, "ad.no_wards"))
         with ui.row().classes("cl-card gap-3 items-end w-full flex-wrap"):
-            wc, wn, wcity = ui.input(tr(c, "ad.ward_code")).props("outlined dense"), ui.input("Name").props("outlined dense"), ui.select([x.code for x in ref["cities"]], label=tr(c, "col.city")).props("outlined dense")
-            ui.button(tr(c, "ad.save_ward"), icon="check", on_click=_act(lambda: c.admin.save_ward(user.ctx, wc.value or "", wn.value or "", wcity.value))).props("color=primary unelevated")
+            wc, wn, wcity = ui.input(tr(c, "ad.ward_code")).props("outlined dense"), ui.input(tr(c, "col.name")).props("outlined dense"), ui.select([x.code for x in ref["cities"]], label=tr(c, "col.city")).props("outlined dense")
+            ui.button(tr(c, "ad.save_ward"), icon="check", on_click=_act(c, lambda: c.admin.save_ward(user.ctx, wc.value or "", wn.value or "", wcity.value))).props("color=primary unelevated")
 
     @page(c, "/admin/services", "nav.civic_services", roles=ADMINS)
     def services(c: AppContainer, user: UiUser) -> None:
@@ -156,13 +156,13 @@ def register(c: AppContainer) -> None:
         section_title(tr(c, "ad.civic_services"))
         data_table([("code", tr(c, "col.code")), ("name", tr(c, "col.name")), ("dept", tr(c, "lbl.department"))], [{"id": x.code, "code": x.code, "name": x.name, "dept": x.department_code} for x in ref["services"]], empty=tr(c, "ad.no_services"))
         with ui.row().classes("cl-card gap-3 items-end w-full flex-wrap"):
-            sc, sn, sd = ui.input("Code").props("outlined dense"), ui.input("Name").props("outlined dense"), ui.select([d.code for d in ref["departments"]], label=tr(c, "lbl.department")).props("outlined dense")
-            ui.button(tr(c, "act.save"), icon="check", on_click=_act(lambda: c.admin.save_service(user.ctx, sc.value or "", sn.value or "", sd.value))).props("color=primary unelevated")
+            sc, sn, sd = ui.input(tr(c, "col.code")).props("outlined dense"), ui.input(tr(c, "col.name")).props("outlined dense"), ui.select([d.code for d in ref["departments"]], label=tr(c, "lbl.department")).props("outlined dense")
+            ui.button(tr(c, "act.save"), icon="check", on_click=_act(c, lambda: c.admin.save_service(user.ctx, sc.value or "", sn.value or "", sd.value))).props("color=primary unelevated")
         section_title(tr(c, "ad.gov_offices"), tr(c, "ad.gov_offices_sub"))
         data_table([("name", tr(c, "col.name")), ("dept", tr(c, "lbl.department")), ("lat", "Lat"), ("lng", "Lng")], [{"id": x.id, "name": x.name, "dept": x.department_code or "-", "lat": x.lat, "lng": x.lng} for x in ref["offices"]], empty=tr(c, "ad.no_offices"))
         with ui.row().classes("cl-card gap-3 items-end w-full flex-wrap"):
-            oi, on, od, ola, oln, oa = ui.input("Id").props("outlined dense"), ui.input("Name").props("outlined dense"), ui.select([d.code for d in ref["departments"]], label=tr(c, "lbl.department")).props("outlined dense"), ui.number("Lat").props("outlined dense"), ui.number("Lng").props("outlined dense"), ui.input("Address").props("outlined dense")
-            ui.button(tr(c, "ad.save_office"), icon="check", on_click=_act(lambda: c.admin.save_office(user.ctx, oi.value or "", on.value or "", od.value, ola.value, oln.value, oa.value))).props("color=primary unelevated")
+            oi, on, od, ola, oln, oa = ui.input("Id").props("outlined dense"), ui.input(tr(c, "col.name")).props("outlined dense"), ui.select([d.code for d in ref["departments"]], label=tr(c, "lbl.department")).props("outlined dense"), ui.number(tr(c, "col.lat")).props("outlined dense"), ui.number(tr(c, "col.lng")).props("outlined dense"), ui.input(tr(c, "lbl.address")).props("outlined dense")
+            ui.button(tr(c, "ad.save_office"), icon="check", on_click=_act(c, lambda: c.admin.save_office(user.ctx, oi.value or "", on.value or "", od.value, ola.value, oln.value, oa.value))).props("color=primary unelevated")
 
     @page(c, "/admin/routing-rules", "nav.routing", roles=ADMINS)
     def routing(c: AppContainer, user: UiUser) -> None:
@@ -173,15 +173,15 @@ def register(c: AppContainer) -> None:
                    [{"id": r.id, "prio": r.priority, "dept": r.department_code, "cats": ", ".join(sorted(r.categories)), "kw": ", ".join(r.keywords_any), "active": r.active} for r in ref["routing_rules"]], empty=tr(c, "ad.no_routing_rules"))
         with ui.column().classes("cl-card gap-3 w-full"):
             with ui.row().classes("gap-3 items-end flex-wrap"):
-                rid, prio = ui.input(tr(c, "ad.rule_id")).props("outlined dense"), ui.number("Priority", value=100, format="%d").props("outlined dense")
+                rid, prio = ui.input(tr(c, "ad.rule_id")).props("outlined dense"), ui.number(tr(c, "lbl.priority"), value=100, format="%d").props("outlined dense")
                 dept = ui.select([d.code for d in ref["departments"] if d.active], label=tr(c, "lbl.department")).props("outlined dense")
                 sev = ui.select([""] + list(SEVERITIES), value="", label=tr(c, "ad.min_severity")).props("outlined dense")
             cats = ui.select(list(CATEGORIES), multiple=True, label=tr(c, "col.categories")).props("outlined dense").classes("w-full")
             kws = ui.input(tr(c, "ad.keywords")).props("outlined dense").classes("w-full")
-            ui.button(tr(c, "act.save"), icon="check", on_click=_act(lambda: c.admin.save_routing_rule(user.ctx, rid.value or "", int(prio.value), dept.value or "", categories=list(cats.value or []), keywords_any=[k for k in (kws.value or "").split(",") if k.strip()], min_severity=sev.value or None))).props("color=primary unelevated")
+            ui.button(tr(c, "act.save"), icon="check", on_click=_act(c, lambda: c.admin.save_routing_rule(user.ctx, rid.value or "", int(prio.value), dept.value or "", categories=list(cats.value or []), keywords_any=[k for k in (kws.value or "").split(",") if k.strip()], min_severity=sev.value or None))).props("color=primary unelevated")
         with ui.row().classes("gap-3 items-end"):
             delete = ui.select([r.id for r in ref["routing_rules"]], label=tr(c, "ad.delete_rule")).props("outlined dense").classes("w-56")
-            _danger_action("Delete", lambda: c.admin.delete_routing_rule(user.ctx, delete.value))
+            _danger_action(c, tr(c, "act.delete"), lambda: c.admin.delete_routing_rule(user.ctx, delete.value))
 
     @page(c, "/admin/workflow-rules", "nav.workflow", roles=ADMINS)
     def workflow_rules(c: AppContainer, user: UiUser) -> None:
@@ -192,7 +192,7 @@ def register(c: AppContainer) -> None:
                    [{"id": r.id, "name": r.name, "trigger": r.trigger, "cond": json.dumps(r.conditions, ensure_ascii=False), "action": r.action, "active": r.active} for r in ov["rules"]], empty=tr(c, "ad.no_workflow_rules"))
         with ui.column().classes("cl-card gap-3 w-full"):
             with ui.row().classes("gap-3 items-end flex-wrap"):
-                rid, name = ui.input(tr(c, "ad.rule_id")).props("outlined dense"), ui.input("Name").props("outlined dense")
+                rid, name = ui.input(tr(c, "ad.rule_id")).props("outlined dense"), ui.input(tr(c, "col.name")).props("outlined dense")
                 trig, act = ui.select(list(WF_TRIGGERS), value=WF_TRIGGERS[0], label=tr(c, "col.trigger")).props("outlined dense"), ui.select(list(WF_ACTIONS), value=WF_ACTIONS[0], label=tr(c, "col.action")).props("outlined dense")
             cond = ui.textarea(tr(c, "ad.conditions_json"), value='{"priority_min": "critical"}').props("outlined").classes("w-full")
             params = ui.textarea(tr(c, "ad.params_json"), value="{}").props("outlined").classes("w-full")
@@ -204,12 +204,12 @@ def register(c: AppContainer) -> None:
                 except json.JSONDecodeError as exc:
                     ui.notify(f"Invalid JSON: {exc.msg} (line {exc.lineno}, col {exc.colno}).", type="negative")
                     return
-                _act(lambda: c.admin.save_workflow_rule(user.ctx, rid.value or "", name.value or "", trig.value, act.value, conditions=conditions, params=parsed_params))()
+                _act(c, lambda: c.admin.save_workflow_rule(user.ctx, rid.value or "", name.value or "", trig.value, act.value, conditions=conditions, params=parsed_params))()
 
             ui.button(tr(c, "act.save"), icon="check", on_click=save_wf).props("color=primary unelevated")
         with ui.row().classes("gap-3 items-end"):
             dele = ui.select([r.id for r in ov["rules"]], label=tr(c, "ad.delete_rule")).props("outlined dense").classes("w-56")
-            _danger_action("Delete", lambda: c.admin.delete_workflow_rule(user.ctx, dele.value))
+            _danger_action(c, tr(c, "act.delete"), lambda: c.admin.delete_workflow_rule(user.ctx, dele.value))
         section_title(tr(c, "ad.recent_executions"))
         data_table([("when", tr(c, "legal.col_when")), ("rule", tr(c, "col.rule")), ("complaint", tr(c, "col.complaint")), ("action", tr(c, "col.action"))], [{"id": str(i), "when": e.executed_at.strftime("%d %b %H:%M"), "rule": e.rule_id, "complaint": e.complaint_id[:8], "action": e.outcome} for i, e in enumerate(ov["executions"])], empty=tr(c, "ad.no_rule_runs"))
 
@@ -219,20 +219,20 @@ def register(c: AppContainer) -> None:
         items = c.admin.emergency_contacts(user.ctx)
         if not items:
             state_panel(icon="support_agent", title=tr(c, "em.none_title"), body=tr(c, "ad.em_empty_body"),
-                        action_label=tr(c, "ad.em_seed"), on_action=_act(lambda: c.emergency.seed_defaults()))
+                        action_label=tr(c, "ad.em_seed"), on_action=_act(c, lambda: c.emergency.seed_defaults()))
         else:
             data_table([("id", "Id"), ("number", tr(c, "col.number")), ("name", tr(c, "col.name")), ("scope", tr(c, "col.scope")), ("active", tr(c, "filter.active"))], [{"id": x.id, "number": x.number, "name": x.name, "scope": x.scope, "active": x.active} for x in items])
         with ui.column().classes("cl-card gap-3 w-full"):
             with ui.row().classes("gap-3 items-end flex-wrap"):
-                cid, num, nm = ui.input("Id").props("outlined dense"), ui.input("Number").props("outlined dense"), ui.input("Name").props("outlined dense")
+                cid, num, nm = ui.input("Id").props("outlined dense"), ui.input(tr(c, "col.number")).props("outlined dense"), ui.input(tr(c, "col.name")).props("outlined dense")
                 scope = ui.select(["national", "city"], value="national", label=tr(c, "col.scope")).props("outlined dense")
                 city = ui.select([x.code for x in c.admin.reference_data(user.ctx)["cities"]], label=tr(c, "ad.city_scope")).props("outlined dense")
-            desc = ui.input("Description").props("outlined dense").classes("w-full")
-            ui.button(tr(c, "act.save"), icon="check", on_click=_act(lambda: c.admin.save_emergency_contact(user.ctx, cid.value or "", num.value or "", nm.value or "", description=desc.value or "", scope=scope.value, city_code=city.value))).props("color=primary unelevated")
+            desc = ui.input(tr(c, "lbl.description")).props("outlined dense").classes("w-full")
+            ui.button(tr(c, "act.save"), icon="check", on_click=_act(c, lambda: c.admin.save_emergency_contact(user.ctx, cid.value or "", num.value or "", nm.value or "", description=desc.value or "", scope=scope.value, city_code=city.value))).props("color=primary unelevated")
         if items:
             with ui.row().classes("gap-3 items-end"):
                 dele = ui.select([x.id for x in items], label=tr(c, "ad.delete_contact")).props("outlined dense").classes("w-56")
-                _danger_action("Delete", lambda: c.admin.delete_emergency_contact(user.ctx, dele.value))
+                _danger_action(c, tr(c, "act.delete"), lambda: c.admin.delete_emergency_contact(user.ctx, dele.value))
 
     @page(c, "/admin/sla", "nav.sla", roles=ADMINS)
     def sla(c: AppContainer, user: UiUser) -> None:
@@ -244,10 +244,10 @@ def register(c: AppContainer) -> None:
         with ui.row().classes("cl-card gap-3 items-end w-full flex-wrap"):
             pid, prio, hours = ui.input(tr(c, "ad.policy_id")).props("outlined dense"), ui.select(["low", "medium", "high", "critical"], label=tr(c, "lbl.priority")).props("outlined dense"), ui.number(tr(c, "ad.resolution_hours"), value=72, format="%d").props("outlined dense")
             dept = ui.select([""] + [d.code for d in ref["departments"]], value="", label=tr(c, "lbl.department")).props("outlined dense")
-            ui.button(tr(c, "act.save"), icon="check", on_click=_act(lambda: c.admin.save_sla_policy(user.ctx, pid.value or "", prio.value or "", int(hours.value), department_code=dept.value or None))).props("color=primary unelevated")
+            ui.button(tr(c, "act.save"), icon="check", on_click=_act(c, lambda: c.admin.save_sla_policy(user.ctx, pid.value or "", prio.value or "", int(hours.value), department_code=dept.value or None))).props("color=primary unelevated")
         with ui.row().classes("gap-3 items-end"):
             d = ui.select([p.id for p in ref["sla_policies"]], label=tr(c, "ad.delete_policy")).props("outlined dense").classes("w-56")
-            _danger_action("Delete", lambda: c.admin.delete_sla_policy(user.ctx, d.value))
+            _danger_action(c, tr(c, "act.delete"), lambda: c.admin.delete_sla_policy(user.ctx, d.value))
 
     @page(c, "/admin/integrations", "nav.integrations", roles=ADMINS)
     def integrations(c: AppContainer, user: UiUser) -> None:
@@ -264,7 +264,7 @@ def register(c: AppContainer) -> None:
                 raise CivicLensError("Integration health persistence is not configured.")
             c.health.check_all(c.adapters)
 
-        ui.button(tr(c, "ad.run_health"), icon="health_and_safety", on_click=_act(check)).props("color=primary unelevated")
+        ui.button(tr(c, "ad.run_health"), icon="health_and_safety", on_click=_act(c, check)).props("color=primary unelevated")
 
     @page(c, "/admin/audit", "nav.audit", roles=ADMINS)
     def audit(c: AppContainer, user: UiUser) -> None:
@@ -324,7 +324,7 @@ def register(c: AppContainer) -> None:
             with ui.column().classes("cl-card w-full"):
                 ui.echart({"legend": {}, "grid": {"left": 40, "right": 12, "top": 32, "bottom": 24}, "xAxis": {"type": "category", "data": xs}, "yAxis": {"type": "value"},
                            "series": [{"name": k, "type": "line", "data": [p[k] for p in hist["points"]]} for k in ("open", "breached", "at_risk", "backlog")]}).classes("w-full h-64")
-        ui.button(tr(c, "ad.run_anomaly"), icon="troubleshoot", on_click=_act(lambda: c.anomaly_job.run(c.clock()))).props("outline")
+        ui.button(tr(c, "ad.run_anomaly"), icon="troubleshoot", on_click=_act(c, lambda: c.anomaly_job.run(c.clock()))).props("outline")
 
     @page(c, "/admin/anomalies", "nav.anomalies", roles=ADMINS)
     def anomalies(c: AppContainer, user: UiUser) -> None:
@@ -334,9 +334,9 @@ def register(c: AppContainer) -> None:
                    [{"id": a.id, "at": a.detected_at.strftime("%d %b %H:%M"), "kind": a.kind, "subject": a.subject, "sev": a.severity, "status": a.status, "why": a.explanation} for a in items], empty=tr(c, "ad.no_anomalies"))
         with ui.row().classes("cl-card gap-3 items-end w-full flex-wrap"):
             sel = ui.select({a.id: f"{a.kind}: {a.subject}" for a in items if a.status == "open"}, label=tr(c, "ad.open_anomaly")).props("outlined dense").classes("w-96")
-            ui.button("Acknowledge", icon="visibility", on_click=_act(lambda: c.admin.set_anomaly_status(user.ctx, sel.value, "acknowledged"))).props("outline dense")
-            ui.button("Resolve", icon="check", on_click=_act(lambda: c.admin.set_anomaly_status(user.ctx, sel.value, "resolved"))).props("outline dense")
-            ui.button("Investigate", icon="search", on_click=_act(lambda: c.investigations.open(user.ctx, "anomaly", sel.value))).props("outline dense")
+            ui.button(tr(c, "act.acknowledge"), icon="visibility", on_click=_act(c, lambda: c.admin.set_anomaly_status(user.ctx, sel.value, "acknowledged"))).props("outline dense")
+            ui.button(tr(c, "col.resolve"), icon="check", on_click=_act(c, lambda: c.admin.set_anomaly_status(user.ctx, sel.value, "resolved"))).props("outline dense")
+            ui.button(tr(c, "act.investigate"), icon="search", on_click=_act(c, lambda: c.investigations.open(user.ctx, "anomaly", sel.value))).props("outline dense")
 
     @page(c, "/admin/investigations", "nav.investigations", roles=ADMINS)
     def admin_investigations(c: AppContainer, user: UiUser) -> None:
@@ -362,7 +362,7 @@ def register(c: AppContainer) -> None:
                         ui.label(cm.routing.get("explanation", "")).classes("text-xs").style("color: var(--cl-fg-muted);")
                     with ui.row().classes("gap-2 items-end"):
                         sel = ui.select(depts, label=tr(c, "lbl.department")).props("outlined dense").classes("w-56")
-                        ui.button("Route", icon="alt_route", on_click=_act(lambda cid=cm.id, s=sel: c.officer.triage(user.ctx, cid, s.value))).props("color=primary unelevated")
+                        ui.button(tr(c, "act.route"), icon="alt_route", on_click=_act(c, lambda cid=cm.id, s=sel: c.officer.triage(user.ctx, cid, s.value))).props("color=primary unelevated")
 
     @page(c, "/admin/monitoring", "nav.monitoring", roles=ADMINS)
     def monitoring(c: AppContainer, user: UiUser) -> None:
@@ -381,7 +381,7 @@ def register(c: AppContainer) -> None:
         if any(j.status == "dead" for j in jobs):
             with ui.row().classes("gap-3 items-end"):
                 dead = ui.select({j.id: f"{j.kind} - {j.error or ''}"[:80] for j in jobs if j.status == "dead"}, label=tr(c, "ad.dead_job")).props("outlined dense").classes("w-96")
-                ui.button(tr(c, "ad.retry_dead_job"), icon="replay", on_click=_act(lambda: c.jobs.retry_dead(dead.value))).props("outline dense")
+                ui.button(tr(c, "ad.retry_dead_job"), icon="replay", on_click=_act(c, lambda: c.jobs.retry_dead(dead.value))).props("outline dense")
         section_title(tr(c, "ad.notification_delivery"))
         counts = run_in_uow(c, lambda uow: uow.notifications.status_counts())
         data_table([("channel", tr(c, "col.channel")), ("states", "queued / sending / delivered / failed / not_configured")], [{"id": ch, "channel": ch, "states": ", ".join(f"{k}: {v}" for k, v in sorted(st.items()))} for ch, st in counts.items()], empty=tr(c, "ad.no_notifications"))
@@ -399,9 +399,9 @@ def register(c: AppContainer) -> None:
         page_header(tr(c, "nav.exceptions"), tr(c, "ad.exceptions_note"), icon="report_problem")
         counts = c.exceptions.counts(user.ctx)
         with ui.row().classes("gap-3 flex-wrap"):
-            stat_tile("Open", counts.get("open", 0), color="danger", icon="report_problem")
-            stat_tile("Resolved", counts.get("resolved", 0), color="success", icon="check_circle")
-            stat_tile("Ignored", counts.get("ignored", 0), color="muted", icon="visibility_off")
+            stat_tile(tr(c, "card.open"), counts.get("open", 0), color="danger", icon="report_problem")
+            stat_tile(tr(c, "card.resolved"), counts.get("resolved", 0), color="success", icon="check_circle")
+            stat_tile(tr(c, "col.ignored"), counts.get("ignored", 0), color="muted", icon="visibility_off")
 
         status_filter = ui.select({"": "All", "open": tr(c, "card.open"), "resolved": tr(c, "card.resolved"), "ignored": tr(c, "col.ignored")}, value="open", label=tr(c, "lbl.status")).props("outlined dense").classes("w-48")
         box = ui.column().classes("gap-2 w-full")
@@ -428,8 +428,8 @@ def register(c: AppContainer) -> None:
                         if ex.status == "open":
                             note = ui.input(tr(c, "ad.resolution_note")).props("outlined dense").classes("w-full max-w-md")
                             with ui.row().classes("gap-2"):
-                                ui.button("Resolve", icon="check", on_click=_act(lambda i=ex.id, n=note: c.exceptions.resolve(user.ctx, i, note=n.value or "", ignore=False))).props("outline dense")
-                                ui.button("Ignore", icon="visibility_off", on_click=_act(lambda i=ex.id, n=note: c.exceptions.resolve(user.ctx, i, note=n.value or "", ignore=True))).props("flat dense")
+                                ui.button(tr(c, "col.resolve"), icon="check", on_click=_act(c, lambda i=ex.id, n=note: c.exceptions.resolve(user.ctx, i, note=n.value or "", ignore=False))).props("outline dense")
+                                ui.button(tr(c, "act.ignore"), icon="visibility_off", on_click=_act(c, lambda i=ex.id, n=note: c.exceptions.resolve(user.ctx, i, note=n.value or "", ignore=True))).props("flat dense")
 
         status_filter.on_value_change(lambda e: draw())
         draw()

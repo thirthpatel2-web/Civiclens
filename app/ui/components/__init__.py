@@ -166,13 +166,17 @@ def divider() -> None:
     ui.separator().classes("cl-divider")
 
 
-def confirm_dialog(title: str, body: str, *, confirm_label: str = "Confirm", danger: bool = False, on_confirm: Callable[[], None]) -> Callable[[], None]:
-    """Build a confirmation dialog once; returns a function that opens it. Prevents accidental destructive taps."""
+def confirm_dialog(title: str, body: str, *, confirm_label: str = "Confirm", cancel_label: str = "Cancel", danger: bool = False, on_confirm: Callable[[], None]) -> Callable[[], None]:
+    """Build a confirmation dialog once; returns a function that opens it. Prevents accidental destructive taps.
+
+    This module is deliberately container-free, so both button labels are passed in already
+    translated by the caller rather than looked up here.
+    """
     with ui.dialog() as dlg, ui.column().classes("cl-card gap-3 w-full max-w-sm"):
         ui.label(title).classes("text-base font-semibold")
         ui.label(body).classes("text-sm").style("color: var(--cl-fg-muted);")
         with ui.row().classes("justify-end gap-2 w-full q-mt-sm"):
-            ui.button("Cancel", on_click=dlg.close).props("flat")
+            ui.button(cancel_label, on_click=dlg.close).props("flat")
 
             def go() -> None:
                 dlg.close()
