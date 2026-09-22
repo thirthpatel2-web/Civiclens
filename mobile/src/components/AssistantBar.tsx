@@ -106,7 +106,7 @@ export function AssistantBar() {
       </View>
 
       {s.kind === 'recording' ? <Text style={{ color: colors.bad, fontSize: 12.5 }}>● {t('assistant.listening')}</Text> : null}
-      {s.kind === 'error' ? <Text style={{ color: colors.bad, fontSize: 12.5 }}>{s.permissionDenied ? t('assistant.mic_denied') : s.notConfigured ? t('assistant.mic_off') : t('assistant.mic_failed')}</Text> : null}
+      {s.kind === 'error' ? <Text style={{ color: colors.bad, fontSize: 12.5 }}>{s.permissionDenied ? t('assistant.mic_denied') : s.notConfigured ? t('assistant.mic_off') : `${t('assistant.mic_failed')} (${s.message})`}</Text> : null}
       {routeError ? <Text style={{ color: colors.bad, fontSize: 12.5 }}>{routeError}</Text> : null}
 
       {result && dest ? (

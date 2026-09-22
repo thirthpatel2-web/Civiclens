@@ -9,7 +9,7 @@ export default function OfficerTabsLayout() {
   const { colors } = useTheme();
   const icon = (name: any) => ({ color, size }: { color: string; size: number }) => <Ionicons name={name} color={color} size={size} />;
   return (
-    <Tabs screenOptions={{ tabBarActiveTintColor: colors.primary, tabBarInactiveTintColor: colors.textMuted, tabBarStyle: { backgroundColor: colors.card, borderTopColor: colors.border }, headerStyle: { backgroundColor: colors.primary }, headerTintColor: '#fff' }}>
+    <Tabs screenOptions={{ headerShown: false, tabBarActiveTintColor: colors.primary, tabBarInactiveTintColor: colors.textMuted, tabBarStyle: { backgroundColor: colors.card, borderTopColor: colors.border } }}>
       <Tabs.Screen name="dashboard" options={{ title: t('nav.dashboard'), tabBarIcon: icon('stats-chart') }} />
       <Tabs.Screen name="queue" options={{ title: t('nav.officer_queue'), tabBarIcon: icon('list') }} />
       <Tabs.Screen name="investigations" options={{ title: t('nav.investigations'), tabBarIcon: icon('search') }} />

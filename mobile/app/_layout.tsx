@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import { View } from 'react-native';
 import { Slot, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { AuthProvider, useAuth } from '../src/auth/AuthContext.tsx';
@@ -6,6 +7,8 @@ import { I18nProvider } from '../src/i18n/I18nContext.tsx';
 import { SyncProvider } from '../src/offline/SyncContext.tsx';
 import { registerBackgroundSync } from '../src/offline/backgroundTask.ts';
 import { Loading } from '../src/components/ui.tsx';
+import { TopBar } from '../src/components/TopBar.tsx';
+import { PrivacyConsentGate } from '../src/components/PrivacyConsentGate.tsx';
 import { ThemeProvider, useTheme } from '../src/theme/ThemeContext.tsx';
 
 const homeFor = (role: string) => (role === 'citizen' ? '/(tabs)/home' : '/(officer)/dashboard');
@@ -27,7 +30,15 @@ function Gate() {
     else if (user && user.role !== 'citizen' && inCitizenArea) router.replace('/(officer)/dashboard');
   }, [user, loading, segments, router]);
   useEffect(() => { if (user?.role === 'citizen') registerBackgroundSync().catch(() => undefined); }, [user]);
-  return loading ? <Loading label="CivicLens" /> : <Slot />;
+  if (loading) return <Loading label="CivicLens" />;
+  if (!user) return <Slot />;
+  return (
+    <View style={{ flex: 1 }}>
+      <TopBar />
+      <View style={{ flex: 1 }}><Slot /></View>
+      <PrivacyConsentGate />
+    </View>
+  );
 }
 
 function ThemedStatusBar() {

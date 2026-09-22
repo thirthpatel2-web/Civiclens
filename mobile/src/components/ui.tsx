@@ -5,10 +5,19 @@ import { MIN_TOUCH, shadow, spacing, withAlpha } from '../theme.ts';
 import type { ThemeColors } from '../theme.ts';
 import { useTheme } from '../theme/ThemeContext.tsx';
 
+// Capped-width, centered content column - on a wide desktop browser, an unbounded flex layout
+// stretches every card and banner edge-to-edge, which reads as broken rather than "responsive".
+// Mobile/native is unaffected: below the cap, width: '100%' just fills the (already narrow) screen.
+const CONTENT_MAX_WIDTH = 720;
+
 export function Screen({ children, scroll = true, style }: { children: React.ReactNode; scroll?: boolean; style?: ViewStyle }) {
   const { colors } = useTheme();
-  const body = <View style={[{ padding: spacing.lg, gap: spacing.md }, style]}>{children}</View>;
-  return scroll ? <ScrollView style={{ flex: 1, backgroundColor: colors.bg }} keyboardShouldPersistTaps="handled">{body}</ScrollView> : <View style={{ flex: 1, backgroundColor: colors.bg }}>{body}</View>;
+  const body = <View style={[{ width: '100%', maxWidth: CONTENT_MAX_WIDTH, padding: spacing.lg, gap: spacing.md }, style]}>{children}</View>;
+  return scroll ? (
+    <ScrollView style={{ flex: 1, backgroundColor: colors.bg }} contentContainerStyle={{ flexGrow: 1, alignItems: 'center' }} keyboardShouldPersistTaps="handled">{body}</ScrollView>
+  ) : (
+    <View style={{ flex: 1, backgroundColor: colors.bg, alignItems: 'center' }}>{body}</View>
+  );
 }
 
 export const Card = ({ children, style }: { children: React.ReactNode; style?: ViewStyle }) => {

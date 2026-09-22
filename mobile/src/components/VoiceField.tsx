@@ -51,7 +51,7 @@ export function VoiceField({ label, value, onChangeText, placeholder, multiline,
         </Pressable>
       </View>
       {s.kind === 'recording' ? <Text style={{ color: colors.bad, fontSize: 12 }}>● {t('assistant.listening')}</Text> : null}
-      {s.kind === 'error' ? <Text style={{ color: colors.bad, fontSize: 12 }}>{s.permissionDenied ? t('assistant.mic_denied') : s.notConfigured ? t('assistant.mic_off') : t('assistant.mic_failed')}</Text> : null}
+      {s.kind === 'error' ? <Text style={{ color: colors.bad, fontSize: 12 }}>{s.permissionDenied ? t('assistant.mic_denied') : s.notConfigured ? t('assistant.mic_off') : `${t('assistant.mic_failed')} (${s.message})`}</Text> : null}
     </View>
   );
 }

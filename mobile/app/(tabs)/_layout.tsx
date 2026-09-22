@@ -11,7 +11,7 @@ export default function TabsLayout() {
   const { colors } = useTheme();
   const icon = (name: any) => ({ color, size }: { color: string; size: number }) => <Ionicons name={name} color={color} size={size} />;
   return (
-    <Tabs screenOptions={{ tabBarActiveTintColor: colors.primary, tabBarInactiveTintColor: colors.textMuted, tabBarStyle: { backgroundColor: colors.card, borderTopColor: colors.border }, headerStyle: { backgroundColor: colors.primary }, headerTintColor: '#fff' }}>
+    <Tabs screenOptions={{ headerShown: false, tabBarActiveTintColor: colors.primary, tabBarInactiveTintColor: colors.textMuted, tabBarStyle: { backgroundColor: colors.card, borderTopColor: colors.border } }}>
       <Tabs.Screen name="home" options={{ title: t('nav.dashboard'), tabBarIcon: icon('home') }} />
       <Tabs.Screen name="report" options={{ title: t('nav.report'), tabBarIcon: icon('add-circle') }} />
       <Tabs.Screen name="track" options={{ title: t('nav.grievances'), tabBarIcon: icon('list'), tabBarBadge: pending + needsAttention > 0 ? pending + needsAttention : undefined }} />
