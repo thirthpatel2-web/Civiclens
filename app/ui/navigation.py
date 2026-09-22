@@ -29,7 +29,7 @@ class NavGroup:
 
 
 NAVIGATION: tuple[NavGroup, ...] = (
-    NavGroup(None, (NavItem("nav.dashboard", "/dashboard", "dashboard", CIT),)),
+    NavGroup(None, (NavItem("nav.dashboard", "/dashboard", "dashboard", CIT), NavItem("nav.assistant", "/assistant", "record_voice_over", ALL))),
     NavGroup("nav.services", (NavItem("nav.report", "/report", "add_circle", CIT), NavItem("nav.rti", "/rti", "gavel", CIT), NavItem("nav.legal", "/legal", "balance", CIT))),
     NavGroup("nav.intelligence", (NavItem("nav.copilot", "/copilot", "smart_toy", ALL), NavItem("nav.gis", "/gis", "map", ALL), NavItem("nav.interop", "/interop", "hub", ALL))),
     NavGroup("nav.track", (NavItem("nav.grievances", "/grievances", "assignment", CIT),)),

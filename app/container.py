@@ -52,6 +52,7 @@ from app.services.duplicate_review import DuplicateReviewApp
 from app.services.emergency_service import EmergencyHubService
 from app.services.gis_service import GisService
 from app.services.government_service import GovernmentSubmissionService
+from app.services.intent_router import IntentRouter
 from app.services.interop_service import (
     ClassificationCorrectionService,
     ExceptionService,
@@ -190,7 +191,12 @@ class AppContainer:
         self.admin = AdminService(self.uow_factory, self.auth_for, self.clock)
         self.anomaly_job = AnomalyDetectionJob(self.uow_factory)
         self.rti_reminders = RtiReminderService(self.uow_factory, self.notifications, self.rti_rules, self.bus)
-        ai = ClassificationService(self.llm) if self.llm is not None else None
+        # One instance, two uses: the worker still gets None when no model is configured (its AI
+        # enrichment stays off), while the UI always has the rules-only classifier available - it
+        # reports ai_status="not_configured" rather than pretending a model answered.
+        self.classifier = ClassificationService(self.llm)
+        self.intent_router = IntentRouter()
+        ai = self.classifier if self.llm is not None else None
         self.worker = GrievanceWorker(self.uow_factory, self.complaints, ai, self.vision, self.storage, self.effects, self.notifications, self.ingestor_factory, self.profiles.has_consent, self.translation, self.push_sender, self.government)
         self.jobs.handlers.update(self.worker.handlers())
         self.scheduler = SchedulerService(self._tasks(), self.scheduler_state, self.lock, self.clock)

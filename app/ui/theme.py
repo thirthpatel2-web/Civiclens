@@ -422,8 +422,52 @@ body.body--dark .cl-blob { filter: blur(80px); opacity: .55; }
   background: var(--cl-ai); box-shadow: 0 0 12px 1px var(--cl-ai);
 }
 
+/* ---- segmented control: the citizen / government-official portal switcher --------------------- */
+.cl-segment { display: flex; gap: 4px; padding: 5px; border-radius: var(--cl-radius-pill); background: var(--cl-surface-alt); border: 1px solid var(--cl-border); width: 100%; }
+.cl-segment-item {
+  flex: 1 1 0; display: flex; align-items: center; justify-content: center; gap: 8px; padding: 10px 14px;
+  border-radius: var(--cl-radius-pill); font-size: .84rem; font-weight: 600; color: var(--cl-fg-muted);
+  cursor: pointer; white-space: nowrap; transition: background .2s ease, color .2s ease, box-shadow .2s ease;
+}
+.cl-segment-item:hover { color: var(--cl-fg); }
+.cl-segment-item.cl-on { color: #fff; box-shadow: 0 8px 22px -10px var(--cl-glow-primary); }
+.cl-segment-item.cl-on.cl-citizen { background: var(--cl-gradient-brand); }
+.cl-segment-item.cl-on.cl-official { background: linear-gradient(135deg, #8A5A16 0%, var(--cl-emergency) 100%); }
+body.body--dark .cl-segment-item.cl-on.cl-official { background: linear-gradient(135deg, var(--cl-warning) 0%, var(--cl-emergency) 100%); }
+
+/* ---- hero (landing) -------------------------------------------------------------------------- */
+.cl-hero { text-align: center; padding: 64px 20px 28px; }
+.cl-hero-title { font-size: clamp(2.5rem, 7vw, 4.25rem); font-weight: 800; letter-spacing: -.04em; line-height: 1.02; }
+.cl-hero-sub { font-size: clamp(1rem, 2.2vw, 1.18rem); line-height: 1.6; color: var(--cl-fg-muted); max-width: 58ch; }
+.cl-eyebrow {
+  display: inline-flex; align-items: center; gap: 8px; padding: 6px 14px; border-radius: var(--cl-radius-pill);
+  font-size: .76rem; font-weight: 600; letter-spacing: .02em;
+  background: var(--cl-ai-soft); color: var(--cl-ai); border: 1px solid color-mix(in srgb, var(--cl-ai) 24%, transparent);
+}
+.cl-hero-strip { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px 28px; }
+.cl-hero-stat-n { font-size: 1.6rem; font-weight: 800; letter-spacing: -.02em; color: var(--cl-fg); line-height: 1.1; }
+.cl-hero-stat-l { font-size: .74rem; font-weight: 500; color: var(--cl-fg-subtle); text-transform: uppercase; letter-spacing: .07em; }
+
+/* ---- feature tiles (landing + assistant) ------------------------------------------------------ */
+.cl-tile { width: 210px; padding: 20px 18px; gap: 10px; display: flex; flex-direction: column; align-items: flex-start; }
+@media (max-width: 520px) { .cl-tile { width: 100%; } }
+.cl-tile-title { font-size: .95rem; font-weight: 700; color: var(--cl-fg); }
+.cl-tile-body { font-size: .8rem; line-height: 1.5; color: var(--cl-fg-muted); }
+
+/* ---- AI triage assistant ---------------------------------------------------------------------- */
+.cl-ask {
+  border-radius: var(--cl-radius-xl); padding: 6px 6px 6px 18px; display: flex; align-items: center; gap: 10px;
+  background: var(--cl-surface); border: 1.5px solid var(--cl-border-strong); box-shadow: var(--cl-shadow-soft);
+  transition: border-color .2s ease, box-shadow .2s ease;
+}
+.cl-ask:focus-within { border-color: var(--cl-ai); box-shadow: var(--cl-shadow-lift), 0 0 0 4px var(--cl-ai-soft); }
+.cl-route-card { border-left: 4px solid var(--cl-ai); }
+@keyframes cl-pulse-ring { 0% { box-shadow: 0 0 0 0 var(--cl-glow-ai); } 70% { box-shadow: 0 0 0 14px transparent; } 100% { box-shadow: 0 0 0 0 transparent; } }
+.cl-mic-live { animation: cl-pulse-ring 1.6s ease-out infinite; }
+
 @media (prefers-reduced-motion: reduce) {
   .cl-blob { animation: none; }
+  .cl-mic-live { animation: none; }
 }
 """
 

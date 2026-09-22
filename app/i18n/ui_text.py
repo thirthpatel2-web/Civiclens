@@ -1,7 +1,8 @@
 """UI string lookup: ported dictionary + ``ui_extra.json`` (strings for screens the original app lacked).
 
-The extras exist in English and Hindi only; other languages fall back to English for those keys and
-the gap is reported by ``coverage()`` - it is not machine-translated or guessed.
+The extras now carry every key in all seven languages. A key added later that is missing for a
+language falls back to English and the gap is reported by ``extras_coverage()`` - it is never
+machine-translated on the fly or guessed.
 """
 
 from __future__ import annotations

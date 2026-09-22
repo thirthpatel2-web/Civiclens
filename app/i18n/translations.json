@@ -131,7 +131,17 @@
   "voiceRecording": "বলতে মাইক চাপুন",
   "wardDetails": "ওয়ার্ড সমস্যার বিবরণ",
   "welcomeBack": "নমস্কার,",
-  "xaiReasoning": "এআই বিশ্লেষণ"
+  "xaiReasoning": "এআই বিশ্লেষণ",
+  "tabInsights": "ইনসাইট",
+  "tabInterop": "ইন্টারঅপ",
+  "citiesDirectoryLabel": "মহানগর ও রাজ্য",
+  "faqTitle": "প্রায়শই জিজ্ঞাসিত প্রশ্ন",
+  "guideModalTitle": "নাগরিক অধিকার ও সংবিধিবদ্ধ হ্যান্ডবুক",
+  "languagesLabel": "ভারতীয় ভাষা",
+  "nationalPrecedentsSub": "সুপ্রিম কোর্ট, হাইকোর্ট এবং কেন্দ্রীয় মন্ত্রণালয়জুড়ে অফলাইন-প্রস্তুত নজির ডেটাবেস।",
+  "nationalPrecedentsTitle": "জাতীয় আইনি ও নাগরিক ডেটাবেস",
+  "precedentsCountLabel": "বিচারিক মামলা",
+  "proTip": "প্রো টিপ"
  },
  "en": {
   "activeHotspots": "Active Wards",
@@ -417,7 +427,9 @@
   "voiceRecording": "बोलने हेतु माइक दबाएं",
   "wardDetails": "वार्ड समस्या विवरण",
   "welcomeBack": "नमस्ते,",
-  "xaiReasoning": "एआई कानूनी विश्लेषण"
+  "xaiReasoning": "एआई कानूनी विश्लेषण",
+  "tabInsights": "इनसाइट्स",
+  "tabInterop": "इंटरऑप"
  },
  "kn": {
   "activeHotspots": "ಸಕ್ರಿಯ ವಾರ್ಡ್‌ಗಳು",
@@ -559,7 +571,9 @@
   "voiceRecording": "ಮಾತನಾಡಲು ಮೈಕ್ ಒತ್ತಿ",
   "wardDetails": "ವಾರ್ಡ್ ಸಮಸ್ಯೆ ವಿವರ",
   "welcomeBack": "ನಮಸ್ಕಾರ,",
-  "xaiReasoning": "AI ಕಾನೂನು ವಿಶ್ಲೇಷಣೆ"
+  "xaiReasoning": "AI ಕಾನೂನು ವಿಶ್ಲೇಷಣೆ",
+  "tabInsights": "ಒಳನೋಟಗಳು",
+  "tabInterop": "ಇಂಟರ್‌ಆಪ್"
  },
  "mr": {
   "activeHotspots": "सक्रिय प्रभाग",
@@ -693,7 +707,17 @@
   "voiceRecording": "बोलण्यासाठी माईक दाबा",
   "wardDetails": "प्रभाग समस्या तपशील",
   "welcomeBack": "नमस्कार,",
-  "xaiReasoning": "AI कायदेशीर विश्लेषण"
+  "xaiReasoning": "AI कायदेशीर विश्लेषण",
+  "tabInsights": "इनसाइट्स",
+  "tabInterop": "इंटरऑप",
+  "citiesDirectoryLabel": "महानगरे आणि राज्ये",
+  "faqTitle": "वारंवार विचारले जाणारे प्रश्न",
+  "guideModalTitle": "नागरिक हक्क आणि वैधानिक मार्गदर्शिका",
+  "languagesLabel": "भारतीय भाषा",
+  "nationalPrecedentsSub": "सर्वोच्च न्यायालय, उच्च न्यायालये आणि केंद्रीय मंत्रालयांमधील ऑफलाइन-सज्ज पूर्वदृष्टांत डेटाबेस.",
+  "nationalPrecedentsTitle": "राष्ट्रीय कायदेशीर आणि नागरी डेटाबेस",
+  "precedentsCountLabel": "न्यायिक प्रकरणे",
+  "proTip": "प्रो टिप"
  },
  "ta": {
   "activeHotspots": "செயலில் உள்ளவை",
@@ -827,7 +851,17 @@
   "voiceRecording": "பேச மைக் அழுத்தவும்",
   "wardDetails": "வார்டு தகவல்",
   "welcomeBack": "வணக்கம்,",
-  "xaiReasoning": "AI சட்ட விளக்கம்"
+  "xaiReasoning": "AI சட்ட விளக்கம்",
+  "tabInsights": "உள்நோக்குகள்",
+  "tabInterop": "இயங்குதிறன்",
+  "citiesDirectoryLabel": "பெருநகரங்கள் & மாநிலங்கள்",
+  "faqTitle": "அடிக்கடி கேட்கப்படும் கேள்விகள்",
+  "guideModalTitle": "குடிமக்கள் உரிமைகள் & சட்டப்பூர்வ கையேடு",
+  "languagesLabel": "இந்திய மொழிகள்",
+  "nationalPrecedentsSub": "உச்ச நீதிமன்றம், உயர் நீதிமன்றங்கள் மற்றும் மத்திய அமைச்சகங்கள் முழுவதும் ஆஃப்லைன்-தயார் முன்னுதாரண தரவுத்தளம்.",
+  "nationalPrecedentsTitle": "தேசிய சட்ட & குடிமை தரவுத்தளம்",
+  "precedentsCountLabel": "நீதித்துறை வழக்குகள்",
+  "proTip": "சிறப்பு உதவிக்குறிப்பு"
  },
  "te": {
   "activeHotspots": "సక్రియ వార్డులు",
@@ -961,6 +995,16 @@
   "voiceRecording": "మాట్లాడటానికి మైక్ నొక్కండి",
   "wardDetails": "వార్డు సమస్య వివరాలు",
   "welcomeBack": "నమస్కారం,",
-  "xaiReasoning": "AI చట్టపరమైన వివరణ"
+  "xaiReasoning": "AI చట్టపరమైన వివరణ",
+  "tabInsights": "ఇన్‌సైట్‌లు",
+  "tabInterop": "ఇంటరాప్",
+  "citiesDirectoryLabel": "మెట్రోలు & రాష్ట్రాలు",
+  "faqTitle": "తరచుగా అడిగే ప్రశ్నలు",
+  "guideModalTitle": "పౌర హక్కులు & చట్టబద్ధమైన హ్యాండ్‌బుక్",
+  "languagesLabel": "భారతీయ భాషలు",
+  "nationalPrecedentsSub": "సుప్రీంకోర్టు, హైకోర్టులు మరియు కేంద్ర మంత్రిత్వ శాఖలలో ఆఫ్‌లైన్-సిద్ధమైన పూర్వదృష్టాంత డేటాబేస్.",
+  "nationalPrecedentsTitle": "జాతీయ న్యాయ & పౌర డేటాబేస్",
+  "precedentsCountLabel": "న్యాయపరమైన కేసులు",
+  "proTip": "ప్రో టిప్"
  }
 }

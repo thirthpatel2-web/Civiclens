@@ -1,4 +1,4 @@
-// UI strings: the ported 7-language dictionary + extras (English and Hindi). Missing keys fall back to English, then to the key.
+// UI strings: the ported 7-language dictionary + extras, now fully translated in all 7 languages. Any future key missing for a language falls back to English, then to the key.
 import type { LanguageCode } from './languages.ts';
 
 export type Dict = Record<string, Record<string, string>>;

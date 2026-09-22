@@ -30,15 +30,23 @@ from app.ui.components import (
 
 logger = logging.getLogger("civiclens.ui")
 PRIV = (Role.ADMIN, Role.SUPER_ADMIN)
+DESK = (Role.OFFICER, Role.ADMIN, Role.SUPER_ADMIN)
 
 
-def _login_form(c: AppContainer, *, privileged: bool) -> None:
-    with ui.column().classes("cl-glass w-full max-w-md q-mx-auto gap-1").style("padding: 28px;"):
+def _login_form(c: AppContainer, *, privileged: bool, allowed: tuple[Role, ...] | None = None, accent: str | None = None, icon: str | None = None, heading: str | None = None, subheading: str | None = None, cta: str | None = None, note: str | None = None, links: bool = True) -> None:
+    """One sign-in card. ``allowed`` restricts which roles may enter through *this* door: the
+    officer/admin portals reject a citizen account (and log the session straight back out) so the
+    two desks are genuinely separate entrances, not cosmetic tabs over one form. ``allowed=None``
+    (the citizen door) lets the server decide the role and where the account lands.
+    """
+    allowed = allowed if allowed is not None else (PRIV if privileged else None)
+    with ui.column().classes("cl-glass w-full max-w-md q-mx-auto gap-1").style(f"padding: 28px;{f' border-color: {accent};' if accent else ''}"):
         with ui.column().classes("items-center w-full gap-1 q-mb-sm"):
-            with ui.element("div").classes("cl-brand-chip").style("width:52px; height:52px;"):
-                ui.icon("admin_panel_settings" if privileged else "account_balance").classes("text-[26px]")
-            ui.label(tr(c, "brand")).classes("text-lg font-bold q-mt-sm cl-gradient-text")
-            ui.label(tr(c, "nav.administration") if privileged else tr(c, "appTagline")).classes("text-xs text-center").style("color: var(--cl-fg-muted); max-width: 30ch;")
+            chip_style = "width:52px; height:52px;" + (f" background: {accent};" if accent else "")
+            with ui.element("div").classes("cl-brand-chip").style(chip_style):
+                ui.icon(icon or ("admin_panel_settings" if privileged else "account_balance")).classes("text-[26px]")
+            ui.label(heading or tr(c, "brand")).classes("text-lg font-bold q-mt-sm cl-gradient-text")
+            ui.label(subheading or (tr(c, "nav.administration") if privileged else tr(c, "appTagline"))).classes("text-xs text-center").style("color: var(--cl-fg-muted); max-width: 34ch;")
         divider()
         with ui.column().classes("w-full gap-3 q-mt-md"):
             email = ui.input(tr(c, "lbl.email")).props("outlined dense").classes("w-full")
@@ -64,7 +72,7 @@ def _login_form(c: AppContainer, *, privileged: bool) -> None:
                 def op(uow):  # type: ignore[no-untyped-def]
                     auth = c.auth_for(uow)
                     res = auth.login(email.value or "", pw.value or "", otp=(otp.value or None), client_key=client_key)
-                    if privileged and res.context.role not in PRIV:
+                    if allowed is not None and res.context.role not in allowed:
                         auth.logout(res.session_token)
                         uow.commit()
                         raise AuthenticationFailed("Invalid e-mail, password or verification code.")
@@ -88,59 +96,120 @@ def _login_form(c: AppContainer, *, privileged: bool) -> None:
 
             pw.on("keydown.enter", submit)
             otp.on("keydown.enter", submit)
-            submit_btn = ui.button(tr(c, "act.sign_in"), icon="login", on_click=submit).props("unelevated").classes("w-full q-mt-sm cl-btn-glow")
-        if not privileged:
+            submit_btn = ui.button(cta or tr(c, "act.sign_in"), icon="login", on_click=submit).props("unelevated").classes("w-full q-mt-sm cl-btn-glow")
+            if accent:
+                submit_btn.style(f"background: {accent} !important;")
+        if note:
+            ui.label(note).classes("text-xs q-mt-sm").style("color: var(--cl-fg-subtle); line-height: 1.5;")
+        if links:
             with ui.row().classes("justify-between w-full q-mt-md text-sm"):
                 ui.link(tr(c, "act.register"), "/register")
                 ui.link(tr(c, "page.forgot"), "/reset-password")
 
 
+OFFICER_ACCENT = "linear-gradient(135deg, #8A5A16 0%, #C22A1B 100%)"
+
+
+def _portal_switcher(c: AppContainer, current: str) -> None:
+    """Citizen / Officer segmented control. Each side is a distinct route, so the chosen desk
+    survives a refresh, a bookmark and a shared link - not just a tab state in one form."""
+    with ui.element("div").classes("cl-segment w-full max-w-md q-mx-auto q-mb-md"):
+        for key, route, icon in (("portal.citizen", "/login", "person"), ("portal.official", "/officer/login", "account_balance")):
+            on = " cl-on cl-" + ("citizen" if key.endswith("citizen") else "official") if key.split(".")[1] == current else ""
+            el = ui.element("div").classes("cl-segment-item cl-focusable" + on).props('role=tab tabindex=0')
+            with el:
+                ui.icon(icon).classes("text-[17px]")
+                ui.label(tr(c, key))
+            if key.split(".")[1] != current:
+                el.on("click", lambda r=route: ui.navigate.to(r))
+
+
+def _tile(icon: str, title: str, body: str, *, route: str | None = None) -> None:
+    col = ui.column().classes("cl-glass cl-tile" + (" cl-card-hover" if route else ""))
+    with col:
+        with ui.element("div").classes("cl-brand-chip").style("width:38px; height:38px;"):
+            ui.icon(icon).classes("text-[19px]")
+        ui.label(title).classes("cl-tile-title")
+        ui.label(body).classes("cl-tile-body")
+    if route:
+        col.on("click", lambda r=route: ui.navigate.to(r))
+
+
 def register(c: AppContainer) -> None:
     @page(c, "/", "brand", public=True, shell_on=False)
     def landing(c: AppContainer, user: UiUser | None) -> None:
-        with ui.column().classes("items-center w-full q-pa-xl gap-3").style("max-width: 880px; margin: 0 auto;"):
-            with ui.row().classes("cl-badge cl-badge-ai q-mb-sm"):
-                ui.icon("auto_awesome")
-                ui.label("AI-assisted civic grievance platform")
-            ui.label(tr(c, "brand")).classes("text-5xl font-extrabold text-center cl-gradient-text").style("letter-spacing: -.03em; padding-bottom: 4px;")
-            ui.label(tr(c, "appTagline")).classes("text-base text-center").style("color: var(--cl-fg-muted); max-width: 56ch;")
+        from app.services.classification_service import CATEGORIES
+
+        with ui.column().classes("items-center w-full cl-hero gap-4").style("max-width: 920px; margin: 0 auto;"):
+            with ui.element("div").classes("cl-eyebrow"):
+                ui.icon("auto_awesome").classes("text-[15px]")
+                ui.label(tr(c, "hero.eyebrow"))
+            ui.label(tr(c, "brand")).classes("cl-hero-title text-center cl-gradient-text").style("padding-bottom: 6px;")
+            ui.label(tr(c, "appTagline")).classes("cl-hero-sub text-center")
             with ui.row().classes("gap-3 q-mt-md justify-center flex-wrap"):
-                ui.button(tr(c, "act.sign_in"), icon="login", on_click=lambda: ui.navigate.to("/login")).props("unelevated size=lg").classes("cl-btn-glow")
-                ui.button(tr(c, "act.register"), on_click=lambda: ui.navigate.to("/register")).props("outline color=primary size=lg")
+                ui.button(tr(c, "portal.citizen"), icon="person", on_click=lambda: ui.navigate.to("/login")).props("unelevated size=lg").classes("cl-btn-glow")
+                ui.button(tr(c, "portal.official"), icon="account_balance", on_click=lambda: ui.navigate.to("/officer/login")).props("outline size=lg").style("color: var(--cl-warning);")
                 ui.button(tr(c, "nav.emergency"), icon="emergency", on_click=lambda: ui.navigate.to("/emergency-public")).props("flat size=lg").style("color: var(--cl-emergency);")
 
-        with ui.column().classes("w-full items-center q-mt-xl"):
-            with ui.column().classes("cl-page q-py-xl gap-4"):
-                section_title("How it works")
-                with ui.row().classes("gap-3 w-full flex-wrap justify-center q-mt-sm"):
-                    steps = [("edit_note", "Citizen reports"), ("smart_toy", "AI analyses"), ("alt_route", "Smart routing"), ("task_alt", "Tracked to resolution")]
-                    for i, (icon, label) in enumerate(steps):
-                        with ui.row().classes("items-center gap-3"):
-                            with ui.column().classes("cl-glass cl-card-hover items-center gap-2").style("width: 168px; padding: 18px;"):
-                                with ui.element("div").classes("cl-brand-chip").style("width:40px; height:40px;"):
-                                    ui.icon(icon).classes("text-[20px]")
-                                ui.label(label).classes("text-sm font-medium text-center").style("color: var(--cl-fg);")
-                            if i < len(steps) - 1:
-                                ui.icon("arrow_forward").classes("gt-xs").style("color: var(--cl-fg-subtle);")
+            # Every number here is read from this server's live configuration, never hard-coded copy.
+            with ui.element("div").classes("cl-hero-strip q-mt-lg"):
+                for value, label_key in ((str(len(c.ui_text.languages)), "hero.stat_languages"), (str(len(CATEGORIES)), "hero.stat_categories"), (str(c.settings.rti_response_days), "hero.stat_rti_days")):
+                    with ui.column().classes("items-center gap-0"):
+                        ui.label(value).classes("cl-hero-stat-n")
+                        ui.label(tr(c, label_key)).classes("cl-hero-stat-l")
 
         with ui.column().classes("cl-page q-py-xl gap-4 items-center"):
-            section_title("Everything a citizen needs")
-            with ui.row().classes("gap-4 justify-center flex-wrap q-mt-sm"):
-                for key, icon, route in (("nav.report", "add_circle", "/login"), ("nav.rti", "gavel", "/login"), ("nav.copilot", "smart_toy", "/login"), ("nav.gis", "map", "/login")):
-                    with ui.column().classes("cl-glass cl-card-hover items-center gap-2").style("width: 168px; padding: 18px;").on("click", lambda r=route: ui.navigate.to(r)):
-                        with ui.element("div").classes("cl-brand-chip").style("width:40px; height:40px;"):
-                            ui.icon(icon).classes("text-[20px]")
-                        ui.label(tr(c, key)).classes("text-sm font-medium text-center").style("color: var(--cl-fg);")
+            section_title(tr(c, "land.how"))
+            with ui.row().classes("gap-3 w-full flex-wrap justify-center q-mt-sm items-stretch"):
+                steps = [("edit_note", "land.step_report"), ("smart_toy", "land.step_analyse"), ("alt_route", "land.step_route"), ("task_alt", "land.step_resolve")]
+                for i, (icon, key) in enumerate(steps):
+                    with ui.row().classes("items-center gap-3"):
+                        with ui.column().classes("cl-glass items-center gap-2").style("width: 168px; padding: 18px;"):
+                            with ui.element("div").classes("cl-brand-chip").style("width:40px; height:40px;"):
+                                ui.icon(icon).classes("text-[20px]")
+                            ui.label(tr(c, key)).classes("text-sm font-medium text-center").style("color: var(--cl-fg);")
+                        if i < len(steps) - 1:
+                            ui.icon("arrow_forward").classes("gt-xs").style("color: var(--cl-fg-subtle);")
+
+        with ui.column().classes("cl-page q-py-xl gap-4 items-center"):
+            section_title(tr(c, "land.everything"))
+            with ui.row().classes("gap-4 justify-center flex-wrap q-mt-sm items-stretch"):
+                _tile("record_voice_over", tr(c, "nav.assistant"), tr(c, "land.t_assistant"), route="/login")
+                _tile("add_circle", tr(c, "nav.report"), tr(c, "land.t_report"), route="/login")
+                _tile("gavel", tr(c, "nav.rti"), tr(c, "land.t_rti"), route="/login")
+                _tile("balance", tr(c, "nav.legal"), tr(c, "land.t_legal"), route="/login")
+                _tile("map", tr(c, "nav.gis"), tr(c, "land.t_gis"), route="/login")
+                _tile("hub", tr(c, "nav.interop"), tr(c, "land.t_interop"), route="/login")
+
+        with ui.column().classes("cl-page q-py-xl gap-4 items-center q-mb-xl"):
+            section_title(tr(c, "land.for_officials"), tr(c, "land.for_officials_sub"))
+            with ui.row().classes("gap-4 justify-center flex-wrap q-mt-sm items-stretch"):
+                _tile("inbox", tr(c, "nav.officer_queue"), tr(c, "land.t_queue"))
+                _tile("timer", tr(c, "nav.sla"), tr(c, "land.t_sla"))
+                _tile("search", tr(c, "nav.investigations"), tr(c, "land.t_investigations"))
+            ui.button(tr(c, "portal.official_cta"), icon="account_balance", on_click=lambda: ui.navigate.to("/officer/login")).props("outline size=lg q-mt-md").style("color: var(--cl-warning);")
 
     @page(c, "/login", "act.sign_in", public=True, shell_on=False)
     def login(c: AppContainer, user: UiUser | None) -> None:
-        _login_form(c, privileged=False)
+        _portal_switcher(c, "citizen")
+        _login_form(c, privileged=False, icon="person", heading=tr(c, "portal.citizen_title"), subheading=tr(c, "portal.citizen_sub"))
+
+    @page(c, "/officer/login", "portal.official_title", public=True, shell_on=False)
+    def officer_login(c: AppContainer, user: UiUser | None) -> None:
+        _portal_switcher(c, "official")
+        _login_form(
+            c, privileged=False, allowed=DESK, accent=OFFICER_ACCENT, icon="account_balance",
+            heading=tr(c, "portal.official_title"), subheading=tr(c, "portal.official_sub"),
+            cta=tr(c, "portal.official_cta"), note=tr(c, "portal.official_note"), links=False,
+        )
+        with ui.row().classes("justify-center w-full q-mt-sm text-sm"):
+            ui.link(tr(c, "portal.admin_link"), "/admin/login").classes("text-xs")
 
     @page(c, "/admin/login", "act.sign_in", public=True, shell_on=False)
     def admin_login(c: AppContainer, user: UiUser | None) -> None:
         with ui.column().classes("items-center w-full max-w-md q-mx-auto q-mb-sm"):
             ui.label(tr(c, "nav.administration")).classes("text-xs font-semibold uppercase").style("color: var(--cl-fg-subtle); letter-spacing: .08em;")
-        _login_form(c, privileged=True)
+        _login_form(c, privileged=True, icon="admin_panel_settings", links=False)
 
     @page(c, "/register", "act.register", public=True, shell_on=False)
     def registration(c: AppContainer, user: UiUser | None) -> None:

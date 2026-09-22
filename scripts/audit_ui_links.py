@@ -77,7 +77,12 @@ def run() -> list[str]:
     for rel, t in web_targets():
         if EXTERNAL.match(t):
             continue
-        if _norm(t) not in wr:
+        norm = _norm(t)
+        if not norm.startswith("/"):
+            continue  # the base path itself is a runtime variable (e.g. an f-string built from a
+            # lookup table of already-registered routes) - nothing literal here for a regex scan
+            # to check, so it is left unverified rather than flagged as a false dead link.
+        if norm not in wr:
             problems.append(f"{rel}: navigates to '{t}' but no page is registered for it")
     mr = mobile_routes()
     for rel, t in mobile_targets():

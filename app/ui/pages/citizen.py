@@ -96,7 +96,188 @@ def _events(events: list[Any]) -> None:
                         ui.label(e.remarks).classes("text-sm").style("color: var(--cl-fg-muted);")
 
 
+# Where each IntentRouter destination actually goes *in this web app*. The label is the page that
+# really opens, so the assistant never announces a screen that does not exist here (the mobile app
+# has dedicated Locator/Directory screens; on web the closest real surface is the GIS map).
+DEST_ROUTE: dict[str, tuple[str, str, str]] = {
+    "complaint": ("add_circle", "nav.report", "/report"),
+    "rti": ("gavel", "nav.rti", "/rti"),
+    "legal": ("balance", "nav.legal", "/legal"),
+    "track": ("assignment", "nav.grievances", "/grievances"),
+    "map": ("map", "nav.gis", "/gis"),
+    "locator": ("map", "nav.gis", "/gis"),
+    "document": ("folder", "nav.documents", "/documents"),
+    "emergency": ("emergency", "nav.emergency", "/emergency"),
+}
+
+# Browser-side recorder. NiceGUI has no built-in microphone element, so this uses MediaRecorder
+# directly and hands the clip back as one base64 event. Failures (no permission, no device, an
+# insecure origin) are reported to the page instead of silently doing nothing.
+MIC_JS = """
+window._clRec = window._clRec || {};
+window.clStartRec = async function () {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({audio: true});
+    const mr = new MediaRecorder(stream);
+    const chunks = [];
+    mr.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
+    mr.onstop = async () => {
+      stream.getTracks().forEach(t => t.stop());
+      const buf = await new Blob(chunks, {type: mr.mimeType}).arrayBuffer();
+      const bytes = new Uint8Array(buf);
+      let bin = '';
+      for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+      emitEvent('cl_audio', {mime: mr.mimeType, b64: btoa(bin)});
+    };
+    window._clRec.mr = mr;
+    mr.start();
+    return true;
+  } catch (err) {
+    emitEvent('cl_audio_error', {message: String(err && err.message || err)});
+    return false;
+  }
+};
+window.clStopRec = function () {
+  const mr = window._clRec.mr;
+  if (mr && mr.state !== 'inactive') mr.stop();
+};
+"""
+
+
 def register(c: AppContainer) -> None:
+    @page(c, "/assistant", "nav.assistant")
+    def assistant_router(c: AppContainer, user: UiUser) -> None:
+        """Type or speak the problem; the app works out which desk it belongs to and takes you
+        there with the text already filled in. Both layers are rules-first and show their working:
+        the destination comes from ``IntentRouter``, the civic category from ``ClassificationService``.
+        """
+        import base64
+
+        page_header(tr(c, "nav.assistant"), tr(c, "page.assistant_help"), icon="record_voice_over")
+        state: dict[str, Any] = {"text": "", "dest": None, "voice_id": None, "recording": False}
+        caps = c.voice.capabilities()
+
+        with ui.column().classes("w-full max-w-3xl gap-3"):
+            with ui.element("div").classes("cl-ask w-full"):
+                ui.icon("auto_awesome").classes("text-[20px]").style("color: var(--cl-ai);")
+                box = ui.input(placeholder=tr(c, "assistant.placeholder")).props("borderless debounce=400").classes("flex-1")
+                mic = ui.button(icon="mic").props("round unelevated").style("background: var(--cl-ai); color: #fff;")
+                mic.tooltip(tr(c, "assistant.mic_tip") if caps["state"] == "CONFIGURED" else tr(c, "assistant.mic_off"))
+                mic.set_enabled(caps["state"] == "CONFIGURED")
+            hint = ui.label(tr(c, "assistant.hint")).classes("text-xs").style("color: var(--cl-fg-subtle);")
+            out = ui.column().classes("w-full gap-3")
+
+        def go(dest: str) -> None:
+            from urllib.parse import quote
+
+            _icon, _key, route = DEST_ROUTE[dest]
+            text = (state["text"] or "")[:1500]
+            sep = "&" if "?" in route else "?"
+            ui.navigate.to(f"{route}{sep}text={quote(text)}" + (f"&voice={state['voice_id']}" if state["voice_id"] and dest == "complaint" else ""))
+
+        def render() -> None:
+            out.clear()
+            text = (state["text"] or "").strip()
+            if len(text) < 4:
+                with out:
+                    state_panel(icon="lightbulb", title=tr(c, "assistant.idle_title"), body=tr(c, "assistant.idle_body"))
+                return
+            intent = c.intent_router.route(text)
+            dest = intent.destination
+            state["dest"] = dest
+            icon, label_key, _route = DEST_ROUTE[dest]
+            with out:
+                with ui.column().classes("cl-card cl-route-card w-full gap-3"):
+                    with ui.row().classes("items-center gap-3 w-full flex-wrap"):
+                        with ui.element("div").classes("cl-brand-chip").style("width:40px; height:40px;"):
+                            ui.icon(icon).classes("text-[20px]")
+                        with ui.column().classes("gap-0 flex-1"):
+                            ui.label(tr(c, "assistant.goes_to")).classes("text-xs").style("color: var(--cl-fg-muted);")
+                            ui.label(tr(c, label_key)).classes("text-base font-bold").style("color: var(--cl-fg);")
+                        ui.button(tr(c, "assistant.take_me"), icon="arrow_forward", on_click=lambda d=dest: go(d)).props("unelevated").classes("cl-btn-glow")
+
+                    if dest == "complaint":
+                        r = c.classifier.classify("", text)
+                        with ui.row().classes("gap-2 flex-wrap items-center"):
+                            chip(tr(c, "lbl.category") + ": " + (r.category.replace("_", " ").title() if r.category != "other" else tr(c, "assistant.unsure")), color="info")
+                            chip(tr(c, "lbl.severity") + ": " + r.severity, color={"low": "muted", "medium": "info", "high": "warning", "critical": "danger"}[r.severity])
+                            chip(f"{tr(c, 'assistant.confidence')} {r.confidence:.0%}", color="muted", outline=True)
+                            chip(tr(c, "assistant.decided_by_rules") if r.source == "rules" else tr(c, "assistant.decided_by_ai"), color="ai", outline=True)
+                        if r.affects_safety or r.near_sensitive_site:
+                            info_banner(tr(c, "assistant.safety_flag"), "orange")
+                        if r.ai_status == "not_configured" and r.ambiguous:
+                            info_banner(tr(c, "msg.ai_unavailable"), "orange")
+                        ui.label(r.explanation or "").classes("text-xs").style("color: var(--cl-fg-subtle);")
+                        if r.category == "other":
+                            info_banner(tr(c, "assistant.manual_triage"), "blue")
+                    else:
+                        ui.label(intent.explanation).classes("text-xs").style("color: var(--cl-fg-subtle);")
+                        if not intent.certain:
+                            info_banner(tr(c, "assistant.ambiguous"), "orange")
+
+                # One-tap correction. The router is never treated as final: whatever the person
+                # picks here is what actually opens.
+                others = [d for d in DEST_ROUTE if d != dest and d != "locator"]
+                with ui.column().classes("w-full gap-2"):
+                    ui.label(tr(c, "assistant.not_right")).classes("text-xs font-medium").style("color: var(--cl-fg-muted);")
+                    with ui.row().classes("gap-2 flex-wrap"):
+                        for d in others:
+                            di, dk, _ = DEST_ROUTE[d]
+                            ui.button(tr(c, dk), icon=di, on_click=lambda dd=d: go(dd)).props("outline dense size=sm")
+
+        def on_text(e: Any) -> None:
+            state["text"] = e.value or ""
+            render()
+
+        box.on_value_change(on_text)
+
+        # ---- voice ------------------------------------------------------------------------------
+        ui.add_body_html(f"<script>{MIC_JS}</script>")
+
+        def on_audio(e: Any) -> None:
+            state["recording"] = False
+            mic.props("icon=mic").classes(remove="cl-mic-live")
+            try:
+                raw = base64.b64decode(e.args["b64"])
+            except (KeyError, ValueError):
+                ui.notify(tr(c, "assistant.mic_failed"), type="negative")
+                return
+            try:
+                r = c.voice.transcribe(user.ctx, raw, e.args.get("mime") or "audio/webm", "auto" if caps["auto_detect"] else caps["languages"][0]["code"])
+            except CivicLensError as exc:
+                ui.notify(exc.message, type="negative")
+                return
+            if r.status != "OK" or not r.transcript:
+                ui.notify(r.error or r.status, type="warning")
+                return
+            state["voice_id"] = r.id
+            box.value = r.transcript  # kept in the spoken language and script - nothing is translated
+            state["text"] = r.transcript
+            hint.set_text(tr(c, "assistant.heard", lang=r.language_detected or "?", how=r.detected_by))
+            render()
+
+        def on_audio_error(e: Any) -> None:
+            state["recording"] = False
+            mic.props("icon=mic").classes(remove="cl-mic-live")
+            ui.notify(tr(c, "assistant.mic_denied") + " " + str(e.args.get("message", "")), type="negative")
+
+        ui.on("cl_audio", on_audio)
+        ui.on("cl_audio_error", on_audio_error)
+
+        async def toggle_mic() -> None:
+            if state["recording"]:
+                state["recording"] = False
+                mic.props("icon=mic").classes(remove="cl-mic-live")
+                ui.run_javascript("window.clStopRec()")
+                return
+            state["recording"] = True
+            mic.props("icon=stop").classes(add="cl-mic-live")
+            hint.set_text(tr(c, "assistant.listening"))
+            await ui.run_javascript("window.clStartRec()")
+
+        mic.on_click(toggle_mic)
+        render()
+
     @page(c, "/dashboard", "nav.dashboard", roles=CIT)
     def dashboard(c: AppContainer, user: UiUser) -> None:
         d = c.dashboards.citizen(user.ctx)
@@ -145,17 +326,150 @@ def register(c: AppContainer) -> None:
     def report(c: AppContainer, user: UiUser) -> None:
         crid = uuid.uuid4().hex
         evidence_records: dict[str, Any] = {}
+        qp = ui.context.client.request.query_params if ui.context.client.request else {}  # type: ignore[union-attr]
+        pre_text = (qp.get("text") or "")[:1500]
+        pre_voice = qp.get("voice") or None
 
         page_header(tr(c, "nav.report"), tr(c, "page.report_help"), icon="add_circle")
 
-        with ui.column().classes("w-full max-w-3xl gap-0 q-mt-sm"):
+        def receipt(cm: Any, warnings: list[str]) -> None:
+            for w in warnings:
+                ui.notify(w, type="warning")
+            with ui.dialog() as dlg, ui.column().classes("cl-card gap-3 w-full max-w-md"):
+                with ui.row().classes("items-center gap-2"):
+                    ui.icon("check_circle").classes("text-[26px]").style("color: var(--cl-success);")
+                    ui.label(tr(c, "report.submitted")).classes("text-lg font-semibold").style("color: var(--cl-fg);")
+                with ui.column().classes("cl-surface-alt q-pa-md gap-1 w-full"):
+                    ui.label(f"{tr(c, 'lbl.reference')}: {cm.reference}").classes("cl-mono text-sm font-semibold")
+                    ui.label(f"{tr(c, 'lbl.department')}: {cm.department_code or tr(c, 'report.awaiting_triage')}").classes("text-sm")
+                    ui.label(f"{tr(c, 'lbl.priority')}: {cm.priority}").classes("text-sm")
+                    if cm.sla_due_at:
+                        ui.label(f"{tr(c, 'lbl.due')}: {cm.sla_due_at.strftime('%d %b %Y %H:%M')}").classes("text-sm")
+                if cm.ai_status in ("pending", "not_configured"):
+                    info_banner(tr(c, "msg.ai_unavailable") if cm.ai_status == "not_configured" else tr(c, "report.ai_queued"))
+                if cm.duplicates:
+                    section_title(tr(c, "report.similar"))
+                    for x in cm.duplicates:
+                        ui.label(f"{x['reference']} - {x['explanation']}").classes("text-xs").style("color: var(--cl-fg-muted);")
+                ui.button(tr(c, "nav.grievances"), icon="arrow_forward", on_click=lambda: ui.navigate.to(f"/grievances/{cm.id}")).props("color=primary unelevated").classes("w-full")
+            dlg.open()
+
+        def create(data: dict[str, Any]) -> None:
+            try:
+                r = c.complaints.create(user.ctx, ComplaintInput(client_request_id=crid, **{k: v for k, v in data.items() if v not in (None, "")}))
+            except CivicLensError as exc:
+                ui.notify(exc.message + (f" {exc.details}" if exc.details else ""), type="negative")
+                return
+            receipt(r.complaint, r.warnings)
+
+        # ------------------------------------------------------------------ quick mode
+        # One screen, one required field. Everything the four-step form asks for is optional and
+        # is inferred (category by the classifier, department by routing) or simply left empty -
+        # nothing here is invented to fill a blank.
+        def derive_title(desc: str) -> str:
+            s = " ".join((desc or "").split())
+            for sep in (". ", "। ", "? ", "! "):
+                if sep in s:
+                    s = s.split(sep)[0]
+                    break
+            return s[:90].strip()
+
+        panes = ui.column().classes("w-full max-w-3xl gap-3")
+        with ui.element("div").classes("cl-segment w-full max-w-3xl q-mb-sm"):
+            seg_items = {}
+            for key, label_key, icon in (("quick", "report.mode_quick", "bolt"), ("detailed", "report.mode_detailed", "tune")):
+                el = ui.element("div").classes("cl-segment-item cl-focusable" + (" cl-on cl-citizen" if key == "quick" else "")).props("role=tab tabindex=0")
+                with el:
+                    ui.icon(icon).classes("text-[17px]")
+                    ui.label(tr(c, label_key))
+                seg_items[key] = el
+
+        def show(which: str) -> None:
+            for k, el in seg_items.items():
+                el.classes(add="cl-on cl-citizen") if k == which else el.classes(remove="cl-on cl-citizen")
+            quick_pane.set_visibility(which == "quick")
+            detail_pane.set_visibility(which == "detailed")
+
+        for k in seg_items:
+            seg_items[k].on("click", lambda kk=k: show(kk))
+
+        with panes:
+            quick_pane = ui.column().classes("w-full gap-3")
+            with quick_pane, ui.column().classes("cl-card w-full gap-3"):
+                q_desc = ui.textarea(tr(c, "report.q_what"), value=pre_text).props("outlined autogrow rows=4").classes("w-full")
+                field_hint(tr(c, "report.q_what_hint"))
+                q_where = ui.input(tr(c, "report.q_where")).props("outlined dense").classes("w-full")
+                field_hint(tr(c, "report.q_where_hint"))
+                q_coords = ui.label("").classes("text-xs").style("color: var(--cl-fg-subtle);")
+                q_geo: dict[str, Any] = {"lat": None, "lng": None}
+
+                def on_geo(e: Any) -> None:
+                    q_geo["lat"], q_geo["lng"] = round(float(e.args["lat"]), 6), round(float(e.args["lng"]), 6)
+                    q_coords.set_text(f"{tr(c, 'report.q_pinned')} {q_geo['lat']:.5f}, {q_geo['lng']:.5f}")
+
+                def on_geo_error(e: Any) -> None:
+                    q_coords.set_text(tr(c, "report.q_geo_failed") + " " + str(e.args.get("message", "")))
+
+                ui.on("cl_geo", on_geo)
+                ui.on("cl_geo_error", on_geo_error)
+                q_files = ui.row().classes("gap-2 flex-wrap w-full")
+
+                def q_redraw() -> None:
+                    q_files.clear()
+                    with q_files:
+                        for rid, rec in evidence_records.items():
+                            with ui.row().classes("cl-badge cl-badge-info items-center gap-2"):
+                                ui.icon("description").classes("text-[14px]")
+                                ui.label(rec.name)
+                                ui.icon("close").classes("text-[14px] cursor-pointer").on("click", lambda i=rid: (evidence_records.pop(i, None), q_redraw()))
+
+                def q_upload(e: Any) -> None:
+                    try:
+                        rec = c.complaints.upload_evidence(user.ctx, e.name, e.content.read(), e.type)
+                    except CivicLensError as exc:
+                        ui.notify(exc.message, type="negative")
+                        return
+                    evidence_records[rec.id] = rec
+                    q_redraw()
+
+                with ui.row().classes("gap-2 flex-wrap items-center w-full"):
+                    ui.button(tr(c, "report.q_use_location"), icon="my_location", on_click=lambda: ui.run_javascript(
+                        "navigator.geolocation.getCurrentPosition("
+                        "p => emitEvent('cl_geo', {lat: p.coords.latitude, lng: p.coords.longitude}),"
+                        "e => emitEvent('cl_geo_error', {message: e.message}));",
+                    )).props("outline dense")
+                    ui.upload(on_upload=q_upload, auto_upload=True, multiple=True, label=tr(c, "report.q_photo")).props("flat dense accept=image/*,.pdf").classes("flex-1")
+
+                def q_submit() -> None:
+                    desc = (q_desc.value or "").strip()
+                    if len(desc) < 10:
+                        ui.notify(tr(c, "report.q_too_short"), type="warning")
+                        return
+                    title = derive_title(desc)
+                    if len(title) < 5:
+                        title = desc[:90]
+                    create({
+                        "title": title, "description": desc, "language": lang(),
+                        "address": (q_where.value or "").strip() or None,
+                        "lat": q_geo["lat"], "lng": q_geo["lng"],
+                        "evidence_ids": list(evidence_records.keys()), "voice_id": pre_voice,
+                    })
+
+                ui.button(tr(c, "act.submit"), icon="send", on_click=q_submit).props("unelevated size=lg").classes("cl-btn-glow w-full")
+                ui.label(tr(c, "report.q_footnote")).classes("text-xs").style("color: var(--cl-fg-subtle); line-height:1.5;")
+
+            detail_pane = ui.column().classes("w-full gap-0")
+            detail_pane.set_visibility(False)
+
+        # ------------------------------------------------------------------ detailed mode
+        with detail_pane, ui.column().classes("w-full max-w-3xl gap-0"):
             with ui.stepper().props("flat animated").classes("w-full cl-card !p-0") as stepper:
                 # ---- Step 1: describe -----------------------------------------------------------
-                with ui.step("describe", title="Describe the issue", icon="edit_note"):
-                    title = ui.input(tr(c, "lbl.title")).props("outlined dense").classes("w-full")
-                    field_hint("A short, specific title (e.g. \"Large pothole outside 12 MG Road\").")
-                    desc = ui.textarea(tr(c, "lbl.description")).props("outlined autogrow").classes("w-full")
-                    field_hint("What's wrong, since when, and how it affects you or others.")
+                with ui.step("describe", title=tr(c, "report.step_describe"), icon="edit_note"):
+                    title = ui.input(tr(c, "lbl.title"), value=derive_title(pre_text)).props("outlined dense").classes("w-full")
+                    field_hint(tr(c, "report.title_hint"))
+                    desc = ui.textarea(tr(c, "lbl.description"), value=pre_text).props("outlined autogrow").classes("w-full")
+                    field_hint(tr(c, "report.desc_hint"))
                     from app.i18n.languages import LANGUAGES
 
                     language = ui.select({k: f"{v.native} ({k})" for k, v in LANGUAGES.items()}, value=lang(), label=tr(c, "lbl.language")).props("outlined dense").classes("w-56")
@@ -163,11 +477,11 @@ def register(c: AppContainer) -> None:
                         ui.button(tr(c, "act.next"), icon="arrow_forward", on_click=stepper.next).props("color=primary unelevated")
 
                 # ---- Step 2: category & location -------------------------------------------------
-                with ui.step("locate", title="Category & location", icon="place"):
+                with ui.step("locate", title=tr(c, "report.step_locate"), icon="place"):
                     with ui.row().classes("gap-3 w-full flex-wrap"):
-                        cat = ui.select({"": "Not sure", **{k: k.replace("_", " ").title() for k in CATEGORIES}}, value="", label=tr(c, "lbl.category")).props("outlined dense").classes("w-52")
+                        cat = ui.select({"": tr(c, "assistant.unsure"), **{k: k.replace("_", " ").title() for k in CATEGORIES}}, value="", label=tr(c, "lbl.category")).props("outlined dense").classes("w-52")
                         ward = ui.input(tr(c, "lbl.ward") + " (" + tr(c, "lbl.optional") + ")").props("outlined dense").classes("w-40")
-                    field_hint("Click the map to mark the exact spot, or type coordinates. Nothing is invented if left empty.")
+                    field_hint(tr(c, "report.map_hint"))
                     with ui.row().classes("gap-3 items-end w-full flex-wrap"):
                         lat = ui.number(tr(c, "lbl.latitude"), format="%.6f").props("outlined dense").classes("w-40")
                         lng = ui.number(tr(c, "lbl.longitude"), format="%.6f").props("outlined dense").classes("w-40")
@@ -187,7 +501,7 @@ def register(c: AppContainer) -> None:
                         ui.button(tr(c, "act.next"), icon="arrow_forward", on_click=stepper.next).props("color=primary unelevated")
 
                 # ---- Step 3: evidence --------------------------------------------------------------
-                with ui.step("evidence", title="Evidence (optional)", icon="attach_file"):
+                with ui.step("evidence", title=tr(c, "report.step_evidence"), icon="attach_file"):
                     section_title(tr(c, "lbl.evidence"))
                     ev_list = ui.row().classes("gap-2 flex-wrap w-full")
 
@@ -210,18 +524,18 @@ def register(c: AppContainer) -> None:
                         redraw_evidence()
                         ui.notify(f"{rec.name} added.", type="positive")
 
-                    ui.upload(on_upload=on_upload, auto_upload=True, multiple=True, label="Drop photos or documents, or click to browse").props("flat accept=.png,.jpg,.jpeg,.pdf,.txt,.docx").classes("cl-dropzone w-full")
-                    field_hint("PNG, JPG, PDF, TXT or DOCX. You can remove an item before submitting by clicking its ×.")
+                    ui.upload(on_upload=on_upload, auto_upload=True, multiple=True, label=tr(c, "report.dropzone")).props("flat accept=.png,.jpg,.jpeg,.pdf,.txt,.docx").classes("cl-dropzone w-full")
+                    field_hint(tr(c, "report.dropzone_hint"))
 
                     divider()
-                    section_title("Voice input", tr(c, "lbl.optional"))
+                    section_title(tr(c, "report.voice_input"), tr(c, "lbl.optional"))
                     caps = c.voice.capabilities()
-                    voice_state: dict[str, Any] = {"id": None}
+                    voice_state: dict[str, Any] = {"id": pre_voice}
                     if caps["state"] != "CONFIGURED":
-                        info_banner("Speech-to-text is not configured on this server; recordings will not be transcribed.", "orange")
+                        info_banner(tr(c, "report.stt_off"), "orange")
                     else:
-                        options = ({"auto": "Auto-detect language"} if caps["auto_detect"] else {}) | {x["code"]: f"{x['native']} ({x['name']})" for x in caps["languages"]}
-                        voice_lang = ui.select(options, value=next(iter(options)), label="Spoken language").props("outlined dense").classes("w-64")
+                        options = ({"auto": tr(c, "report.auto_detect")} if caps["auto_detect"] else {}) | {x["code"]: f"{x['native']} ({x['name']})" for x in caps["languages"]}
+                        voice_lang = ui.select(options, value=next(iter(options)), label=tr(c, "report.spoken_language")).props("outlined dense").classes("w-64")
                         transcript_note = ui.label().classes("text-xs").style("color: var(--cl-fg-subtle);")
 
                         def on_audio(e: Any) -> None:
@@ -237,30 +551,30 @@ def register(c: AppContainer) -> None:
                             desc.value = ((desc.value or "") + " " + r.transcript).strip()  # same language, native script - never translated
                             if r.language_detected in c.ui_text.languages or r.language_detected:
                                 language.value = r.language_detected if r.language_detected in [k for k in language.options] else language.value
-                            transcript_note.set_text(f"Detected language: {r.language_detected or 'unknown'} ({r.detected_by}). Please review the text in step 1." + (" WARNING: " + " ".join(r.warnings) if r.warnings else ""))
-                            ui.notify("Transcript added - please review it.", type="positive")
+                            transcript_note.set_text(tr(c, "report.transcript_note", lang=r.language_detected or "?", how=r.detected_by) + (" " + " ".join(r.warnings) if r.warnings else ""))
+                            ui.notify(tr(c, "report.transcript_added"), type="positive")
 
-                        ui.upload(on_upload=on_audio, auto_upload=True, label="Record or upload audio").props("flat accept=.wav,.webm,.ogg,.mp3,.m4a").classes("cl-dropzone w-full")
+                        ui.upload(on_upload=on_audio, auto_upload=True, label=tr(c, "report.record_audio")).props("flat accept=.wav,.webm,.ogg,.mp3,.m4a").classes("cl-dropzone w-full")
                     with ui.stepper_navigation():
                         ui.button(tr(c, "act.back"), on_click=stepper.previous).props("flat")
                         ui.button(tr(c, "act.next"), icon="arrow_forward", on_click=stepper.next).props("color=primary unelevated")
 
                 # ---- Step 4: review & submit --------------------------------------------------------
-                with ui.step("review", title="Review & submit", icon="task_alt"):
+                with ui.step("review", title=tr(c, "report.step_review"), icon="task_alt"):
                     review = ui.column().classes("gap-2 w-full")
 
                     def draw_review() -> None:
                         review.clear()
                         with review, ui.column().classes("cl-surface-alt q-pa-md gap-2 w-full"):
-                            ui.label(title.value or "(no title yet)").classes("text-sm font-semibold").style("color: var(--cl-fg);")
-                            ui.label((desc.value or "(no description yet)")[:280]).classes("text-sm cl-clip-2").style("color: var(--cl-fg-muted);")
+                            ui.label(title.value or tr(c, "report.no_title")).classes("text-sm font-semibold").style("color: var(--cl-fg);")
+                            ui.label((desc.value or tr(c, "report.no_desc"))[:280]).classes("text-sm cl-clip-2").style("color: var(--cl-fg-muted);")
                             with ui.row().classes("gap-2 flex-wrap"):
-                                chip(cat.value or "Category: not sure", color="info", outline=True)
+                                chip(cat.value or tr(c, "lbl.category") + ": " + tr(c, "assistant.unsure"), color="info", outline=True)
                                 if ward.value:
-                                    chip(f"Ward {ward.value}", color="muted", outline=True)
+                                    chip(f"{tr(c, 'lbl.ward')} {ward.value}", color="muted", outline=True)
                                 if lat.value and lng.value:
                                     chip(f"{lat.value:.4f}, {lng.value:.4f}", color="muted", outline=True)
-                                chip(f"{len(evidence_records)} evidence file(s)", color="muted", outline=True)
+                                chip(tr(c, "report.n_evidence", n=len(evidence_records)), color="muted", outline=True)
 
                     stepper.on_value_change(lambda e: draw_review() if e.value == "review" else None)
                     draw_review()
@@ -279,33 +593,7 @@ def register(c: AppContainer) -> None:
                     ui.timer(10.0, autosave)  # server-side draft; survives page reloads and dropped connections
 
                     def submit() -> None:
-                        try:
-                            d = payload()
-                            r = c.complaints.create(user.ctx, ComplaintInput(client_request_id=crid, **{k: v for k, v in d.items() if v not in (None, "")}))
-                            for w in r.warnings:
-                                ui.notify(w, type="warning")
-                        except CivicLensError as exc:
-                            ui.notify(exc.message + (f" {exc.details}" if exc.details else ""), type="negative")
-                            return
-                        cm = r.complaint
-                        with ui.dialog() as dlg, ui.column().classes("cl-card gap-3 w-full max-w-md"):
-                            with ui.row().classes("items-center gap-2"):
-                                ui.icon("check_circle").classes("text-[26px]").style("color: var(--cl-success);")
-                                ui.label("Report submitted").classes("text-lg font-semibold").style("color: var(--cl-fg);")
-                            with ui.column().classes("cl-surface-alt q-pa-md gap-1 w-full"):
-                                ui.label(f"{tr(c, 'lbl.reference')}: {cm.reference}").classes("cl-mono text-sm font-semibold")
-                                ui.label(f"{tr(c, 'lbl.department')}: {cm.department_code or 'awaiting manual triage'}").classes("text-sm")
-                                ui.label(f"{tr(c, 'lbl.priority')}: {cm.priority}").classes("text-sm")
-                                if cm.sla_due_at:
-                                    ui.label(f"{tr(c, 'lbl.due')}: {cm.sla_due_at.strftime('%d %b %Y %H:%M')}").classes("text-sm")
-                            if cm.ai_status in ("pending", "not_configured"):
-                                info_banner(tr(c, "msg.ai_unavailable") if cm.ai_status == "not_configured" else "AI enrichment is queued.")
-                            if cm.duplicates:
-                                section_title("Similar complaints already exist")
-                                for x in cm.duplicates:
-                                    ui.label(f"{x['reference']} - {x['explanation']}").classes("text-xs").style("color: var(--cl-fg-muted);")
-                            ui.button(tr(c, "nav.grievances"), icon="arrow_forward", on_click=lambda: ui.navigate.to(f"/grievances/{cm.id}")).props("color=primary unelevated").classes("w-full")
-                        dlg.open()
+                        create(payload())
 
                     def pending() -> None:
                         for dr in c.drafts.sync_all(user.ctx):
@@ -512,45 +800,92 @@ def register(c: AppContainer) -> None:
 
     @page(c, "/legal", "nav.legal", roles=CIT)
     async def legal(c: AppContainer, user: UiUser) -> None:
+        import base64
+
         page_header(tr(c, "nav.legal"), icon="balance")
         info_banner(tr(c, "msg.metadata_only"), "orange")
-        problem = ui.textarea(tr(c, "caseInputLabel")).props("outlined autogrow").classes("w-full max-w-3xl")
-        with ui.row().classes("gap-3 items-center"):
-            analyze_btn = ui.button(tr(c, "analyzeBtn").replace(" & Predict Outcome", ""), icon="balance", on_click=lambda: analyze(problem.value or "")).props("color=primary unelevated")
-            ui.upload(on_upload=lambda e: on_doc(e), auto_upload=True, label="Or upload a document").props("flat accept=.pdf,.txt,.docx").classes("cl-dropzone")
+        _qp = ui.context.client.request.query_params if ui.context.client.request else {}  # type: ignore[union-attr]
+        state: dict[str, Any] = {"recording": False}
+        caps = c.voice.capabilities()
+
+        with ui.element("div").classes("cl-ask w-full max-w-3xl"):
+            ui.icon("balance").classes("text-[20px]").style("color: var(--cl-ai);")
+            problem = ui.textarea(tr(c, "caseInputLabel"), value=(_qp.get("text") or "")[:2000]).props("borderless autogrow").classes("flex-1")
+            mic = ui.button(icon="mic").props("round unelevated").style("background: var(--cl-ai); color: #fff;")
+            mic.tooltip(tr(c, "assistant.mic_tip") if caps["state"] == "CONFIGURED" else tr(c, "assistant.mic_off"))
+            mic.set_enabled(caps["state"] == "CONFIGURED")
+        voice_hint = ui.label("").classes("text-xs").style("color: var(--cl-fg-subtle);")
+
+        with ui.row().classes("gap-2 flex-wrap items-center q-mt-xs"):
+            ui.label(tr(c, "legal.examples_label")).classes("text-xs").style("color: var(--cl-fg-subtle);")
+            for key in ("legal.example_rti", "legal.example_consumer", "legal.example_rera"):
+                text = tr(c, key)
+                ui.chip(text, icon="edit_note", on_click=lambda t=text: setattr(problem, "value", t)).props("outline dense")
+
+        with ui.row().classes("gap-3 items-center q-mt-sm"):
+            analyze_btn = ui.button(tr(c, "legal.analyze_btn"), icon="search", on_click=lambda: analyze(problem.value or "")).props("color=primary unelevated")
+            ui.upload(on_upload=lambda e: on_doc(e), auto_upload=True, label=tr(c, "legal.upload_doc")).props("flat accept=.pdf,.txt,.docx").classes("cl-dropzone")
         result = ui.column().classes("w-full max-w-3xl gap-3")
+
+        STATUS_KEY = {"no_verified_precedent": "legal.status_no_verified_precedent", "precedents_only": "legal.status_precedents_only", "analysed": "legal.status_analysed"}
+        CONF_KEY = {"none": "legal.conf_none", "low": "legal.conf_low", "medium": "legal.conf_medium"}
 
         def render(r: Any) -> None:
             result.clear()
             with result:
                 with ui.row().classes("items-center gap-2"):
-                    ui.label(f"Status: {r.status}").classes("text-sm font-medium").style("color: var(--cl-fg);")
-                    chip(f"confidence: {r.confidence}", color="muted", outline=True)
-                if r.concepts:
-                    with ui.column().classes("cl-surface-alt q-pa-sm gap-1 w-full"):
-                        ui.label("Statutes mentioned (keyword-detected, not legal advice)").classes("text-xs font-medium").style("color: var(--cl-fg-muted);")
-                        ui.label("; ".join(r.concepts)).classes("text-sm").style("color: var(--cl-fg);")
-                section_title("Verified precedents", "Retrieved from the case index - not model output.")
-                data_table([("cit", "Neutral citation"), ("title", "Case"), ("date", "Decided"), ("disposal", "Disposal"), ("how", "Matched on")],
-                           [{"id": p["cnr"], "cit": p["neutralCitation"], "title": p["title"], "date": p["decisionDate"], "disposal": p["disposal"] or "-", "how": p["matchedOn"]} for p in r.precedents], empty="No verified precedent matched.")
-                from urllib.parse import quote
+                    ui.label(tr(c, STATUS_KEY.get(r.status, r.status))).classes("text-sm font-medium").style("color: var(--cl-fg);")
+                    chip(tr(c, CONF_KEY.get(r.confidence, r.confidence)), color="muted", outline=True)
+                with ui.tabs().props("dense no-caps active-color=primary indicator-color=primary").classes("w-full") as result_tabs:
+                    t_analysis = ui.tab("analysis", label=tr(c, "legal.tab_analysis"))
+                    t_laws = ui.tab("laws", label=tr(c, "legal.tab_laws"))
+                    t_precedents = ui.tab("precedents", label=tr(c, "legal.tab_precedents"))
+                with ui.tab_panels(result_tabs, value=t_analysis).classes("w-full").style("background: transparent;"):
+                    with ui.tab_panel(t_analysis).classes("gap-3"):
+                        if r.interpretation:
+                            section_title(tr(c, "legal.ai_interpretation_title"), tr(c, "legal.ai_interpretation_sub"))
+                            with ui.row().classes("cl-card w-full items-start gap-2").style("background: var(--cl-ai-soft); border-color: transparent;"):
+                                ui.icon("auto_awesome").style("color: var(--cl-ai);")
+                                ui.label(r.interpretation).classes("text-sm").style("color: var(--cl-fg);")
+                        for w in r.warnings:
+                            info_banner(w, "orange")
+                        for line in r.bias_and_coverage:
+                            ui.label(line).classes("text-xs").style("color: var(--cl-fg-subtle);")
+                        ui.label(r.disclaimer).classes("text-xs italic").style("color: var(--cl-fg-subtle);")
+                    with ui.tab_panel(t_laws).classes("gap-3"):
+                        if r.concepts:
+                            with ui.column().classes("cl-surface-alt q-pa-sm gap-1 w-full"):
+                                ui.label(tr(c, "legal.statutes_detected")).classes("text-xs font-medium").style("color: var(--cl-fg-muted);")
+                                ui.label("; ".join(r.concepts)).classes("text-sm").style("color: var(--cl-fg);")
+                        else:
+                            ui.label(tr(c, "legal.no_concepts")).classes("text-sm").style("color: var(--cl-fg-muted);")
+                        for g in r.court_guides:
+                            with ui.column().classes("cl-card w-full gap-2"):
+                                ui.label(g["concept"]).classes("text-sm font-semibold").style("color: var(--cl-fg);")
+                                for label_key, value in ((tr(c, "legal.forum"), g["forum"]), (tr(c, "legal.advocate_mandatory"), g["advocateMandatory"]), (tr(c, "legal.fee_basis"), g["feeBasis"])):
+                                    with ui.row().classes("gap-2 items-start"):
+                                        ui.label(label_key + ":").classes("text-xs font-medium").style("color: var(--cl-fg-muted); min-width: 11rem;")
+                                        ui.label(value).classes("text-xs").style("color: var(--cl-fg);")
+                                ui.label(tr(c, "legal.procedure") + ":").classes("text-xs font-medium q-mt-xs").style("color: var(--cl-fg-muted);")
+                                for i, step in enumerate(g["steps"], 1):
+                                    ui.label(f"{i}. {step}").classes("text-xs").style("color: var(--cl-fg);")
+                    with ui.tab_panel(t_precedents).classes("gap-3"):
+                        section_title(tr(c, "legal.verified_precedents"), tr(c, "legal.verified_precedents_sub"))
+                        data_table([("cit", tr(c, "legal.col_neutral_citation")), ("title", tr(c, "legal.col_case")), ("date", tr(c, "legal.col_decided")), ("disposal", tr(c, "lbl.status")), ("how", tr(c, "legal.col_matched_on"))],
+                                   [{"id": p["cnr"], "cit": p["neutralCitation"], "title": p["title"], "date": p["decisionDate"], "disposal": p["disposal"] or "-", "how": p["matchedOn"]} for p in r.precedents], empty=tr(c, "msg.no_data"))
+                        if r.full_text_excerpts:
+                            section_title(tr(c, "legal.full_text_title"), tr(c, "legal.full_text_sub"))
+                            for e in r.full_text_excerpts:
+                                with ui.expansion(f"{e.get('neutralCitation') or e['judgmentId']} - {e.get('title') or ''}").classes("w-full"):
+                                    ui.label(e["text"]).classes("text-xs").style("color: var(--cl-fg-muted);")
+                        from urllib.parse import quote
 
-                query_text = (problem.value or "")[:300]
-                with ui.row().classes("cl-card items-center justify-between w-full flex-wrap gap-2").style("background: var(--cl-info-soft); border-color: transparent;"):
-                    with ui.column().classes("gap-0"):
-                        ui.label("This app's curated index has metadata for a bounded set of cases only.").classes("text-xs font-medium").style("color: var(--cl-info);")
-                        ui.label("For the full case-law database (including full judgment text), search Indian Kanoon directly.").classes("text-xs").style("color: var(--cl-info);")
-                    ui.link("Search Indian Kanoon ↗", f"https://indiankanoon.org/search/?formInput={quote(query_text)}").classes("text-sm font-medium").props("target=_blank")
-                if r.interpretation:
-                    section_title("AI-generated interpretation", "Generated from the records above - not authoritative legal advice.")
-                    with ui.row().classes("cl-card w-full items-start gap-2").style("background: var(--cl-ai-soft); border-color: transparent;"):
-                        ui.icon("auto_awesome").style("color: var(--cl-ai);")
-                        ui.label(r.interpretation).classes("text-sm").style("color: var(--cl-fg);")
-                for w in r.warnings:
-                    info_banner(w, "orange")
-                for line in r.bias_and_coverage:
-                    ui.label(line).classes("text-xs").style("color: var(--cl-fg-subtle);")
-                ui.label(r.disclaimer).classes("text-xs italic").style("color: var(--cl-fg-subtle);")
+                        query_text = (problem.value or "")[:300]
+                        with ui.row().classes("cl-card items-center justify-between w-full flex-wrap gap-2").style("background: var(--cl-info-soft); border-color: transparent;"):
+                            with ui.column().classes("gap-0"):
+                                ui.label(tr(c, "legal.curated_note")).classes("text-xs font-medium").style("color: var(--cl-info);")
+                                ui.label(tr(c, "legal.curated_note_sub")).classes("text-xs").style("color: var(--cl-info);")
+                            ui.link(tr(c, "legal.search_kanoon"), f"https://indiankanoon.org/search/?formInput={quote(query_text)}").classes("text-sm font-medium").props("target=_blank")
 
         async def analyze(text: str) -> None:
             result.clear()
@@ -570,10 +905,53 @@ def register(c: AppContainer) -> None:
             v = validate_upload(e.name, data, max_bytes=c.settings.max_upload_bytes, declared_mime=e.type)
             await analyze(" ".join(t for _p, t in extract_pages(v.mime, data, None))[:8000])
 
+        # ---- voice: same mic bridge the AI triage assistant uses (MediaRecorder -> emitEvent) -----
+        ui.add_body_html(f"<script>{MIC_JS}</script>")
+
+        def on_audio(e: Any) -> None:
+            state["recording"] = False
+            mic.props("icon=mic").classes(remove="cl-mic-live")
+            try:
+                raw = base64.b64decode(e.args["b64"])
+            except (KeyError, ValueError):
+                ui.notify(tr(c, "assistant.mic_failed"), type="negative")
+                return
+            try:
+                r = c.voice.transcribe(user.ctx, raw, e.args.get("mime") or "audio/webm", "auto" if caps["auto_detect"] else caps["languages"][0]["code"])
+            except CivicLensError as exc:
+                ui.notify(exc.message, type="negative")
+                return
+            if r.status != "OK" or not r.transcript:
+                ui.notify(r.error or r.status, type="warning")
+                return
+            problem.value = ((problem.value or "") + " " + r.transcript).strip()  # spoken language/script kept, never translated
+            voice_hint.set_text(tr(c, "assistant.heard", lang=r.language_detected or "?", how=r.detected_by))
+
+        def on_audio_error(e: Any) -> None:
+            state["recording"] = False
+            mic.props("icon=mic").classes(remove="cl-mic-live")
+            ui.notify(tr(c, "assistant.mic_denied") + " " + str(e.args.get("message", "")), type="negative")
+
+        ui.on("cl_audio", on_audio)
+        ui.on("cl_audio_error", on_audio_error)
+
+        async def toggle_mic() -> None:
+            if state["recording"]:
+                state["recording"] = False
+                mic.props("icon=mic").classes(remove="cl-mic-live")
+                ui.run_javascript("window.clStopRec()")
+                return
+            state["recording"] = True
+            mic.props("icon=stop").classes(add="cl-mic-live")
+            voice_hint.set_text(tr(c, "assistant.listening"))
+            await ui.run_javascript("window.clStartRec()")
+
+        mic.on_click(toggle_mic)
+
         past = c.legal.list_mine(user.ctx)
         if past:
-            section_title(tr(c, "act.view_all") + ": my earlier analyses")
-            data_table([("when", "When"), ("status", tr(c, "lbl.status")), ("problem", "Matter")], [{"id": r.id, "when": r.created_at.strftime("%d %b %Y %H:%M"), "status": r.status, "problem": r.problem[:100]} for r in past],
+            section_title(tr(c, "legal.past_analyses"))
+            data_table([("when", tr(c, "legal.col_when")), ("status", tr(c, "lbl.status")), ("problem", tr(c, "legal.col_matter"))], [{"id": r.id, "when": r.created_at.strftime("%d %b %Y %H:%M"), "status": r.status, "problem": r.problem[:100]} for r in past],
                        on_row=lambda row: ui.navigate.to(f"/legal?open={row['id']}"))
 
     @page(c, "/copilot", "nav.copilot")

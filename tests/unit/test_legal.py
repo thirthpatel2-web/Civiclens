@@ -184,6 +184,27 @@ class AnalysisTests(unittest.TestCase):
         self.assertEqual(detect_concepts("garbage on the street"), [])
         self.assertEqual(detect_concepts("my print job"), [])  # 'rti'/'pio' are matched as whole words only
 
+    def test_court_guide_is_attached_for_a_detected_concept_and_invents_no_fee_figure(self):
+        # The problem text matches the RERA concept via the index-derived precedent, not a keyword,
+        # so this also proves the guide is looked up from `concepts`, not from the precedent hits.
+        res = LegalAnalysisService(self.index).analyze(self.problem)
+        self.assertIn("Real Estate (Regulation and Development) Act, 2016", res.concepts)
+        guide = next(g for g in res.court_guides if g["concept"] == "Real Estate (Regulation and Development) Act, 2016")
+        self.assertIn("RERA", guide["forum"])
+        self.assertEqual(guide["advocateMandatory"][:2], "No")
+        self.assertNotRegex(guide["feeBasis"], r"₹\s?\d")  # a specific rupee figure is never invented
+        self.assertGreaterEqual(len(guide["steps"]), 3)
+
+    def test_court_guide_is_still_shown_when_the_precedent_index_is_empty(self):
+        # Statute guidance is independent of whether the curated precedent index has a matching case.
+        res = LegalAnalysisService(PrecedentIndex()).analyze("I filed an RTI to the PIO and got no reply")
+        self.assertEqual(res.status, "no_verified_precedent")
+        self.assertEqual([g["concept"] for g in res.court_guides], ["Right to Information Act, 2005"])
+
+    def test_no_concept_detected_means_no_court_guide_invented(self):
+        res = LegalAnalysisService(self.index).analyze("zzzz qqqq unrelated words")
+        self.assertEqual(res.court_guides, [])
+
 
 class FullTextIntegrationTests(unittest.TestCase):
     """Full-text judgment search is optional (default None -> identical behaviour to AnalysisTests

@@ -140,15 +140,45 @@ class UiAuditTests(unittest.TestCase):
         self.assertEqual(sorted(k for k in used if k not in known), [])
 
     def test_no_javascript_no_dead_buttons_no_placeholders(self):
+        # The only sanctioned JavaScript in the web UI is two thin bridges to browser hardware APIs
+        # that NiceGUI has no Python equivalent for: MediaRecorder (voice input) and
+        # navigator.geolocation ("use my location"). Both only relay one raw event back to Python
+        # via emitEvent(); every decision is still made in Python. Anything else stays banned, and
+        # a stray fetch/XHR/eval/innerHTML alongside a legitimate bridge is still caught below.
+        BANNED_EVEN_NEAR_A_BRIDGE = ("fetch(", "XMLHttpRequest", "eval(", "innerHTML", "document.write", "add_head_html")
         for f in list((ROOT / "app/ui").rglob("*.py")):
             src = f.read_text(encoding="utf-8")
-            self.assertNotIn("run_javascript", src, f)
             self.assertNotIn("add_head_html", src, f)
+            if "run_javascript" in src or "add_body_html" in src:
+                self.assertTrue(("MediaRecorder" in src and "getUserMedia" in src) or "navigator.geolocation" in src, f"{f.name}: JS present without a recognised hardware-API bridge")
+                for banned in BANNED_EVEN_NEAR_A_BRIDGE:
+                    self.assertNotIn(banned, src, f"{f.name}: disallowed JavaScript pattern {banned!r}")
             tree = ast.parse(src)
             in_with = {id(x) for w in ast.walk(tree) if isinstance(w, ast.With) for i in w.items for x in ast.walk(i.context_expr)}  # a button used as a menu trigger
+            # A button can also get its handler after construction - `mic = ui.button(...)` then
+            # later `mic.on_click(fn)` or `mic.on("click", fn)` - which is the only way to wire one
+            # up when the handler closes over the button variable itself (see the voice mic toggle).
+            deferred_bound = {
+                n.func.value.id
+                for n in ast.walk(tree)
+                if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute) and isinstance(n.func.value, ast.Name)
+                and (n.func.attr == "on_click" or (n.func.attr == "on" and n.args and isinstance(n.args[0], ast.Constant) and n.args[0].value == "click"))
+            }
+            # `mic = ui.button(...).props(...).style(...)` assigns the *outermost* chained call to
+            # `mic`, not the ui.button() call itself, so every Call in the chain is mapped to the
+            # assigned name, not just the leaf.
+            assign_targets: dict[int, str] = {}
+            for n in ast.walk(tree):
+                if isinstance(n, ast.Assign) and len(n.targets) == 1 and isinstance(n.targets[0], ast.Name):
+                    cur = n.value
+                    while isinstance(cur, ast.Call):
+                        assign_targets[id(cur)] = n.targets[0].id
+                        cur = cur.func.value if isinstance(cur.func, ast.Attribute) else None
             for n in ast.walk(tree):
                 if isinstance(n, ast.Call) and ast.unparse(n.func) == "ui.button" and id(n) not in in_with:
-                    self.assertTrue(any(k.arg == "on_click" for k in n.keywords), f"{f.name}: ui.button without a handler: {ast.unparse(n)[:80]}")
+                    name = assign_targets.get(id(n))
+                    has_handler = any(k.arg == "on_click" for k in n.keywords) or (name is not None and name in deferred_bound)
+                    self.assertTrue(has_handler, f"{f.name}: ui.button without a handler: {ast.unparse(n)[:80]}")
         # The ONLY JavaScript/TypeScript allowed is the React Native + Expo client under mobile/; the backend and the web UI stay Python.
         # Third-party packages (.venv, node_modules) are excluded: they are dependencies, not code this project wrote.
         excluded_roots = {"mobile", ".venv", "venv", "node_modules", ".git"}

@@ -15,18 +15,22 @@ class TranslatorTests(unittest.TestCase):
 
     def test_real_coverage_numbers_are_reported_not_hidden(self):
         cov = self.tr.coverage()
-        self.assertEqual((cov["en"]["translated"], cov["en"]["total"]), (142, 142))
-        self.assertEqual([cov[l]["translated"] for l in ("hi", "kn")], [140, 140])
-        self.assertEqual([cov[l]["translated"] for l in ("ta", "te", "mr", "bn")], [132] * 4)
-        self.assertIn("tabInsights", cov["ta"]["missing_keys"])
+        # All 7 languages now carry the full 142-key dictionary; a language-specific gap would
+        # show up here as translated < total, and the previously-untranslated keys (tabInsights,
+        # tabInterop, ...) were filled in for hi/kn/mr/bn/ta/te rather than left to fall back.
+        for lang in self.tr.languages:
+            self.assertEqual((cov[lang]["translated"], cov[lang]["total"]), (142, 142), lang)
+            self.assertEqual(cov[lang]["missing_keys"], [])
 
     def test_translation_and_fallback_tracking(self):
         self.assertEqual({self.tr.t("appName", l) for l in self.tr.languages}, {"CivicLens"})  # brand is never transliterated
         self.assertNotEqual(self.tr.t("tabHome", "hi"), self.tr.t("tabHome", "en"))
-        t = Translator.from_files()
-        self.assertEqual(t.t("tabInsights", "ta"), t.t("tabInsights", "en"))  # missing in Tamil -> English
-        self.assertIn(("ta", "tabInsights"), t.missing)
-        self.assertEqual(t.t("no.such.key", "en"), "no.such.key")  # visible, never invented
+        self.assertNotEqual(self.tr.t("tabInsights", "ta"), self.tr.t("tabInsights", "en"))  # now genuinely translated, not a fallback
+        # Fallback behaviour itself is exercised against a synthetic gap, not a real one.
+        gap = Translator({"en": {"only.in.english": "Only in English"}, "hi": {}})
+        self.assertEqual(gap.t("only.in.english", "hi"), "Only in English")
+        self.assertIn(("hi", "only.in.english"), gap.missing)
+        self.assertEqual(Translator.from_files().t("no.such.key", "en"), "no.such.key")  # visible, never invented
 
     def test_language_resolution(self):
         self.assertEqual(self.tr.resolve_language("hi-IN"), "hi")

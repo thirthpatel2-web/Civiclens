@@ -1,9 +1,9 @@
 """UI string lookup for the seven supported languages.
 
-The dictionary (``translations.json``) was ported from the original CivicLens app: 142
-English keys; Hindi and Kannada lack 2 of them and Tamil, Telugu, Marathi and Bengali lack
-10. A missing key falls back to English (and is *reported*, so gaps are visible) - it is
-never machine-translated on the fly and never silently invented.
+The dictionary (``translations.json``) was ported from the original CivicLens app and now
+carries all 142 keys in all seven languages. A key added later that is missing for a language
+still falls back to English (and is *reported*, so gaps are visible) - it is never
+machine-translated on the fly and never silently invented.
 """
 
 from __future__ import annotations

@@ -14,6 +14,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
+from app.legal.court_guide import guides_for
 from app.legal.judgment_search import JudgmentExcerpt, JudgmentSearchPort
 from app.legal.precedents import CitationCheck, PrecedentHit, PrecedentIndex
 from app.rag.grounded_generation import AnswerStatus, GroundedGenerator
@@ -45,6 +46,7 @@ class LegalAnalysis:
     citations_check: dict[str, list[str]] = field(default_factory=dict)
     disclaimer: str = NOT_LEGAL_ADVICE
     full_text_excerpts: list[dict[str, Any]] = field(default_factory=list)
+    court_guides: list[dict[str, Any]] = field(default_factory=list)
 
 
 def detect_concepts(text: str) -> list[str]:
@@ -111,8 +113,9 @@ class LegalAnalysisService:
         full_text = [_excerpt_dict(e) for e in excerpts]
         if excerpts:
             coverage.append(f"Real judgment text was retrieved for {len(full_text)} passage(s) below - these are genuine excerpts from the source PDF, not summaries.")
+        court_guides = guides_for(concepts)
         if not hits and not excerpts:
-            return LegalAnalysis("no_verified_precedent", concepts, [], None, "none", coverage, ["No verified precedent or judgment text matched this description."])
+            return LegalAnalysis("no_verified_precedent", concepts, [], None, "none", coverage, ["No verified precedent or judgment text matched this description."], court_guides=court_guides)
 
         gen = self._generator.generate(
             f"Which of these verified records relate to: {problem[:1500]}? For metadata-only records, describe only what the metadata shows. "
@@ -134,4 +137,4 @@ class LegalAnalysisService:
                     confidence = "medium"  # the grounded, citation-verified answer actually cites real judgment text, not metadata alone
         elif gen.status is AnswerStatus.MODEL_UNAVAILABLE:
             warnings.append("No language model available: showing verified precedent records and any retrieved judgment text only.")
-        return LegalAnalysis(status, concepts, precedents, interpretation, confidence, coverage, warnings, check_dict, full_text_excerpts=full_text)
+        return LegalAnalysis(status, concepts, precedents, interpretation, confidence, coverage, warnings, check_dict, full_text_excerpts=full_text, court_guides=court_guides)
