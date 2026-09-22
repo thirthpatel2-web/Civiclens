@@ -24,6 +24,10 @@ mobile/node_modules/
 mobile/.expo/
 mobile/dist/
 mobile/.env
+classic-app/node_modules/
+classic-app/.expo/
+classic-app/dist/
+classic-app/.env
 *.jks
 *.p8
 *.p12

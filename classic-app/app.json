@@ -1,0 +1,81 @@
+{
+  "expo": {
+    "name": "CivicLens Classic",
+    "slug": "civiclens-classic",
+    "scheme": "civiclens-classic",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#1f4e79"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "org.civiclens.classic",
+      "infoPlist": {
+        "NSMicrophoneUsageDescription": "CivicLens records your voice so it can be turned into text, in the language you speak, for your complaint. Nothing is recorded until you press the microphone button.",
+        "NSCameraUsageDescription": "CivicLens uses the camera to photograph the problem (for example a pothole) as evidence for your complaint.",
+        "NSPhotoLibraryUsageDescription": "CivicLens lets you attach an existing photo as evidence for your complaint.",
+        "NSLocationWhenInUseUsageDescription": "CivicLens uses your location, only when you ask it to, to attach the place of the problem to your complaint."
+      }
+    },
+    "android": {
+      "package": "org.civiclens.classic",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#1f4e79"
+      },
+      "softwareKeyboardLayoutMode": "resize",
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.CAMERA",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.MODIFY_AUDIO_SETTINGS"
+      ]
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      [
+        "expo-notifications",
+        {
+          "color": "#1f4e79"
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "CivicLens uses your location, only when you ask it to, to attach the place of the problem to your complaint."
+        }
+      ],
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "CivicLens records your voice so it can be turned into text, in the language you speak, for your complaint."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "CivicLens uses the camera to photograph the problem as evidence.",
+          "photosPermission": "CivicLens lets you attach an existing photo as evidence."
+        }
+      ],
+      "expo-background-task",
+      "expo-status-bar"
+    ],
+    "experiments": {
+      "typedRoutes": false
+    },
+    "extra": {
+      "apiBaseUrl": "http://10.0.2.2:8080",
+      "router": {}
+    },
+    "owner": "thirth"
+  }
+}
