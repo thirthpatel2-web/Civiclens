@@ -42,7 +42,6 @@ jobs:
 
       - name: Mypy type-check
         run: mypy app/
-        continue-on-error: true # not yet a hard gate; see pending-items list
 
       - name: Apply migrations
         run: alembic upgrade head

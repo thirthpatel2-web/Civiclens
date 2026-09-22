@@ -62,7 +62,7 @@ python scripts/audit_ui_links.py                    # every web + mobile navigat
 python scripts/generate_initial_migration.py --check   # migrations == models
 cd mobile && npm test                               # Node test runner over the pure TypeScript logic
 cd mobile && sh tools/stubcheck.sh                  # tsc over the app against ambient stubs (no node_modules needed)
-ruff check . && ruff format --check . && mypy app   # not run in the build environment
+ruff check . && mypy app   # both are hard CI gates; `ruff format --check .` is not run here - this codebase's dense, hand-tuned formatting (see the many `# fmt: skip` markers) predates and diverges from ruff's own formatter
 ```
 
 ## Honest degradation (nothing pretends to work)
