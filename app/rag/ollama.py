@@ -17,6 +17,12 @@ from urllib.parse import urlparse
 
 from app.core.exceptions import DependencyUnavailable, NotConfigured
 
+# Ollama's default keep_alive (5m) unloads the model between the kind of request gaps this app
+# sees in normal use (an officer reading a report, a citizen typing a complaint), so a cold load
+# - which alone took 52s for llama3.1:8b on this machine - hits nearly every request. Asking Ollama
+# to hold the model resident for longer trades idle RAM for avoiding that repeated penalty.
+OLLAMA_KEEP_ALIVE = "30m"
+
 
 def validate_base_url(url: str, *, allow_private: bool = True) -> str:
     """Only http(s) URLs without embedded credentials (SSRF/credential-leak hygiene)."""
@@ -61,7 +67,7 @@ class OllamaClient:
         return [m.get("name", "") for m in data.get("models", []) if isinstance(m, dict)]
 
     def embed(self, model: str, inputs: Sequence[str]) -> list[list[float]]:
-        data = self._request("/api/embed", {"model": model, "input": list(inputs)})
+        data = self._request("/api/embed", {"model": model, "input": list(inputs), "keep_alive": OLLAMA_KEEP_ALIVE})
         vectors = data.get("embeddings")
         if not isinstance(vectors, list) or len(vectors) != len(inputs):
             raise DependencyUnavailable("Ollama returned an unexpected embedding payload.")
@@ -70,7 +76,10 @@ class OllamaClient:
     def chat(self, model: str, messages: list[dict[str, str]], *, temperature: float = 0.0, json_mode: bool = False, images: list[str] | None = None) -> str:
         if images:  # base64 images attach to the last (user) message, as Ollama's chat API expects
             messages = [*messages[:-1], {**messages[-1], "images": images}]  # type: ignore[dict-item]
-        payload: dict[str, Any] = {"model": model, "messages": messages, "stream": False, "options": {"temperature": temperature}}
+        # think=False is a no-op on models without a "thinking" capability, but on ones that have it
+        # (e.g. gemma4) it skips an internal reasoning trace we never surface anyway - one measured
+        # test dropped a trivial reply from 165 generated tokens to 3 for the same visible answer.
+        payload: dict[str, Any] = {"model": model, "messages": messages, "stream": False, "options": {"temperature": temperature}, "keep_alive": OLLAMA_KEEP_ALIVE, "think": False}
         if json_mode:
             payload["format"] = "json"
         data = self._request("/api/chat", payload)

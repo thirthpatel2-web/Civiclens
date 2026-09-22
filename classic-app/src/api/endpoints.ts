@@ -41,7 +41,9 @@ export function createEndpoints(api: ApiClient) {
     // language: a code, or "auto" (only if the engine declares auto-detect). The result is in the SPOKEN language; it is never translated.
     transcribe: async (file: T.LocalFile, language: LanguageCode | 'auto') => api.request<T.VoiceResult>('POST', '/voice/transcribe', { form: await fileForm('audio', file, { language }), timeoutMs: 120000 }),
 
-    ask: (question: string, language: LanguageCode, conversationId?: string | null) => api.post<T.AskResponse>('/assistant/ask', { question, language, conversation_id: conversationId ?? null }),
+    // The Ollama-backed answer can genuinely take well past a normal request timeout on CPU-only inference, so this
+    // gets the same generous budget as file uploads rather than the default - a slow real answer beats a fast fake timeout.
+    ask: (question: string, language: LanguageCode, conversationId?: string | null) => api.post<T.AskResponse>('/assistant/ask', { question, language, conversation_id: conversationId ?? null }, { timeoutMs: 150000 }),
     assistantRoute: (text: string, ward?: string | null) => api.post<T.AssistantRouteResult>('/assistant/route', { text, ward: ward ?? null }),
     notifications: () => api.get<{ items: T.NotificationItem[]; unread: number }>('/notifications'),
     markRead: (id: string) => api.post(`/notifications/${id}/read`),
@@ -58,7 +60,7 @@ export function createEndpoints(api: ApiClient) {
     consents: () => api.get<Record<string, { granted: boolean }>>('/consent'),
     setConsent: (purpose: string, granted: boolean) => api.put(`/consent/${purpose}`, { granted }),
     listRti: () => api.get<{ items: T.RtiApplication[] }>('/rti'),
-    analyzeLegal: (problem: string) => api.post<T.LegalAnalysis>('/legal/analyze', { problem }),
+    analyzeLegal: (problem: string) => api.post<T.LegalAnalysis>('/legal/analyze', { problem }, { timeoutMs: 150000 }),
     profile: () => api.get<any>('/profiles/me'),
     updateProfile: (fields: { full_name?: string; phone?: string; city?: string; ward?: string; language?: string; complete_onboarding?: boolean }) => api.put<any>('/profiles/me', fields),
 
@@ -87,7 +89,8 @@ export function createEndpoints(api: ApiClient) {
 
     openInvestigation: (subject_type: string, subject_id: string) => api.post<T.Investigation>('/officer/investigations', { subject_type, subject_id }),
     listInvestigations: () => api.get<{ items: T.Investigation[] }>('/officer/investigations'),
-    investigationReport: (id: string) => api.get<T.InvestigationReport>(`/officer/investigations/${id}`),
+    // Assembles rag_findings + legal_sources, both Ollama-backed - same generous timeout as other AI-heavy calls.
+    investigationReport: (id: string) => api.request<T.InvestigationReport>('GET', `/officer/investigations/${id}`, { timeoutMs: 150000 }),
     addInvestigationNote: (id: string, text: string) => api.post(`/officer/investigations/${id}/notes`, { text }),
     closeInvestigation: (id: string) => api.post(`/officer/investigations/${id}/close`, {}),
 

@@ -76,6 +76,21 @@ def create_app(container: AppContainer | None = None, *, with_ui: bool = True) -
         if c.index_sync is not None:
             await run_in_threadpool(c.index_sync.refresh)
         logger.info("CivicLens started: %s precedents loaded", n)
+
+        def warm_up_ollama() -> None:
+            # Ollama unloads a model after its keep_alive window; without this, whichever request
+            # happens to be first after that (or after a fresh server start) eats the full model-load
+            # latency - which measured ~52s for llama3.1:8b on this machine, well past client timeouts.
+            try:
+                if c.embedder is not None:
+                    c.embedder.embed(["warm up"])
+                if c.llm is not None:
+                    c.llm.chat([{"role": "user", "content": "hi"}])
+            except Exception:
+                logger.warning("Ollama warm-up failed; first real request will pay the cold-load cost")
+
+        if c.llm is not None or c.embedder is not None:
+            asyncio.create_task(run_in_threadpool(warm_up_ollama))
         try:
             yield
         finally:

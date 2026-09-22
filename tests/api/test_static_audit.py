@@ -179,17 +179,19 @@ class UiAuditTests(unittest.TestCase):
                     name = assign_targets.get(id(n))
                     has_handler = any(k.arg == "on_click" for k in n.keywords) or (name is not None and name in deferred_bound)
                     self.assertTrue(has_handler, f"{f.name}: ui.button without a handler: {ast.unparse(n)[:80]}")
-        # The ONLY JavaScript/TypeScript allowed is the React Native + Expo client under mobile/; the backend and the web UI stay Python.
+        # The ONLY JavaScript/TypeScript allowed is the React Native + Expo clients under mobile/ and
+        # classic-app/ (the zip-ported client); the backend and the web UI stay Python.
         # Third-party packages (.venv, node_modules) are excluded: they are dependencies, not code this project wrote.
-        excluded_roots = {"mobile", ".venv", "venv", "node_modules", ".git"}
+        excluded_roots = {"mobile", "classic-app", ".venv", "venv", "node_modules", ".git"}
         js = [p for p in ROOT.rglob("*") if (p.suffix in (".js", ".ts", ".tsx", ".jsx", ".vue") or p.name in ("package.json", "node_modules")) and not excluded_roots & set(p.relative_to(ROOT).parts[:1])]
         self.assertEqual(js, [])
-        self.assertFalse((ROOT / "mobile" / "server").exists(), "no second (Node) backend")
         import json
 
-        pkg = json.loads((ROOT / "mobile" / "package.json").read_text(encoding="utf-8"))
-        deps = set(pkg.get("dependencies", {})) | set(pkg.get("devDependencies", {}))
-        self.assertEqual(deps & {"express", "koa", "fastify", "pg", "mongoose", "bullmq", "ioredis", "sequelize", "prisma", "@nestjs/core"}, set(), "the mobile app must not bundle backend frameworks")
+        for client_dir in ("mobile", "classic-app"):
+            self.assertFalse((ROOT / client_dir / "server").exists(), f"no second (Node) backend under {client_dir}")
+            pkg = json.loads((ROOT / client_dir / "package.json").read_text(encoding="utf-8"))
+            deps = set(pkg.get("dependencies", {})) | set(pkg.get("devDependencies", {}))
+            self.assertEqual(deps & {"express", "koa", "fastify", "pg", "mongoose", "bullmq", "ioredis", "sequelize", "prisma", "@nestjs/core"}, set(), f"{client_dir} must not bundle backend frameworks")
 
     def test_pages_call_services_not_raw_sql(self):
         for name, src in self.files.items():

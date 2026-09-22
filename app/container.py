@@ -305,7 +305,10 @@ def build_container(settings: Settings) -> AppContainer:
         redis_client = redis.Redis.from_url(settings.redis_url, socket_timeout=3, socket_connect_timeout=3)
         backend, lock, state = RedisQueueBackend(redis_client), RedisLock(redis_client), RedisSchedulerState(redis_client)
         bus = RedisEventBus(redis_client)
-    ollama = OllamaClient(settings.ollama_base_url, timeout=90) if settings.ollama_base_url and (settings.ollama_model or settings.ollama_embedding_model or settings.ollama_vision_model) else None
+    # A cold model load alone measured ~52s for llama3.1:8b on CPU-only inference; 90s left too little
+    # room for the load plus even a short generation, so warm-up and first-request calls were degrading
+    # to "unavailable" before the model ever finished loading.
+    ollama = OllamaClient(settings.ollama_base_url, timeout=180) if settings.ollama_base_url and (settings.ollama_model or settings.ollama_embedding_model or settings.ollama_vision_model) else None
     llm = OllamaChatProvider(ollama, settings.ollama_model) if ollama and settings.ollama_model else None
     embedder = OllamaEmbeddingProvider(ollama, settings.ollama_embedding_model, settings.embedding_dimensions) if ollama and settings.ollama_embedding_model else None
     vision = OllamaVisionProvider(ollama, settings.ollama_vision_model) if ollama and settings.ollama_vision_model else None

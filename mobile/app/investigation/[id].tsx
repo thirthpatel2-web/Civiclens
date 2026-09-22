@@ -30,7 +30,7 @@ export default function InvestigationScreen() {
   useEffect(() => { load(); }, [load]);
 
   if (error && !r) return <Screen><ErrorBanner message={error} onRetry={load} /></Screen>;
-  if (!r) return <Screen><Loading label={t('msg.loading')} /></Screen>;
+  if (!r) return <Screen><Loading label="Assembling the case file - this runs a real AI legal search and can take a minute or two." /></Screen>;
   const inv = r.investigation;
 
   return (
