@@ -1,6 +1,6 @@
 // Microphone -> server transcription in the SPOKEN language (never translated). The reducer (voiceMachine.ts) is the single source of truth.
 import { useCallback, useEffect, useReducer, useRef } from 'react';
-import { Audio } from 'expo-av';
+import { requestRecordingPermissionsAsync, setAudioModeAsync, useAudioRecorder, RecordingPresets } from 'expo-audio';
 import { initialVoice, voiceReducer } from '../voice/voiceMachine.ts';
 import type { VoiceState } from '../voice/voiceMachine.ts';
 import { endpoints } from '../api/instance.ts';
@@ -9,7 +9,7 @@ import type { LanguageCode } from '../i18n/languages.ts';
 
 export function useVoiceInput(initialLanguage: LanguageCode | 'auto', isOnline: () => Promise<boolean>) {
   const [state, dispatch] = useReducer(voiceReducer, initialVoice(initialLanguage));
-  const recording = useRef<Audio.Recording | null>(null);
+  const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
   const stateRef = useRef<VoiceState>(state);
   stateRef.current = state;
 
@@ -25,36 +25,33 @@ export function useVoiceInput(initialLanguage: LanguageCode | 'auto', isOnline: 
 
   const start = useCallback(async () => {
     dispatch({ type: 'PRESS_MIC' });
-    const perm = await Audio.requestPermissionsAsync(); // the OS prompt shows the purpose text from app.json
+    const perm = await requestRecordingPermissionsAsync(); // the OS prompt shows the purpose text from app.json
     if (!perm.granted) { dispatch({ type: 'PERMISSION_DENIED' }); return; }
     try {
-      await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
-      const { recording: rec } = await Audio.Recording.createAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
-      recording.current = rec;
+      await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
+      await recorder.prepareToRecordAsync();
+      recorder.record();
       dispatch({ type: 'PERMISSION_GRANTED', now: Date.now() });
     } catch (e: any) { dispatch({ type: 'FAILED', message: e?.message ?? 'Could not start recording.' }); }
-  }, []);
+  }, [recorder]);
 
   const stop = useCallback(async () => {
-    const rec = recording.current;
-    if (!rec) return;
-    recording.current = null;
+    if (!recorder.isRecording) return;
     try {
-      await rec.stopAndUnloadAsync();
-      await Audio.setAudioModeAsync({ allowsRecordingIOS: false });
-      const uri = rec.getURI();
+      await recorder.stop();
+      await setAudioModeAsync({ allowsRecording: false });
+      const uri = recorder.uri;
       if (!uri) { dispatch({ type: 'FAILED', message: 'The recording is empty.' }); return; }
       const online = await isOnline();
       dispatch({ type: 'STOP', audioUri: uri, online });
       if (online) await transcribe(uri, stateRef.current.language);
     } catch (e: any) { dispatch({ type: 'FAILED', message: e?.message ?? 'Could not finish recording.' }); }
-  }, [isOnline, transcribe]);
+  }, [recorder, isOnline, transcribe]);
 
   const cancel = useCallback(async () => {
-    const rec = recording.current; recording.current = null;
-    if (rec) await rec.stopAndUnloadAsync().catch(() => undefined);
+    if (recorder.isRecording) await recorder.stop().catch(() => undefined);
     dispatch({ type: 'CANCEL' });
-  }, []);
+  }, [recorder]);
 
   const retry = useCallback(async () => {
     const s = stateRef.current;
@@ -62,6 +59,6 @@ export function useVoiceInput(initialLanguage: LanguageCode | 'auto', isOnline: 
     if (s.kind === 'error' && s.audioUri) await transcribe(s.audioUri, s.language);
   }, [transcribe]);
 
-  useEffect(() => () => { recording.current?.stopAndUnloadAsync().catch(() => undefined); }, []);
+  useEffect(() => () => { if (recorder.isRecording) recorder.stop().catch(() => undefined); }, [recorder]);
   return { state, start, stop, cancel, retry, edit: (text: string) => dispatch({ type: 'EDIT', text }), selectLanguage: (language: LanguageCode | 'auto') => dispatch({ type: 'SELECT_LANGUAGE', language }) };
 }

@@ -1,4 +1,4 @@
-declare namespace JSX { interface Element {} interface IntrinsicElements { [k: string]: any } interface ElementChildrenAttribute { children: {} } interface IntrinsicAttributes { key?: any } }
+declare namespace JSX { interface Element { type: any; props: any; key: any; children: any; [k: string]: any } interface IntrinsicElements { [k: string]: any } interface ElementChildrenAttribute { children: {} } interface IntrinsicAttributes { key?: any } }
 declare module 'react' {
   export type ReactNode = any;
   export type FC<P = {}> = (p: P) => any;
@@ -17,7 +17,7 @@ declare module 'react-native-maps' { const M: any; export default M; export cons
 declare module 'expo-router' { export const Slot: any, Link: any, Redirect: any, Tabs: any; export function useRouter(): any; export function useSegments(): string[]; export function useLocalSearchParams<T>(): T; }
 declare module 'expo-status-bar' { export const StatusBar: any; }
 declare module '@expo/vector-icons' { export const Ionicons: any; }
-declare module 'expo-av' { export const Audio: any; export namespace Audio { type Recording = any } }
+declare module 'expo-audio' { export function useAudioRecorder(o: any): any; export const RecordingPresets: any; export function requestRecordingPermissionsAsync(): Promise<any>; export function setAudioModeAsync(o: any): Promise<void>; }
 declare module 'expo-secure-store' { export const WHEN_UNLOCKED_THIS_DEVICE_ONLY: any; export function getItemAsync(k: string): Promise<string | null>; export function setItemAsync(k: string, v: string, o?: any): Promise<void>; export function deleteItemAsync(k: string): Promise<void>; }
 declare module 'expo-location' { const L: any; export = L; }
 declare module 'expo-image-picker' { export const launchCameraAsync: any, launchImageLibraryAsync: any, requestCameraPermissionsAsync: any; export type ImagePickerAsset = { uri: string; fileName?: string | null; mimeType?: string | null }; }

@@ -54,7 +54,7 @@
         }
       ],
       [
-        "expo-av",
+        "expo-audio",
         {
           "microphonePermission": "CivicLens records your voice so it can be turned into text, in the language you speak, for your complaint."
         }
@@ -66,7 +66,8 @@
           "photosPermission": "CivicLens lets you attach an existing photo as evidence."
         }
       ],
-      "expo-background-task"
+      "expo-background-task",
+      "expo-status-bar"
     ],
     "experiments": {
       "typedRoutes": false
