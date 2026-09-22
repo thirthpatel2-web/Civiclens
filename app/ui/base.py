@@ -267,8 +267,17 @@ def shell(c: AppContainer, user: UiUser, route: str, title_key: str) -> None:
         from app.i18n.languages import LANGUAGES as _LANGS
 
         lang_options = {code: _LANGS[code].native if code in _LANGS else code.upper() for code in langs}
-        lang_sel = ui.select(lang_options, value=lang(), on_change=lambda e: (set_language(c, user, e.value), ui.navigate.reload())).props("dense outlined options-dense behavior=menu").classes("w-24 gt-xs")
+
+        def _on_lang_change(e: Any) -> None:
+            set_language(c, user, e.value)
+            ui.navigate.reload()
+
+        lang_sel = ui.select(lang_options, value=lang(), on_change=_on_lang_change).props("dense outlined options-dense behavior=menu").classes("w-24 gt-xs")
         lang_sel.tooltip(tr(c, "lang.select"))
+
+        def _do_sign_out() -> None:
+            sign_out(c)
+            ui.navigate.to("/login")
 
         with ui.button(icon="account_circle").props("flat round dense").style("color: var(--cl-fg);"):
             with ui.menu().props("anchor='bottom right' self='top right'"):
@@ -282,7 +291,7 @@ def shell(c: AppContainer, user: UiUser, route: str, title_key: str) -> None:
                     ui.label(tr(c, "lbl.appearance")).classes("text-sm")
                     ui.button(icon="light_mode" if dm.value else "dark_mode", on_click=flip_theme).props("flat round dense size=sm")
                 ui.separator()
-                ui.menu_item(tr(c, "act.sign_out"), lambda: (sign_out(c), ui.navigate.to("/login")))
+                ui.menu_item(tr(c, "act.sign_out"), _do_sign_out)
 
     def refresh() -> None:
         try:
@@ -297,11 +306,15 @@ def shell(c: AppContainer, user: UiUser, route: str, title_key: str) -> None:
         except Exception:
             logger.warning("header refresh failed")
 
+    def _on_ws_event(d: dict[str, Any]) -> None:
+        _toast(c, d)
+        refresh()
+
     async def connect() -> None:
         await ui.context.client.connected()
         live_label.set_text(tr(c, "conn.live"))
         live.classes(remove="cl-badge-muted", add="cl-badge-success")
-        cid = await c.ws.connect(_UiSocket(ui.context.client, lambda d: (_toast(c, d), refresh())), user.ctx)  # type: ignore[arg-type]
+        cid = await c.ws.connect(_UiSocket(ui.context.client, _on_ws_event), user.ctx)
         ui.context.client.on_disconnect(lambda: c.ws.disconnect(cid))
 
     ui.timer(0.1, connect, once=True)
