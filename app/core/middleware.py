@@ -11,6 +11,7 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.middleware.cors import CORSMiddleware
 
 from app.core.config import Settings
 from app.core.exceptions import CivicLensError
@@ -54,21 +55,45 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         return response
 
 
+def _is_local_dev_origin(origin: str) -> bool:
+    """``http://localhost:<any port>`` or ``http://127.0.0.1:<any port>`` - the Expo web dev server
+    (Metro) runs on its own port and must reach this API cross-origin. Only ever consulted outside
+    production, so this never widens what a deployed instance accepts."""
+    try:
+        scheme, rest = origin.split("://", 1)
+    except ValueError:
+        return False
+    hostname = rest.split(":", 1)[0].split("/", 1)[0]
+    return scheme == "http" and hostname in {"localhost", "127.0.0.1"}
+
+
 class OriginCheckMiddleware(BaseHTTPMiddleware):
-    """Cookie-authenticated state changes must come from this site: reject cross-origin ``Origin``."""
+    """Cookie-authenticated state changes must come from this site: reject cross-origin ``Origin``.
+
+    Outside production, a localhost/127.0.0.1 origin on any port is exempt - that's the Expo web dev
+    server (a different port than the API), which has no other way to reach this API cross-origin for
+    local testing. Production is unaffected: real deployments only ever see their own origin.
+    """
+
+    def __init__(self, app: Any, production: bool) -> None:
+        super().__init__(app)
+        self._prod = production
 
     async def dispatch(self, request: Request, call_next: Any) -> Any:
         if request.method in UNSAFE and request.url.path.startswith("/api/"):
             origin = request.headers.get("origin")
             if origin and origin.rstrip("/").split("://", 1)[-1] != request.headers.get("host", ""):
-                return JSONResponse({"error": {"code": "cross_origin", "message": "Cross-origin requests are not allowed."}}, status_code=403)
+                if self._prod or not _is_local_dev_origin(origin):
+                    return JSONResponse({"error": {"code": "cross_origin", "message": "Cross-origin requests are not allowed."}}, status_code=403)
         return await call_next(request)
 
 
 def install(app: FastAPI, settings: Settings) -> None:
-    app.add_middleware(OriginCheckMiddleware)
+    app.add_middleware(OriginCheckMiddleware, production=settings.is_production)
     app.add_middleware(SecurityHeadersMiddleware, production=settings.is_production)
     app.add_middleware(CorrelationIdMiddleware)
+    if not settings.is_production:  # the Expo web dev server's CORS preflight; real deployments are same-origin only
+        app.add_middleware(CORSMiddleware, allow_origin_regex=r"^http://(localhost|127\.0\.0\.1):\d+$", allow_methods=["*"], allow_headers=["*"], allow_credentials=False)
 
     @app.exception_handler(CivicLensError)
     async def civiclens_error(request: Request, exc: CivicLensError) -> JSONResponse:

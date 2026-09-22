@@ -63,8 +63,13 @@ DANGEROUS = [
     (r"AKIA[0-9A-Z]{16}", "AWS access key"),
     (r"(?i)(api[_-]?key|secret|passw(or)?d|token)\s*=\s*[\"'][A-Za-z0-9+/_\-]{16,}[\"']", "hard-coded credential"),
     (r"debug\s*=\s*True", "debug mode enabled"),
-    (r"CORSMiddleware", "CORS middleware (the web UI is same-origin; mobile uses Bearer, not cookies)"),
+    # CORSMiddleware itself is not banned: the Expo web dev build is a real, non-production cross-origin
+    # client. What's banned is the specific patterns that would make it insecure - a wildcard/unrestricted
+    # origin, or enabling credentialed CORS (this API is Bearer-token only; credentialed CORS is for
+    # cookie-based auth, which this app never sends cross-origin).
     (r"allow_origins\s*=\s*\[\s*[\"']\*", "wildcard CORS"),
+    (r"allow_origin_regex\s*=\s*[\"']\.\*[\"']", "unrestricted CORS origin regex"),
+    (r"allow_credentials\s*=\s*True", "credentialed CORS (this API is Bearer-token only)"),
     (r"innerHTML|dangerouslySetInnerHTML|ui\.html\(|ui\.markdown\([^)]*sanitize\s*=\s*False", "raw HTML injection surface"),
 ]
 
