@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Image, Text, View } from 'react-native';
+import { Image, Pressable, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { AppButton, Body, Card, Chip, ErrorBanner, Field, H1, InfoBanner, Screen, StepProgress } from '../../src/components/ui.tsx';
+import { AppButton, Body, Card, Chip, Disclosure, ErrorBanner, Field, H1, InfoBanner, Screen } from '../../src/components/ui.tsx';
 import { VoiceInput } from '../../src/components/VoiceInput.tsx';
 import type { VoiceAccepted } from '../../src/components/VoiceInput.tsx';
 import { LANGUAGES } from '../../src/i18n/languages.ts';
@@ -20,8 +20,12 @@ import { useTheme } from '../../src/theme/ThemeContext.tsx';
 import * as Crypto from 'expo-crypto';
 
 const CATEGORIES = ['roads', 'water', 'electricity', 'sanitation', 'drainage', 'encroachment', 'police'];
-const TOTAL_STEPS = 3;
-const STEP_TITLES = ['Describe the problem', 'Confirm category & location', 'Evidence & submit'];
+const QUICK_EXAMPLES = [
+  'Deep pothole on the main road causing accidents for 2 weeks',
+  'Garbage dump overflowing near the school gate',
+  'Low voltage power supply and transformer sparks',
+  'Contaminated, muddy drinking water from the pipeline',
+];
 
 export default function Report() {
   const { t, lang } = useI18n();
@@ -29,7 +33,6 @@ export default function Report() {
   const { colors } = useTheme();
   const router = useRouter();
   const draftId = useRef(Crypto.randomUUID()); // also the server client_request_id: resubmission can never duplicate
-  const [step, setStep] = useState(1);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [language, setLanguage] = useState<LanguageCode>(lang);
@@ -74,6 +77,11 @@ export default function Report() {
     const id = setTimeout(() => { draftStore.save(buildDraft(), new Date().toISOString()).then(reload).catch(() => undefined); }, 800);
     return () => clearTimeout(id);
   }); // eslint-disable-line react-hooks/exhaustive-deps
+
+  function useExample(text: string) {
+    setDescription(text);
+    if (!title.trim()) setTitle(text.length > 60 ? `${text.slice(0, 57)}...` : text);
+  }
 
   async function addPhoto(kind: 'camera' | 'library') {
     const picked = kind === 'camera' ? [await takePhoto()].filter(Boolean) as any[] : await pickPhotos();
@@ -120,77 +128,63 @@ export default function Report() {
     );
   }
 
-  const step1Ok = title.trim().length >= 5 && (description.trim().length >= 10 || !!voice.audio);
-  const nextDisabled = step === 1 && !step1Ok;
+  const canSubmit = title.trim().length >= 5 && (description.trim().length >= 10 || !!voice.audio);
 
   return (
     <Screen>
       <H1>{t('nav.report')}</H1>
-      <StepProgress step={step} total={TOTAL_STEPS} label={`${t('lbl.step_of', { current: step, total: TOTAL_STEPS })} · ${STEP_TITLES[step - 1]}`} />
+      <Body soft>{t('page.report_help')}</Body>
       {!online ? <InfoBanner tone="warn" message="You are offline. You can write your complaint now; it will be sent when you are back online." /> : null}
 
-      {step === 1 ? (
-        <>
-          <Body soft>{t('page.report_help')}</Body>
-          <Card>
-            <Field label={t('lbl.title')} value={title} onChangeText={setTitle} maxLength={200} />
-            <Field label={`${t('lbl.description')} (${LANGUAGES[language].native})`} value={description} onChangeText={setDescription} multiline maxLength={5000} />
-            <Text style={{ color: colors.textSoft, fontSize: 13 }}>{t('lbl.language')}</Text>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>{Object.values(LANGUAGES).map((l) => <Chip key={l.code} label={l.native} selected={language === l.code} onPress={() => setLanguage(l.code)} />)}</View>
-          </Card>
-          <VoiceInput initialLanguage={language} onAccept={onVoice} onQueueOffline={onQueueOffline} />
-          {voice.audio ? <InfoBanner message="A voice recording is saved with this complaint and will be converted to text when you are online." /> : null}
-        </>
-      ) : null}
+      <Card>
+        <Field label={t('lbl.title')} value={title} onChangeText={setTitle} maxLength={200} />
+        <Field label={`${t('lbl.description')} (${LANGUAGES[language].native})`} value={description} onChangeText={setDescription} multiline maxLength={5000} />
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+          {QUICK_EXAMPLES.map((ex) => (
+            <Pressable key={ex} accessibilityRole="button" onPress={() => useExample(ex)} style={{ borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingHorizontal: 10, paddingVertical: 6, maxWidth: 220 }}>
+              <Text style={{ color: colors.textSoft, fontSize: 11 }} numberOfLines={1}>💡 {ex}</Text>
+            </Pressable>
+          ))}
+        </View>
+        <Text style={{ color: colors.textSoft, fontSize: 13 }}>{t('lbl.language')}</Text>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>{Object.values(LANGUAGES).map((l) => <Chip key={l.code} label={l.native} selected={language === l.code} onPress={() => setLanguage(l.code)} />)}</View>
+      </Card>
 
-      {step === 2 ? (
-        <>
-          <Card>
-            {suggesting ? <Body soft>🤖 Reading your description…</Body> : suggestion ? (
-              <View style={{ backgroundColor: colors.primaryGlow, borderRadius: radius.sm, padding: 10, gap: 2 }}>
-                <Text style={{ fontWeight: '700', color: colors.primary }}>🤖 AI suggests: {suggestion.category} → {suggestion.department_name ?? 'unrouted (needs manual triage)'}</Text>
-                <Body soft>{suggestion.explanation} {suggestion.severity !== 'medium' ? `· severity: ${suggestion.severity}` : ''}</Body>
-              </View>
-            ) : <Body soft>Go back and describe the problem to get an AI suggestion, or pick a category yourself below.</Body>}
-            <Text style={{ fontWeight: '600', color: colors.text }}>{t('lbl.category')}</Text>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>{CATEGORIES.map((c) => <Chip key={c} label={c} selected={category === c} onPress={() => { categoryTouched.current = true; setCategory(category === c ? null : c); }} />)}</View>
-            <Field label={t('lbl.ward')} value={ward} onChangeText={setWard} />
-          </Card>
-          <Card>
-            <Text style={{ fontWeight: '600', color: colors.text }}>📍 {t('lbl.location')}</Text>
-            {loc.state.kind === 'ok' ? <Body>{loc.state.lat.toFixed(5)}, {loc.state.lng.toFixed(5)}{loc.state.accuracy ? ` (±${Math.round(loc.state.accuracy)} m)` : ''}</Body>
-              : loc.state.kind === 'denied' ? <InfoBanner tone="warn" message="Location permission was denied. You can still submit without a location." />
-              : loc.state.kind === 'error' ? <ErrorBanner message={loc.state.message} /> : <Body soft>No location attached.</Body>}
-            {explainLoc ? <Body soft>Your location is read once, only now, and attached to this complaint so officials can find the problem.</Body> : null}
-            <AppButton label="Use my location" kind="secondary" busy={loc.state.kind === 'locating'} onPress={() => { setExplainLoc(true); loc.request(); }} />
-            {loc.state.kind === 'ok' ? <AppButton label="Remove location" kind="secondary" onPress={loc.clear} /> : null}
-          </Card>
-        </>
-      ) : null}
+      <VoiceInput initialLanguage={language} onAccept={onVoice} onQueueOffline={onQueueOffline} />
+      {voice.audio ? <InfoBanner message="A voice recording is saved with this complaint and will be converted to text when you are online." /> : null}
 
-      {step === 3 ? (
-        <>
-          <Card>
-            <Text style={{ fontWeight: '600', color: colors.text }}>📷 {t('lbl.evidence')} (optional)</Text>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>{files.map((f) => <Image key={f.uri} source={{ uri: f.uri }} style={{ width: 72, height: 72, borderRadius: 8 }} accessibilityLabel={f.name} />)}</View>
-            <AppButton label="Take a photo" kind="secondary" onPress={() => addPhoto('camera')} />
-            <AppButton label="Choose from gallery" kind="secondary" onPress={() => addPhoto('library')} />
-          </Card>
-          <Card>
-            <Text style={{ fontWeight: '600', color: colors.text }}>Review</Text>
-            <Body soft>{t('lbl.title')}</Body><Body>{title}</Body>
-            <Body soft>{t('lbl.description')}</Body><Body numberOfLines={4}>{description || '(voice recording, converted when online)'}</Body>
-            <Body soft>{t('lbl.category')} · {t('lbl.ward')}</Body><Body>{category ?? 'unset'} · {ward || '—'}</Body>
-          </Card>
-          {error ? <ErrorBanner message={error} /> : null}
-          <AppButton label={online ? t('act.submit') : 'Save to send later'} icon="➤" onPress={submit} busy={busy} />
-        </>
-      ) : null}
+      <Card>
+        {suggesting ? <Body soft>🤖 Reading your description…</Body> : suggestion ? (
+          <View style={{ backgroundColor: colors.primaryGlow, borderRadius: radius.sm, padding: 10, gap: 2 }}>
+            <Text style={{ fontWeight: '700', color: colors.primary }}>🤖 AI suggests: {suggestion.category} → {suggestion.department_name ?? 'unrouted (needs manual triage)'}</Text>
+            <Body soft>{suggestion.explanation} {suggestion.severity !== 'medium' ? `· severity: ${suggestion.severity}` : ''}</Body>
+          </View>
+        ) : <Body soft>Describe the problem above to get an AI suggestion, or pick a category yourself below.</Body>}
+        <Text style={{ fontWeight: '600', color: colors.text }}>{t('lbl.category')}</Text>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>{CATEGORIES.map((c) => <Chip key={c} label={c} selected={category === c} onPress={() => { categoryTouched.current = true; setCategory(category === c ? null : c); }} />)}</View>
+        <Field label={t('lbl.ward')} value={ward} onChangeText={setWard} />
+      </Card>
 
-      <View style={{ flexDirection: 'row', gap: 8 }}>
-        {step > 1 ? <AppButton label={t('act.back')} kind="secondary" onPress={() => setStep((s) => s - 1)} /> : null}
-        {step < TOTAL_STEPS ? <AppButton label={t('act.next')} onPress={() => setStep((s) => s + 1)} disabled={nextDisabled} /> : null}
-      </View>
+      <Card>
+        <Text style={{ fontWeight: '600', color: colors.text }}>📍 {t('lbl.location')}</Text>
+        {loc.state.kind === 'ok' ? <Body>{loc.state.lat.toFixed(5)}, {loc.state.lng.toFixed(5)}{loc.state.accuracy ? ` (±${Math.round(loc.state.accuracy)} m)` : ''}</Body>
+          : loc.state.kind === 'denied' ? <InfoBanner tone="warn" message="Location permission was denied. You can still submit without a location." />
+          : loc.state.kind === 'error' ? <ErrorBanner message={loc.state.message} /> : <Body soft>No location attached.</Body>}
+        {explainLoc ? <Body soft>Your location is read once, only now, and attached to this complaint so officials can find the problem.</Body> : null}
+        <AppButton label="Use my location" kind="secondary" busy={loc.state.kind === 'locating'} onPress={() => { setExplainLoc(true); loc.request(); }} />
+        {loc.state.kind === 'ok' ? <AppButton label="Remove location" kind="secondary" onPress={loc.clear} /> : null}
+      </Card>
+
+      <Disclosure label={`📷 ${t('lbl.evidence')} (optional)`}>
+        <View style={{ gap: 8 }}>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>{files.map((f) => <Image key={f.uri} source={{ uri: f.uri }} style={{ width: 72, height: 72, borderRadius: 8 }} accessibilityLabel={f.name} />)}</View>
+          <AppButton label="Take a photo" kind="secondary" onPress={() => addPhoto('camera')} />
+          <AppButton label="Choose from gallery" kind="secondary" onPress={() => addPhoto('library')} />
+        </View>
+      </Disclosure>
+
+      {error ? <ErrorBanner message={error} /> : null}
+      <AppButton label={online ? t('act.submit') : 'Save to send later'} icon="➤" onPress={submit} busy={busy} disabled={!canSubmit} />
     </Screen>
   );
 }

@@ -1,14 +1,22 @@
+import { Platform } from 'react-native';
 import type { ApiClient } from './client.ts';
 import type * as T from './types.ts';
 import type { LanguageCode } from '../i18n/languages.ts';
 
 /** One function per backend endpoint; screens and the sync engine depend on this, never on raw fetch. */
 export function createEndpoints(api: ApiClient) {
-  const fileForm = (fieldName: string, file: T.LocalFile, fields: Record<string, string> = {}) => {
+  const fileForm = async (fieldName: string, file: T.LocalFile, fields: Record<string, string> = {}) => {
     const fd = new FormData();
     for (const [k, v] of Object.entries(fields)) fd.append(k, v);
-    // React Native accepts { uri, name, type } as a file part
-    fd.append(fieldName, { uri: file.uri, name: file.name, type: file.type } as any);
+    if (Platform.OS === 'web') {
+      // React Native's { uri, name, type } object trick only works through RN's native FormData bridge.
+      // On web, FormData is the browser's real implementation, which needs an actual Blob/File part -
+      // file.uri here is a blob: URL (from expo-audio's recorder or an <input type=file>), so fetch it back.
+      const blob = await (await fetch(file.uri)).blob();
+      fd.append(fieldName, blob, file.name);
+    } else {
+      fd.append(fieldName, { uri: file.uri, name: file.name, type: file.type } as any);
+    }
     return fd;
   };
   return {
@@ -22,12 +30,12 @@ export function createEndpoints(api: ApiClient) {
     complaintDetail: (id: string) => api.get<T.ComplaintDetail>(`/complaints/${id}`),
     createComplaint: (body: T.ComplaintInput) => api.post<T.CreateComplaintResponse>('/complaints', body),
     classifyPreview: (title: string, description: string, ward?: string | null) => api.post<T.ClassifyPreview>('/complaints/classify-preview', { title, description, ward: ward || null }),
-    uploadEvidence: (file: T.LocalFile) => api.request<T.Evidence>('POST', '/complaints/evidence', { form: fileForm('file', file), timeoutMs: 120000 }),
+    uploadEvidence: async (file: T.LocalFile) => api.request<T.Evidence>('POST', '/complaints/evidence', { form: await fileForm('file', file), timeoutMs: 120000 }),
     feedback: (id: string, rating: number, comment: string | null) => api.post(`/complaints/${id}/feedback`, { rating, comment }),
 
     voiceLanguages: () => api.get<T.VoiceCapabilities>('/voice/languages'),
     // language: a code, or "auto" (only if the engine declares auto-detect). The result is in the SPOKEN language; it is never translated.
-    transcribe: (file: T.LocalFile, language: LanguageCode | 'auto') => api.request<T.VoiceResult>('POST', '/voice/transcribe', { form: fileForm('audio', file, { language }), timeoutMs: 120000 }),
+    transcribe: async (file: T.LocalFile, language: LanguageCode | 'auto') => api.request<T.VoiceResult>('POST', '/voice/transcribe', { form: await fileForm('audio', file, { language }), timeoutMs: 120000 }),
 
     ask: (question: string, language: LanguageCode, conversationId?: string | null) => api.post<T.AskResponse>('/assistant/ask', { question, language, conversation_id: conversationId ?? null }),
     assistantRoute: (text: string, ward?: string | null) => api.post<T.AssistantRouteResult>('/assistant/route', { text, ward: ward ?? null }),
@@ -82,7 +90,7 @@ export function createEndpoints(api: ApiClient) {
     directory: () => api.get<T.DirectoryData>('/reference/directory'),
 
     // ---- documents (scan/upload -> OCR/text-extract -> chunk -> embed -> searchable by Civic Saathi) ------------
-    uploadDocument: (file: T.LocalFile) => api.request<T.DocumentRecord>('POST', '/documents', { form: fileForm('file', file, { visibility: 'private' }), timeoutMs: 120000 }),
+    uploadDocument: async (file: T.LocalFile) => api.request<T.DocumentRecord>('POST', '/documents', { form: await fileForm('file', file, { visibility: 'private' }), timeoutMs: 120000 }),
     listDocuments: () => api.get<{ items: T.DocumentRecord[] }>('/documents'),
     documentStatus: (id: string) => api.get<T.DocumentRecord>(`/documents/${id}`),
     retryDocument: (id: string) => api.post<T.DocumentRecord>(`/documents/${id}/retry`, {}),
