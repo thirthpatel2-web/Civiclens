@@ -48,7 +48,7 @@ export default function WorkflowRules() {
 
   return (
     <Screen>
-      <H1>Workflow Rules</H1>
+      <H1>⚙️ Workflow Rules</H1>
       <Body soft>Configurable rule-based orchestration: when X happens, do Y - the same rules the real complaint pipeline evaluates.</Body>
       {error ? <ErrorBanner message={error} onRetry={load} /> : null}
 

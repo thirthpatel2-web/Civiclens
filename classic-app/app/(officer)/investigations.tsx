@@ -22,7 +22,7 @@ export default function Investigations() {
 
   return (
     <Screen>
-      <H1>{t('nav.investigations')}</H1>
+      <H1>🔍 {t('nav.investigations')}</H1>
       <Body soft>Open an investigation from a complaint's detail screen to build a case file around it.</Body>
       {error ? <ErrorBanner message={error} onRetry={load} /> : null}
       {items === null ? <Loading label={t('msg.loading')} /> : items.length === 0 ? <EmptyState message={t('msg.no_data')} /> : items.map((inv) => (

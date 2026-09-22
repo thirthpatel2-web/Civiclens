@@ -25,7 +25,7 @@ export default function Register() {
   }
   return (
     <Screen>
-      <H1>{t('act.register')}</H1>
+      <H1>👤 {t('act.register')}</H1>
       <Card>
         <Field label={t('fullName')} value={name} onChangeText={setName} />
         <Field label={t('lbl.email')} value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" />

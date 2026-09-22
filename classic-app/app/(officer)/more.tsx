@@ -21,7 +21,7 @@ export default function OfficerMore() {
   const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
   return (
     <Screen>
-      <H1>{t('nav.account')}</H1>
+      <H1>👤 {t('nav.account')}</H1>
       <Card><Body>{user?.full_name ?? user?.email}</Body><Body soft>{user?.role} · {user?.department_code ?? 'no department assigned'}</Body></Card>
       {(isAdmin ? [...items, ...adminItems] : items).map(([href, key, icon]) => (
         <Pressable key={href} accessibilityRole="button" onPress={() => router.push(href as any)} style={{ minHeight: 56 }}>

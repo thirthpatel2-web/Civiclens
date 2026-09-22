@@ -42,7 +42,7 @@ export default function OfficerDashboard() {
 
   if (error) return <Screen><ErrorBanner message={error} onRetry={load} /></Screen>;
   if (!d) return <Screen><Loading label={t('msg.loading')} /></Screen>;
-  if (!d.has_data) return <Screen><H1>{t('nav.dashboard')}</H1><EmptyState message={t('msg.no_data')} /></Screen>;
+  if (!d.has_data) return <Screen><H1>📊 {t('nav.dashboard')}</H1><EmptyState message={t('msg.no_data')} /></Screen>;
 
   const maxCategory = Math.max(1, ...Object.values(d.by_category));
   const maxPriority = Math.max(1, ...Object.values(d.by_priority));
@@ -50,7 +50,7 @@ export default function OfficerDashboard() {
 
   return (
     <Screen>
-      <H1>{d.department_code ?? 'All departments'}{user?.department_code ? '' : ' (org-wide)'}</H1>
+      <H1>📊 {d.department_code ?? 'All departments'}{user?.department_code ? '' : ' (org-wide)'}</H1>
       <Row>
         <Stat label="Total" value={d.total} />
         <Stat label="Open" value={d.open} tone={colors.primary} />

@@ -28,7 +28,7 @@ export default function ComplaintScreen() {
   const langName = LANGUAGES[(c.original_language as LanguageCode)]?.native ?? c.original_language;
   return (
     <Screen>
-      <H1>{c.reference}</H1>
+      <H1>📄 {c.reference}</H1>
       <StatusBadge status={c.status} />
       <Card>
         <Body soft>{t('lbl.description')} · {langName}{c.input_method === 'voice' ? ' · 🎤' : ''}</Body>

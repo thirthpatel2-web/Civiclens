@@ -19,7 +19,7 @@ export default function Notifications() {
   useNotificationAlerts(perm === 'granted');
   return (
     <Screen>
-      <H1>{t('nav.notifications')}</H1>
+      <H1>🔔 {t('nav.notifications')}</H1>
       {perm === null ? (<Card><Body>Get an alert when your complaint's status changes or an escalation happens. CivicLens will ask your phone for permission next.</Body><AppButton label="Turn on alerts" onPress={async () => setPerm(await enableNotifications())} /></Card>) : null}
       {perm === 'denied' ? <InfoBanner tone="warn" message="Alerts are off. You can enable them in your phone's settings." /> : null}
       {perm === 'unavailable' ? <InfoBanner message="Alerts work while the app is open. Background push is not available for this build." /> : null}

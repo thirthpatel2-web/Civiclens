@@ -28,7 +28,7 @@ export default function OfficerQueue() {
 
   return (
     <Screen>
-      <H1>{t('nav.officer_queue')}</H1>
+      <H1>📋 {t('nav.officer_queue')}</H1>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
         <Chip label="All" selected={status === null} onPress={() => setStatus(null)} />
         {STATUSES.map((s) => <Chip key={s} label={s.replace(/_/g, ' ')} selected={status === s} onPress={() => setStatus(s)} />)}

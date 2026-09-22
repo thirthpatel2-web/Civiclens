@@ -14,7 +14,7 @@ export default function Emergency() {
   useEffect(() => { endpoints.helplines(lang).then(setData).catch((e) => setError(e?.message ?? 'Could not load helplines.')); }, [lang]);
   return (
     <Screen>
-      <H1>{t('nav.emergency')}</H1>
+      <H1>🚨 {t('nav.emergency')}</H1>
       <InfoBanner tone="warn" message={t('msg.emergency_warning')} />
       {error ? <ErrorBanner message={error} /> : !data ? <Loading /> : !data.configured || data.items.length === 0 ? <EmptyState message="No emergency contacts are configured on this server." /> : data.items.map((h) => (
         <Card key={h.code}>

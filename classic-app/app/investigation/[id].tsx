@@ -35,7 +35,7 @@ export default function InvestigationScreen() {
 
   return (
     <Screen>
-      <H1>Investigation · {inv.subject_type}</H1>
+      <H1>🔍 Investigation · {inv.subject_type}</H1>
       <StatusBadge status={inv.status} />
       {error ? <ErrorBanner message={error} /> : null}
       <Body soft>Opened {new Date(inv.created_at).toLocaleString()}{inv.closed_at ? ` · closed ${new Date(inv.closed_at).toLocaleString()}` : ''}</Body>

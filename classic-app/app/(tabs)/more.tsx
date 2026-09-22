@@ -17,7 +17,7 @@ export default function More() {
   const router = useRouter();
   return (
     <Screen>
-      <H1>{t('nav.account')}</H1>
+      <H1>👤 {t('nav.account')}</H1>
       {items.map(([href, key, icon]) => (
         <Pressable key={href} accessibilityRole="button" onPress={() => router.push(href as any)} style={{ minHeight: 56 }}>
           <Card><Text style={{ fontSize: 17, color: colors.text }}>{icon}  {t(key)}</Text></Card>

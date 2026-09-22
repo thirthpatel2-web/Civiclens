@@ -61,7 +61,7 @@ export default function OfficerComplaintScreen() {
 
   return (
     <Screen>
-      <H1>{c.reference}</H1>
+      <H1>📄 {c.reference}</H1>
       <StatusBadge status={c.status} />
       {error ? <ErrorBanner message={error} /> : null}
 
