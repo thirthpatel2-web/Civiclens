@@ -77,7 +77,10 @@ def stat_tile(label: str, value: Any, *, color: str = "primary", icon: str | Non
                     ui.icon(icon).classes("text-[18px]")
         ui.label(str(value)).classes("text-2xl font-bold").style("color: var(--cl-fg); letter-spacing: -.02em;")
         if hint or trend:
-            ui.label(trend or hint).classes("text-xs").style("color: var(--cl-fg-subtle);")
+            # `or ""` is unreachable (the guard above already proves one of the two is truthy) but
+            # gives mypy a definite str: it cannot narrow "at least one of two separate Optional
+            # variables is truthy" into "their `or` together can't be None".
+            ui.label(trend or hint or "").classes("text-xs").style("color: var(--cl-fg-subtle);")
 
 
 def chip(text: str, *, color: str = "muted", icon: str | None = None, outline: bool = False) -> None:

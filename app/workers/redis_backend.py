@@ -79,7 +79,8 @@ class RedisQueueBackend:
 
 class RedisLock:
     def __init__(self, client: Any, prefix: str = "civiclens") -> None:
-        self._r, self._p, self._tokens = client, f"{prefix}:lock:", {}
+        self._r, self._p = client, f"{prefix}:lock:"
+        self._tokens: dict[str, str] = {}
 
     @_wrap
     def acquire(self, name: str, ttl_seconds: int) -> bool:

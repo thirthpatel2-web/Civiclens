@@ -9,9 +9,11 @@ transition yields a ``HistoryEvent`` so nothing changes without a trace.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum
+from typing import Protocol
 
 from app.core.exceptions import ValidationFailed
 
@@ -98,7 +100,25 @@ class TimelineStep:
     at: datetime | None
 
 
-def build_timeline(current: ComplaintStatus, events: list[HistoryEvent]) -> list[TimelineStep]:
+class _TimelineEvent(Protocol):
+    """What build_timeline actually needs from an event, not any one concrete class.
+
+    Callers pass either the ``HistoryEvent`` this module produces or a service-layer
+    ``ComplaintEvent`` (a superset, with id/kind/details/internal too) - both records the same
+    transition, just at different layers. A ``Sequence`` of this narrower Protocol accepts either
+    list without forcing HistoryEvent's shape onto ComplaintEvent or vice versa.
+    """
+
+    # @property, not a plain attribute: both real implementations are frozen dataclasses, so their
+    # fields are read-only. A plain Protocol attribute means "gettable AND settable", which a
+    # frozen dataclass's fields can never satisfy even when the value type matches exactly.
+    @property
+    def to_status(self) -> ComplaintStatus | None: ...
+    @property
+    def at(self) -> datetime: ...
+
+
+def build_timeline(current: ComplaintStatus, events: Sequence[_TimelineEvent]) -> list[TimelineStep]:
     """Tracker view. Timestamps come only from recorded events (never invented)."""
     reached: dict[str, datetime] = {}
     for ev in sorted(events, key=lambda e: e.at):
@@ -108,9 +128,9 @@ def build_timeline(current: ComplaintStatus, events: list[HistoryEvent]) -> list
             if ev.to_status in statuses:
                 reached.setdefault(label, ev.at)
     if current is S.REJECTED:
-        steps = [TimelineStep(label, "done" if label in reached else "skipped", reached.get(label)) for label, _ in TIMELINE_STAGES[:1]]
+        rejected_steps = [TimelineStep(label, "done" if label in reached else "skipped", reached.get(label)) for label, _ in TIMELINE_STAGES[:1]]
         rejected_at = next((e.at for e in events if e.to_status is S.REJECTED), None)
-        return steps + [TimelineStep("Rejected", "rejected", rejected_at)]
+        return rejected_steps + [TimelineStep("Rejected", "rejected", rejected_at)]
     current_idx = next(i for i, (_, sts) in enumerate(TIMELINE_STAGES) if current in sts)
     steps: list[TimelineStep] = []
     for i, (label, _) in enumerate(TIMELINE_STAGES):

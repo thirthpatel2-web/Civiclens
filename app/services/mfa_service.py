@@ -58,7 +58,7 @@ class PyOtpEngine:
         now = time.time() if at is None else at
         totp = self._pyotp.TOTP(secret, interval=TOTP_INTERVAL)
         for offset in range(-window, window + 1):
-            if hmac.compare_digest(str(totp.at(now, offset)), code):
+            if hmac.compare_digest(str(totp.at(int(now), offset)), code):  # pyotp.TOTP.at() does this int() conversion itself when given a float; doing it here just satisfies its declared (int | datetime) signature explicitly
                 return int(now // TOTP_INTERVAL) + offset
         return None
 

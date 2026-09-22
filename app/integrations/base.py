@@ -257,7 +257,11 @@ class GovernmentAdapter(ABC):
         path = self.config.endpoints.get(endpoint)
         if not path:
             return self._finish(OperationResult(OperationStatus.NOT_CONFIGURED, operation, self.platform, error=f"Endpoint '{endpoint}' is not configured; no request was made."))
-        url = self.config.base_url + path + (f"/{urllib.request.quote(path_suffix, safe='')}" if path_suffix else "")
+        # urllib.parse.quote, not urllib.request.quote: the latter happens to work too (CPython's
+        # urllib.request re-exports it from urllib.parse for backward compatibility with the old
+        # Python 2 single urllib module), but that is an implementation detail typeshed does not
+        # declare as part of urllib.request's interface, and urllib.parse is already imported here.
+        url = self.config.base_url + path + (f"/{urllib.parse.quote(path_suffix, safe='')}" if path_suffix else "")
         if query:
             url += "?" + urllib.parse.urlencode(query)
         headers = {self.config.auth_header: f"{self.config.auth_scheme} {self.config.api_key}".strip()}

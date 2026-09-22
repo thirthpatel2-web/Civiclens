@@ -31,7 +31,11 @@ def _act(c: AppContainer, fn: Any) -> Any:
         try:
             fn(*a)
         except (CivicLensError, ValueError) as exc:
-            ui.notify(getattr(exc, "message", str(exc)) + (f" {exc.details}" if getattr(exc, "details", None) else ""), type="negative")
+            # `details` only exists on CivicLensError, not on a plain ValueError, hence getattr
+            # rather than a direct attribute access - looked up once and reused, so mypy is never
+            # asked to accept `exc.details` unconditionally on the union type.
+            details = getattr(exc, "details", None)
+            ui.notify(getattr(exc, "message", str(exc)) + (f" {details}" if details else ""), type="negative")
             return
         ui.notify(tr(c, "msg.saved"), type="positive")
         ui.navigate.reload()

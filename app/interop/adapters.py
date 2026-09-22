@@ -138,11 +138,16 @@ STATE_PORTAL_FIXTURE = {
 
 
 def from_state_portal(rec: dict) -> CanonicalRecord:
+    # rec is raw external data, so status_code is not guaranteed to actually be the int this real
+    # portal's export normally sends it as; a missing or malformed one now honestly falls through
+    # to "unknown" - the same label already used for an int that just isn't in the map - rather
+    # than being passed as a lookup key of a type STATE_PORTAL_STATUS_MAP was never keyed by.
+    status_code = rec.get("status_code")
     return CanonicalRecord(
         source_system="state_portal",
         external_id=str(rec.get("ref_no", "")),
         category=str(rec.get("service_name", "")).lower(),
-        status=STATE_PORTAL_STATUS_MAP.get(rec.get("status_code"), "unknown"),
+        status=STATE_PORTAL_STATUS_MAP.get(status_code, "unknown") if isinstance(status_code, int) else "unknown",
         title=str(rec.get("service_name", "")),
         department=str(rec.get("dept_code", "")),
         citizen_name=rec.get("applicant"),
