@@ -348,6 +348,47 @@ class GisTests(unittest.TestCase):
         self.assertEqual(self.gis.radar(ADMIN, category="water")["hotspots"][0]["categories"], {"water": 1})
         self.assertEqual(self.gis.radar(ADMIN, category="roads", ward="nope")["hotspots"], [])
         self.assertEqual(self.gis.radar(ADMIN, min_severity="critical")["total_complaints"], 0)
+
+
+class LocatorTests(unittest.TestCase):
+    """The Civic Locator is directory data, so unlike the radar it has no aggregation floor."""
+
+    def setUp(self):
+        from app.services.ports import CityRecord, GovOfficeRecord
+
+        self.env = Env()
+        with self.env.uow() as u:
+            u.config.save_city(CityRecord("blr", "Bengaluru", "Karnataka", 12.97, 77.59))
+            u.config.save_city(CityRecord("pnq", "Pune", "Maharashtra", 18.52, 73.85))
+            u.config.save_office(GovOfficeRecord("o1", "BBMP Roads Wing", "roads", 12.97, 77.59, "Hudson Circle", "blr"))
+            u.config.save_office(GovOfficeRecord("o2", "BWSSB Water Board", "water", 12.98, 77.60, "Cauvery Bhavan", "blr"))
+            u.config.save_office(GovOfficeRecord("o3", "PMC Roads Wing", "roads", 18.52, 73.85, "Shivajinagar", "pnq"))
+            u.config.save_office(GovOfficeRecord("o4", "Unlinked office", "roads", 0.0, 0.0, None, None))
+            u.commit()
+        self.gis = GisService(self.env.factory, self.env.clock)
+
+    def test_lists_every_office_with_its_city_and_department_names_resolved(self):
+        r = self.gis.locator(CIT)
+        self.assertEqual((r["total"], r["shown"]), (4, 4))
+        by_id = {o["id"]: o for o in r["offices"]}
+        self.assertEqual(by_id["o1"]["city_name"], "Bengaluru")
+        self.assertEqual(by_id["o1"]["department_name"], "Roads Department")  # resolved from the seed, not echoed from the code
+        self.assertEqual(by_id["o1"]["address"], "Hudson Circle")
+
+    def test_filters_by_city_and_by_department_independently(self):
+        self.assertEqual({o["id"] for o in self.gis.locator(CIT, city_code="blr")["offices"]}, {"o1", "o2"})
+        self.assertEqual({o["id"] for o in self.gis.locator(CIT, department_code="roads")["offices"]}, {"o1", "o3", "o4"})
+        self.assertEqual({o["id"] for o in self.gis.locator(CIT, city_code="pnq", department_code="roads")["offices"]}, {"o3"})
+        self.assertEqual(self.gis.locator(CIT, city_code="nope")["offices"], [])
+
+    def test_an_office_without_a_city_is_still_listed_and_counted_not_hidden(self):
+        r = self.gis.locator(CIT)
+        self.assertEqual(r["unlinked"], 1)
+        unlinked = next(o for o in r["offices"] if o["id"] == "o4")
+        self.assertIsNone(unlinked["city_name"])
+
+    def test_citizens_may_read_the_directory(self):
+        self.assertEqual(self.gis.locator(CIT)["shown"], 4)  # no aggregation floor: this is public directory data
         from app.services.ports import GovOfficeRecord
 
         self.env.stores.offices = [GovOfficeRecord("o1", "Roads HQ", "roads", 12.97, 77.59), GovOfficeRecord("o2", "Water HQ", "water", 13.0, 77.6)]

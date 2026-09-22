@@ -1058,6 +1058,58 @@ def register(c: AppContainer) -> None:
 
         draw()
 
+    @page(c, "/locator", "nav.locator")
+    def locator(c: AppContainer, user: UiUser) -> None:
+        """Civic Locator: which government office to actually walk into, and where it is.
+
+        The mobile app has had this screen for a while; the web app never did, so the real office
+        directory was only reachable on a phone. Addresses come from the offices table - nothing
+        here is generated.
+        """
+        from urllib.parse import quote
+
+        page_header(tr(c, "nav.locator"), tr(c, "loc.help"), icon="place")
+        state: dict[str, Any] = {"city": "", "dept": ""}
+        controls = ui.row().classes("gap-3 items-end w-full flex-wrap")
+        body = ui.column().classes("w-full gap-3")
+
+        def draw() -> None:
+            body.clear()
+            r = c.gis.locator(user.ctx, city_code=state["city"] or None, department_code=state["dept"] or None)
+            with body:
+                if not r["offices"]:
+                    state_panel(icon="place", title=tr(c, "msg.no_data"), body=tr(c, "loc.none_body"))
+                    return
+                ui.label(tr(c, "loc.count", shown=r["shown"], total=r["total"])).classes("text-xs").style("color: var(--cl-fg-subtle);")
+                with ui.row().classes("gap-4 w-full flex-wrap items-start"):
+                    mappable = [o for o in r["offices"] if o["lat"] and o["lng"]]
+                    if mappable:
+                        centre = (mappable[0]["lat"], mappable[0]["lng"])
+                        m = ui.leaflet(center=centre, zoom=11 if state["city"] else 5).classes("h-96").style("flex: 1.2; min-width: 320px; border-radius: var(--cl-radius-md); overflow: hidden;")
+                        for o in mappable:
+                            m.marker(latlng=(o["lat"], o["lng"]))
+                    with ui.column().classes("gap-2").style("flex: 1; min-width: 320px; max-height: 24rem; overflow-y: auto;"):
+                        for o in r["offices"]:
+                            with ui.column().classes("cl-card gap-1 w-full"):
+                                ui.label(o["name"]).classes("text-sm font-semibold").style("color: var(--cl-fg);")
+                                with ui.row().classes("gap-2 flex-wrap items-center"):
+                                    if o["department_name"]:
+                                        chip(o["department_name"], color="info", outline=True)
+                                    if o["city_name"]:
+                                        chip(o["city_name"], color="muted", outline=True)
+                                if o["address"]:
+                                    ui.label(o["address"]).classes("text-xs").style("color: var(--cl-fg-muted);")
+                                if o["lat"] and o["lng"]:
+                                    ui.link(tr(c, "loc.directions"), f"https://www.google.com/maps/dir/?api=1&destination={quote(f'{o['lat']},{o['lng']}')}").classes("text-xs").props("target=_blank")
+
+        ref = c.gis.locator(user.ctx)
+        with controls:
+            city = ui.select({"": tr(c, "filter.all"), **{x["code"]: x["name"] for x in ref["cities"]}}, value="", label=tr(c, "col.city")).props("outlined dense").classes("w-56")
+            dept = ui.select({"": tr(c, "filter.all"), **{d["code"]: d["name"] for d in ref["departments"]}}, value="", label=tr(c, "lbl.department")).props("outlined dense").classes("w-56")
+            city.on_value_change(lambda e: (state.__setitem__("city", e.value or ""), draw()))
+            dept.on_value_change(lambda e: (state.__setitem__("dept", e.value or ""), draw()))
+        draw()
+
     @page(c, "/interop", "nav.interop")
     def interop(c: AppContainer, user: UiUser) -> None:
         import json as _json

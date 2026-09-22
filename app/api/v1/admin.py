@@ -86,7 +86,7 @@ def save_service(body: ServiceBody, ctx: AuthContext = DEP, c: AppContainer = De
 
 @router.put("/offices")
 def save_office(body: OfficeBody, ctx: AuthContext = DEP, c: AppContainer = Depends(get_container)) -> dict:  # type: ignore[type-arg]
-    return to_jsonable(c.admin.save_office(ctx, body.id, body.name, body.department_code, body.lat, body.lng, body.address))  # type: ignore[no-any-return]
+    return to_jsonable(c.admin.save_office(ctx, body.id, body.name, body.department_code, body.lat, body.lng, body.address, body.city_code))  # type: ignore[no-any-return]
 
 
 @router.put("/routing-rules/{rule_id}")

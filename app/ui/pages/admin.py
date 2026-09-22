@@ -159,10 +159,11 @@ def register(c: AppContainer) -> None:
             sc, sn, sd = ui.input(tr(c, "col.code")).props("outlined dense"), ui.input(tr(c, "col.name")).props("outlined dense"), ui.select([d.code for d in ref["departments"]], label=tr(c, "lbl.department")).props("outlined dense")
             ui.button(tr(c, "act.save"), icon="check", on_click=_act(c, lambda: c.admin.save_service(user.ctx, sc.value or "", sn.value or "", sd.value))).props("color=primary unelevated")
         section_title(tr(c, "ad.gov_offices"), tr(c, "ad.gov_offices_sub"))
-        data_table([("name", tr(c, "col.name")), ("dept", tr(c, "lbl.department")), ("lat", "Lat"), ("lng", "Lng")], [{"id": x.id, "name": x.name, "dept": x.department_code or "-", "lat": x.lat, "lng": x.lng} for x in ref["offices"]], empty=tr(c, "ad.no_offices"))
+        data_table([("name", tr(c, "col.name")), ("dept", tr(c, "lbl.department")), ("city", tr(c, "col.city")), ("lat", tr(c, "col.lat")), ("lng", tr(c, "col.lng"))], [{"id": x.id, "name": x.name, "dept": x.department_code or "-", "city": x.city_code or "-", "lat": x.lat, "lng": x.lng} for x in ref["offices"]], empty=tr(c, "ad.no_offices"))
         with ui.row().classes("cl-card gap-3 items-end w-full flex-wrap"):
             oi, on, od, ola, oln, oa = ui.input("Id").props("outlined dense"), ui.input(tr(c, "col.name")).props("outlined dense"), ui.select([d.code for d in ref["departments"]], label=tr(c, "lbl.department")).props("outlined dense"), ui.number(tr(c, "col.lat")).props("outlined dense"), ui.number(tr(c, "col.lng")).props("outlined dense"), ui.input(tr(c, "lbl.address")).props("outlined dense")
-            ui.button(tr(c, "ad.save_office"), icon="check", on_click=_act(c, lambda: c.admin.save_office(user.ctx, oi.value or "", on.value or "", od.value, ola.value, oln.value, oa.value))).props("color=primary unelevated")
+            oc = ui.select([x.code for x in ref["cities"]], label=tr(c, "col.city")).props("outlined dense")
+            ui.button(tr(c, "ad.save_office"), icon="check", on_click=_act(c, lambda: c.admin.save_office(user.ctx, oi.value or "", on.value or "", od.value, ola.value, oln.value, oa.value, oc.value))).props("color=primary unelevated")
 
     @page(c, "/admin/routing-rules", "nav.routing", roles=ADMINS)
     def routing(c: AppContainer, user: UiUser) -> None:

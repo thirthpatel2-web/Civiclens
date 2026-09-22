@@ -260,6 +260,7 @@ class OfficeBody(Strict):
     lat: float
     lng: float
     address: str | None = None
+    city_code: str | None = None
 
 
 class RuleBody(Strict):

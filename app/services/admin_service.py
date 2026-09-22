@@ -160,14 +160,20 @@ class AdminService:
             uow.commit()
         return rec
 
-    def save_office(self, ctx: AuthContext, office_id: str, name: str, department_code: str | None, lat: float, lng: float, address: str | None = None) -> GovOfficeRecord:
+    def save_office(self, ctx: AuthContext, office_id: str, name: str, department_code: str | None, lat: float, lng: float, address: str | None = None, city_code: str | None = None) -> GovOfficeRecord:
         self._guard(ctx, Permission.ADMIN_DEPARTMENTS)
         from app.services.location_service import validate_location
 
         loc = validate_location(lat, lng, address=address)
         if loc.lat is None:
             raise ValidationFailed("Office coordinates are required.")
-        rec = GovOfficeRecord(_slug(office_id), _name(name), department_code, loc.lat, loc.lng or 0.0, loc.address)
+        # ``city_code`` is what lets the Civic Locator group and filter offices by city, so an
+        # unknown code is rejected here rather than stored and silently never matching a city.
+        if city_code:
+            with self._uow() as uow:
+                if city_code not in {x.code for x in uow.config.cities()}:
+                    raise ValidationFailed(f"Unknown city code: {city_code}")
+        rec = GovOfficeRecord(_slug(office_id), _name(name), department_code, loc.lat, loc.lng or 0.0, loc.address, city_code or None)
         with self._uow() as uow:
             uow.config.save_office(rec)
             self._audit(uow, ctx, "admin.office_saved", "office", rec.id)

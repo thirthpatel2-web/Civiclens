@@ -39,3 +39,34 @@ class GisService:
             "wards": [{"code": w.code, "name": w.name} for w in wards], "ward_boundaries": "not_available",
             "privacy": None if staff else f"Areas with fewer than {CITIZEN_MIN_GROUP} reports are hidden to protect reporters.",
         }  # fmt: skip
+
+    def locator(self, ctx: AuthContext, *, city_code: str | None = None, department_code: str | None = None) -> dict[str, Any]:
+        """Government offices a citizen can walk into, grouped by city.
+
+        This is directory data (name, department, address, coordinates) that is already public on
+        the departments' own sites - no complaint data is involved, so no aggregation floor applies
+        here, unlike ``radar``. Only offices that were given real coordinates are returned as
+        mappable; the rest are still listed so an office is never hidden just for lacking a pin.
+        """
+        require(ctx, Permission.GIS_VIEW)
+        with self._uow() as uow:
+            offices = uow.config.offices()
+            cities = {x.code: x for x in uow.config.cities()}
+            departments = {d.code: d.name for d in uow.config.departments()}
+        picked = [
+            o for o in offices
+            if (not city_code or o.city_code == city_code) and (not department_code or o.department_code == department_code)
+        ]  # fmt: skip
+        return {
+            "cities": [{"code": x.code, "name": x.name, "state": x.state, "lat": x.lat, "lng": x.lng} for x in cities.values()],
+            "departments": [{"code": k, "name": v} for k, v in sorted(departments.items())],
+            "offices": sorted(
+                ({"id": o.id, "name": o.name, "department_code": o.department_code,
+                  "department_name": departments.get(o.department_code or "", o.department_code or ""),
+                  "lat": o.lat, "lng": o.lng, "address": o.address, "city_code": o.city_code,
+                  "city_name": cities[o.city_code].name if o.city_code in cities else None} for o in picked),
+                key=lambda d: (d["city_name"] or "", d["name"]),
+            ),
+            "total": len(offices), "shown": len(picked),
+            "unlinked": sum(1 for o in offices if not o.city_code),
+        }  # fmt: skip
