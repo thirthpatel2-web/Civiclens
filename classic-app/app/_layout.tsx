@@ -2,6 +2,8 @@ import React, { useEffect } from 'react';
 import { View } from 'react-native';
 import { Slot, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { useFonts, Fraunces_600SemiBold, Fraunces_700Bold, Fraunces_600SemiBold_Italic } from '@expo-google-fonts/fraunces';
+import { Manrope_400Regular, Manrope_500Medium, Manrope_600SemiBold, Manrope_700Bold, Manrope_800ExtraBold } from '@expo-google-fonts/manrope';
 import { AuthProvider, useAuth } from '../src/auth/AuthContext.tsx';
 import { I18nProvider } from '../src/i18n/I18nContext.tsx';
 import { SyncProvider } from '../src/offline/SyncContext.tsx';
@@ -47,6 +49,10 @@ function ThemedStatusBar() {
 }
 
 export default function RootLayout() {
+  // Fraunces (headlines) + Manrope (body/UI) - the zip's actual brand typography, ported 1:1
+  // (legacy-prototype/src/constants/theme.js FONT_FAMILY). Until this resolves, text renders in
+  // the system font rather than blocking the whole app on a loading screen.
+  useFonts({ Fraunces_600SemiBold, Fraunces_700Bold, Fraunces_600SemiBold_Italic, Manrope_400Regular, Manrope_500Medium, Manrope_600SemiBold, Manrope_700Bold, Manrope_800ExtraBold });
   return (
     <ThemeProvider>
       <AuthProvider>

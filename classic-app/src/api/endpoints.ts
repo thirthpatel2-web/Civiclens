@@ -27,6 +27,7 @@ export function createEndpoints(api: ApiClient) {
     forgotPassword: (email: string) => api.post<{ message: string }>('/auth/password/forgot', { email }, { auth: false }),
 
     listComplaints: (filter = 'all') => api.get<{ items: T.Complaint[] }>('/complaints', { filter }),
+    citizenDashboard: () => api.get<T.CitizenDashboard>('/dashboards/citizen'),
     complaintDetail: (id: string) => api.get<T.ComplaintDetail>(`/complaints/${id}`),
     createComplaint: (body: T.ComplaintInput) => api.post<T.CreateComplaintResponse>('/complaints', body),
     classifyPreview: (title: string, description: string, ward?: string | null) => api.post<T.ClassifyPreview>('/complaints/classify-preview', { title, description, ward: ward || null }),

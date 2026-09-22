@@ -67,7 +67,8 @@
         }
       ],
       "expo-background-task",
-      "expo-status-bar"
+      "expo-status-bar",
+      "expo-font"
     ],
     "experiments": {
       "typedRoutes": false

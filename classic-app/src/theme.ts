@@ -9,7 +9,8 @@ export interface ThemeColors {
   accent: string; accentSaffron: string; accentEmerald: string; accentRose: string; accentAmber: string; accentPurple: string;
   ok: string; warn: string; bad: string; info: string; muted: string;
   bg: string; card: string; surfaceElevated: string; border: string; borderLight: string;
-  text: string; textSoft: string; textMuted: string;
+  text: string; textSoft: string; textMuted: string; textInverse: string;
+  inputBg: string; inputBorder: string; inputFocusBorder: string;
 }
 export const LIGHT: ThemeColors = {
   mode: 'light',
@@ -17,7 +18,8 @@ export const LIGHT: ThemeColors = {
   accent: '#1F7A6D', accentSaffron: '#A85A30', accentEmerald: '#1F7A4C', accentRose: '#9C3A50', accentAmber: '#9C7025', accentPurple: '#654A96',
   ok: '#1F7A4C', warn: '#9C7025', bad: '#B23A3A', info: '#28728A', muted: '#79735A',
   bg: '#FAF7EF', card: '#FFFFFF', surfaceElevated: '#F3EEE1', border: '#E7DFC9', borderLight: '#D6CCAE',
-  text: '#201E13', textSoft: '#4A4632', textMuted: '#79735A',
+  text: '#201E13', textSoft: '#4A4632', textMuted: '#79735A', textInverse: '#FAF7EF',
+  inputBg: '#FFFFFF', inputBorder: '#D6CCAE', inputFocusBorder: '#2A3785',
 };
 export const DARK: ThemeColors = {
   mode: 'dark',
@@ -25,22 +27,33 @@ export const DARK: ThemeColors = {
   accent: '#2E9E8F', accentSaffron: '#BF6B3D', accentEmerald: '#2E9E63', accentRose: '#B0435C', accentAmber: '#BE8A2E', accentPurple: '#7A5FB0',
   ok: '#2E9E63', warn: '#BE8A2E', bad: '#C24545', info: '#3B8FA8', muted: '#8D8874',
   bg: '#0B0E1A', card: '#151A32', surfaceElevated: '#1B2140', border: '#1E2542', borderLight: '#3A4470',
-  text: '#F2EFE6', textSoft: '#C7C2AF', textMuted: '#8D8874',
+  text: '#F2EFE6', textSoft: '#C7C2AF', textMuted: '#8D8874', textInverse: '#0B0E1A',
+  inputBg: '#10142A', inputBorder: '#262E52', inputFocusBorder: '#5568D6',
 };
 
 // Back-compat default (light) for any file not yet migrated to useTheme() - never add new usages of this.
 export const colors: ThemeColors = LIGHT;
 
-export const spacing = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24 };
+// Ported 1:1 from legacy-prototype/src/constants/theme.js (SPACING/RADIUS/FONT_SIZE/SHADOWS) - this
+// is the zip's actual scale, not a re-derived approximation, so density/type-size match exactly.
+export const spacing = { xs: 4, sm: 8, md: 16, lg: 24, xl: 32, xxl: 40 };
 export const radius = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, full: 9999 };
+export const fontSize = { xs: 11, sm: 13, md: 15, lg: 18, xl: 22, xxl: 28, hero: 34 };
 export const MIN_TOUCH = 48; // accessible touch target
+
+// Fraunces (headlines/hero) + Manrope (UI/body) - see ClassicFontProvider in app/_layout.tsx for
+// how these are loaded; falls back to the system font until the async load resolves.
+export const fontFamily = {
+  display: 'Fraunces_600SemiBold', displayBold: 'Fraunces_700Bold', displayItalic: 'Fraunces_600SemiBold_Italic',
+  body: 'Manrope_400Regular', bodyMedium: 'Manrope_500Medium', bodySemiBold: 'Manrope_600SemiBold', bodyBold: 'Manrope_700Bold', bodyExtraBold: 'Manrope_800ExtraBold',
+};
 
 // Cross-platform elevation (shadow* for iOS/web, elevation for Android) - shared so cards, the hero
 // banner and dashboard tiles all read as lifted surfaces instead of flat, bordered rectangles.
 export const shadow = {
-  sm: { shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 3, elevation: 2 },
-  md: { shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 10, elevation: 4 },
-  lg: { shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.16, shadowRadius: 20, elevation: 10 },
+  sm: { shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2, elevation: 2 },
+  md: { shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 6, elevation: 4 },
+  lg: { shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.2, shadowRadius: 12, elevation: 8 },
 } as const;
 
 const STATUS_LIGHT: Record<string, string> = {
