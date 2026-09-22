@@ -178,7 +178,9 @@ def _split_table(text: str, max_tokens: int) -> list[str]:
 def chunk_document(source: str | list[tuple[int | None, str]], config: ChunkConfig | None = None) -> list[RawChunk]:
     """Chunk plain text or ``[(page_number, text), …]``. Deterministic and offline."""
     cfg = config or ChunkConfig()
-    pages = [(None, source)] if isinstance(source, str) else list(source)
+    # Annotated because `[(None, source)]` alone infers list[tuple[None, str]], and lists are
+    # invariant, so it would not satisfy the list[tuple[int | None, str]] this is passed to.
+    pages: list[tuple[int | None, str]] = [(None, source)] if isinstance(source, str) else list(source)
     chunks: list[RawChunk] = []
 
     def emit(text: str, page: int | None, heading: str | None, is_table: bool = False) -> None:
@@ -212,11 +214,11 @@ def chunk_document(source: str | list[tuple[int | None, str]], config: ChunkConf
                 if cur_sents and cur_tokens + t > cfg.max_tokens:
                     carried: list[str] = []
                     carried_tokens = 0
-                    for prev in reversed(cur_sents):
-                        pt = approx_tokens(prev)
+                    for sent in reversed(cur_sents):  # not `prev`: that name holds a RawChunk later in this scope
+                        pt = approx_tokens(sent)
                         if carried_tokens + pt > cfg.overlap_tokens:
                             break
-                        carried.insert(0, prev)
+                        carried.insert(0, sent)
                         carried_tokens += pt
                     flush()
                     cur_sents, cur_tokens = carried, carried_tokens
