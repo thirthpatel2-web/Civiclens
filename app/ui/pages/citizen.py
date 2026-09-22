@@ -39,7 +39,7 @@ def helpline_cards(c: AppContainer) -> None:
         ui.label(tr(c, "msg.emergency_warning")).classes("text-sm font-medium").style("color: var(--cl-emergency);")
     section_title(tr(c, "emergencyHelplines"))
     if not data["configured"]:
-        state_panel(icon="support_agent", title="No emergency contacts configured", body="Ask an administrator to add them under Admin -> Emergency Contacts.")
+        state_panel(icon="support_agent", title=tr(c, "em.none_title"), body=tr(c, "em.none_body"))
         return
     with ui.row().classes("gap-4 flex-wrap w-full"):
         for h in data["items"]:
@@ -58,7 +58,7 @@ def government_panel(c: AppContainer, ctx: Any, complaint_id: str) -> None:
     states = c.government.states(ctx, complaint_id)
     if not states:
         return
-    section_title("Government platforms", "Shared only where an integration is configured and you have consented.")
+    section_title(tr(c, "gov.platforms"), tr(c, "gov.platforms_sub"))
     tone_for = {"submitted": "success", "not_started": "muted", "consent_required": "warning", "not_configured": "muted", "failed": "danger"}
     with ui.column().classes("gap-2 w-full"):
         for st in states:
@@ -73,7 +73,7 @@ def government_panel(c: AppContainer, ctx: Any, complaint_id: str) -> None:
                     if st["last_error"]:
                         ui.label(st["last_error"]).classes("text-xs").style("color: var(--cl-warning);")
                 if st["state"] in ("not_started", "consent_required", "not_configured", "failed"):
-                    ui.button("Request submission", on_click=lambda p=st["platform"]: (c.government.request(ctx, complaint_id, p), ui.navigate.reload())).props("outline dense")
+                    ui.button(tr(c, "gov.request_submission"), on_click=lambda p=st["platform"]: (c.government.request(ctx, complaint_id, p), ui.navigate.reload())).props("outline dense")
 
 
 def _timeline(c: AppContainer, steps: list[Any]) -> None:
@@ -283,7 +283,9 @@ def register(c: AppContainer) -> None:
         d = c.dashboards.citizen(user.ctx)
         prof = c.profiles.get(user.ctx)
         first_name = (user.full_name or user.email).split(" ")[0]
-        page_header(f"{tr(c, 'welcomeBack')}, {first_name}", tr(c, "appTagline"), icon="space_dashboard")
+        # ``welcomeBack`` already carries its own trailing punctuation in every language ("Welcome
+        # back," / "वापसी पर स्वागत है,"), so adding another comma here rendered "Welcome back,, UI".
+        page_header(f"{tr(c, 'welcomeBack')} {first_name}", tr(c, "appTagline"), icon="space_dashboard")
         if not prof.onboarding_complete:
             with ui.row().classes("cl-card w-full items-center justify-between gap-3 flex-wrap").style("background: var(--cl-info-soft); border-color: transparent;"):
                 with ui.row().classes("items-center gap-2"):
@@ -295,7 +297,7 @@ def register(c: AppContainer) -> None:
             stat_tile(tr(c, "card.active"), d["open"], color="info", icon="assignment")
             stat_tile(tr(c, "card.resolved"), d["resolved"], color="success", icon="task_alt")
             stat_tile(tr(c, "card.unread"), d["unread_notifications"], color="warning", icon="notifications")
-            stat_tile("Awaiting your feedback", len(d["pending_feedback"]), color="ai", icon="rate_review")
+            stat_tile(tr(c, "card.awaiting_feedback"), len(d["pending_feedback"]), color="ai", icon="rate_review")
 
         with ui.row().classes("gap-3 flex-wrap items-center"):
             ui.button(tr(c, "nav.report"), icon="add_circle", on_click=lambda: ui.navigate.to("/report")).props("unelevated size=lg").classes("cl-btn-glow")
@@ -304,7 +306,7 @@ def register(c: AppContainer) -> None:
             ui.button(tr(c, "nav.emergency"), icon="emergency", on_click=lambda: ui.navigate.to("/emergency")).props("flat").style("color: var(--cl-emergency);")
 
         if not d["has_data"]:
-            state_panel(icon="inbox", title=tr(c, "msg.empty_complaints"), body="File your first report to start tracking it here.", action_label=tr(c, "nav.report"), on_action=lambda: ui.navigate.to("/report"))
+            state_panel(icon="inbox", title=tr(c, "msg.empty_complaints"), body=tr(c, "msg.first_report"), action_label=tr(c, "nav.report"), on_action=lambda: ui.navigate.to("/report"))
             return
 
         with ui.row().classes("items-center justify-between w-full"):
@@ -654,12 +656,12 @@ def register(c: AppContainer) -> None:
                                 ui.label(cm.sla_due_at.strftime("%d %b %Y %H:%M")).classes("text-sm font-medium").style("color: var(--cl-fg);")
                     if cm.translated_text:
                         divider()
-                        ui.label("Translation (machine-generated; your original text above is kept)").classes("text-xs").style("color: var(--cl-fg-subtle);")
+                        ui.label(tr(c, "gr.translation_note")).classes("text-xs").style("color: var(--cl-fg-subtle);")
                         ui.label(cm.translated_text).classes("text-sm").style("color: var(--cl-fg-muted);")
 
                 section_title(tr(c, "lbl.evidence"))
                 if not d["evidence"]:
-                    state_panel(icon="attach_file", title="No evidence attached")
+                    state_panel(icon="attach_file", title=tr(c, "gr.no_evidence"))
                 else:
                     with ui.row().classes("gap-2 flex-wrap"):
                         for ev in d["evidence"]:
@@ -672,15 +674,15 @@ def register(c: AppContainer) -> None:
                         except CivicLensError as exc:
                             ui.notify(exc.message, type="negative")
                             return
-                        ui.notify("Evidence added.", type="positive")
+                        ui.notify(tr(c, "gr.evidence_added"), type="positive")
                         ui.navigate.reload()
 
-                    ui.upload(on_upload=add_more, auto_upload=True, label="Add more evidence").props("flat accept=.png,.jpg,.jpeg,.pdf,.txt,.docx").classes("cl-dropzone w-full max-w-md")
+                    ui.upload(on_upload=add_more, auto_upload=True, label=tr(c, "gr.add_evidence")).props("flat accept=.png,.jpg,.jpeg,.pdf,.txt,.docx").classes("cl-dropzone w-full max-w-md")
 
                 government_panel(c, user.ctx, cm.id)
 
                 if str(cm.status) in ("resolved", "closed") and not d["feedback"]:
-                    section_title("Rate the resolution")
+                    section_title(tr(c, "gr.rate_resolution"))
                     with ui.column().classes("cl-card gap-3 w-full max-w-lg"):
                         rating = ui.slider(min=1, max=5, value=5, step=1).props("label-always color=primary").classes("w-full")
                         comment = ui.textarea(tr(c, "lbl.comment")).props("outlined").classes("w-full")
@@ -695,7 +697,7 @@ def register(c: AppContainer) -> None:
                     chip(f"Your rating: {d['feedback'].rating}/5", color="success")
 
             with ui.column().classes("gap-4").style("min-width: 280px; max-width: 340px; flex: 1;"):
-                section_title("Status timeline")
+                section_title(tr(c, "gr.status_timeline"))
                 with ui.column().classes("cl-card w-full"):
                     _timeline(c, d["timeline"])
                 section_title("History")
@@ -706,15 +708,15 @@ def register(c: AppContainer) -> None:
         page_header(tr(c, "tabRTI"), tr(c, "tipText"), icon="gavel")
         with ui.row().classes("gap-6 w-full flex-wrap"):
             with ui.column().classes("cl-card gap-3").style("min-width: 320px; max-width: 480px; flex: 1;"):
-                section_title("Subject & authority")
+                section_title(tr(c, "rti.subject_authority"))
                 subject = ui.input(tr(c, "lbl.title")).props("outlined dense").classes("w-full")
-                field_hint("What this RTI is about, e.g. \"Repeated potholes on MG Road near ward 12\".")
+                field_hint(tr(c, "rti.subject_hint"))
                 authority = ui.input(tr(c, "selectDepartment")).props("outlined dense").classes("w-full")
                 location = ui.input(tr(c, "lbl.location") + " (" + tr(c, "lbl.optional") + ")").props("outlined dense").classes("w-full")
 
                 divider()
-                section_title("Records to request", "Pick a category to see the statutory records citizens usually ask for - edit or add your own below.")
-                cat_select = ui.select({"": "General / not sure", **{k: k.replace("_", " ").title() for k in CATEGORIES}}, value="", label=tr(c, "lbl.category")).props("outlined dense").classes("w-full")
+                section_title(tr(c, "rti.records"), tr(c, "rti.records_sub"))
+                cat_select = ui.select({"": tr(c, "col.general_not_sure"), **{k: k.replace("_", " ").title() for k in CATEGORIES}}, value="", label=tr(c, "lbl.category")).props("outlined dense").classes("w-full")
                 record_boxes: dict[str, ui.checkbox] = {}
                 record_list = ui.column().classes("w-full gap-1")
 
@@ -733,10 +735,10 @@ def register(c: AppContainer) -> None:
                 questions = ui.textarea("Additional specific questions (" + tr(c, "lbl.optional") + ", one per line)").props("outlined autogrow").classes("w-full")
 
                 divider()
-                section_title("Applicant details")
+                section_title(tr(c, "rti.applicant"))
                 name = ui.input(tr(c, "fullName"), value=user.full_name).props("outlined dense").classes("w-full")
                 addr = ui.textarea(tr(c, "residentialAddress")).props("outlined").classes("w-full")
-                purpose = ui.input("Context (optional)").props("outlined dense").classes("w-full")
+                purpose = ui.input(tr(c, "rti.context")).props("outlined dense").classes("w-full")
                 with ui.row().classes("gap-4"):
                     life = ui.checkbox(tr(c, "emergency48Hr"))
                     bpl = ui.checkbox("Below poverty line")
@@ -761,7 +763,7 @@ def register(c: AppContainer) -> None:
                 ui.button(tr(c, "generateLetterBtn"), icon="description", on_click=create).props("color=primary unelevated").classes("w-full")
 
             with ui.column().classes("gap-3").style("min-width: 320px; flex: 1;"):
-                section_title("Preview & tracking")
+                section_title(tr(c, "rti.preview"))
                 out = ui.column().classes("w-full gap-2")
 
                 def show(app_id: str) -> None:
@@ -778,9 +780,9 @@ def register(c: AppContainer) -> None:
                             chip(f"Deadline {cd.due_at:%d %b %Y} · {cd.days_remaining} day(s)" + (" (est.)" if cd.is_estimate else ""), color=tone)
                         with ui.row().classes("gap-2 flex-wrap"):
                             if a.status.value == "generated":
-                                ui.button("Mark as filed", on_click=lambda: (run_in_uow(c, lambda uow: c.rti_for(uow).mark_filed(user.ctx, app_id)), show(app_id))).props("outline dense")
+                                ui.button(tr(c, "rti.mark_filed"), on_click=lambda: (run_in_uow(c, lambda uow: c.rti_for(uow).mark_filed(user.ctx, app_id)), show(app_id))).props("outline dense")
                             if a.status.value == "filed":
-                                ui.button("Mark as answered", on_click=lambda: (run_in_uow(c, lambda uow: c.rti_for(uow).mark_responded(user.ctx, app_id)), show(app_id))).props("outline dense")
+                                ui.button(tr(c, "rti.mark_answered"), on_click=lambda: (run_in_uow(c, lambda uow: c.rti_for(uow).mark_responded(user.ctx, app_id)), show(app_id))).props("outline dense")
                             ui.button(tr(c, "act.download") + " PDF", icon="download", on_click=lambda: download_pdf(app_id)).props("outline dense")
 
                 def download_pdf(app_id: str) -> None:
@@ -793,10 +795,10 @@ def register(c: AppContainer) -> None:
 
                 mine = run_in_uow(c, lambda uow: uow.rti.list_for_owner(user.ctx.user_id))
                 if mine:
-                    section_title("My RTI applications")
+                    section_title(tr(c, "rti.mine"))
                     data_table([("ref", tr(c, "lbl.reference")), ("subject", tr(c, "lbl.title")), ("status", tr(c, "lbl.status"))], [{"id": a.id, "ref": a.reference or "draft", "subject": a.draft.subject, "status": a.status.value} for a in mine], on_row=lambda r: show(r["id"]))
                 else:
-                    state_panel(icon="gavel", title="No RTI applications yet", body="Fill in the form to draft your first one.")
+                    state_panel(icon="gavel", title=tr(c, "rti.none_title"), body=tr(c, "rti.none_body"))
 
     @page(c, "/legal", "nav.legal", roles=CIT)
     async def legal(c: AppContainer, user: UiUser) -> None:
@@ -959,7 +961,7 @@ def register(c: AppContainer) -> None:
         state: dict[str, Any] = {"cid": None}
         page_header(tr(c, "chatbotTitle"), tr(c, "page.copilot_help"), icon="smart_toy")
         if c.llm is None:
-            info_banner("No language model is configured: the assistant can show matching sources and database facts but cannot compose answers.", "orange")
+            info_banner(tr(c, "copilot.no_model"), "orange")
         with ui.column().classes("cl-card w-full max-w-3xl !p-0 gap-0"):
             log = ui.column().classes("w-full gap-1 q-pa-md").style("min-height: 240px; max-height: 55vh; overflow-y: auto;")
             with ui.row().classes("q-pa-sm gap-2 items-center w-full cl-hairline"):
@@ -1014,7 +1016,7 @@ def register(c: AppContainer) -> None:
         with ui.row().classes("gap-3 items-end w-full flex-wrap"):
             cat = ui.select({"": tr(c, "filterAll"), **{k: k.title() for k in CATEGORIES}}, value="", label=tr(c, "lbl.category")).props("outlined dense").classes("w-48")
             ward = ui.input(tr(c, "lbl.ward")).props("outlined dense").classes("w-32")
-            sev = ui.select({"": "Any", "medium": "Medium+", "high": "High+", "critical": "Critical"}, value="", label="Severity").props("outlined dense").classes("w-32")
+            sev = ui.select({"": tr(c, "filter.all"), "medium": tr(c, "col.medium_plus"), "high": tr(c, "col.high_plus"), "critical": tr(c, "col.critical")}, value="", label=tr(c, "lbl.severity")).props("outlined dense").classes("w-32")
             ui.button(tr(c, "act.refresh"), icon="refresh", on_click=lambda: draw()).props("color=primary unelevated")
         box = ui.column().classes("w-full gap-3")
 
@@ -1031,7 +1033,7 @@ def register(c: AppContainer) -> None:
                 elif r["offices"]:
                     lat0, lng0 = r["offices"][0]["lat"], r["offices"][0]["lng"]
                 else:
-                    state_panel(icon="map", title=tr(c, "msg.no_data"), body="Reports will appear here once there is enough data to protect reporter privacy.")
+                    state_panel(icon="map", title=tr(c, "msg.no_data"), body=tr(c, "gis.none_body"))
                     return
                 with ui.row().classes("gap-4 w-full flex-wrap items-start"):
                     m = ui.leaflet(center=(lat0, lng0), zoom=11).classes("h-96").style("flex: 2; min-width: 320px; border-radius: var(--cl-radius-md); overflow: hidden;")
@@ -1042,13 +1044,13 @@ def register(c: AppContainer) -> None:
                     with ui.column().classes("cl-card gap-2").style("flex: 1; min-width: 260px;"):
                         section_title("Hotspots")
                         if not r["hotspots"]:
-                            ui.label("No hotspot clusters yet.").classes("text-xs").style("color: var(--cl-fg-subtle);")
+                            ui.label(tr(c, "gis.no_clusters")).classes("text-xs").style("color: var(--cl-fg-subtle);")
                         for h in r["hotspots"][:8]:
                             with ui.row().classes("items-center justify-between w-full"):
                                 ui.label(", ".join(h["wards"]) or "Unassigned ward").classes("text-sm").style("color: var(--cl-fg);")
                                 chip(f"{h['count']} reports", color="danger" if h["severity_score"] >= 3 else "warning")
                         if r["ward_boundaries"] == "not_available":
-                            ui.label("Ward boundary polygons are not loaded; wards are listed by name only.").classes("text-xs").style("color: var(--cl-fg-subtle);")
+                            ui.label(tr(c, "gis.no_polygons")).classes("text-xs").style("color: var(--cl-fg-subtle);")
 
         draw()
 
@@ -1065,21 +1067,21 @@ def register(c: AppContainer) -> None:
             personal_diagnostic,
         )
 
-        page_header(tr(c, "nav.interop"), "Different government systems describe the same request with different field names, casing and status words. See the actual normalization mechanism, live.", icon="hub")
+        page_header(tr(c, "nav.interop"), tr(c, "interop.help"), icon="hub")
 
-        section_title("Fragmentation, in numbers")
+        section_title(tr(c, "interop.frag_numbers"))
         with ui.row().classes("gap-3 w-full flex-wrap"):
-            stat_tile("Services on India's own unification app", f"{NATIONAL_UMANG_SERVICES:,}+", color="info", icon="apps", hint=f"across {NATIONAL_UMANG_DEPARTMENTS}+ departments — {NATIONAL_UMANG_SOURCE}")
+            stat_tile(tr(c, "interop.stat_umang"), f"{NATIONAL_UMANG_SERVICES:,}+", color="info", icon="apps", hint=f"across {NATIONAL_UMANG_DEPARTMENTS}+ departments — {NATIONAL_UMANG_SOURCE}")
             mine = c.complaints.list_mine(user.ctx, filter_name="all")
             diag = personal_diagnostic([m.department_code for m in mine])
-            stat_tile("Departments you've dealt with", diag.distinct_departments, color="primary", icon="apartment", hint=f"across {diag.total_filings} filing(s) through CivicLens")
-            stat_tile("Re-entries avoided", diag.profile_reuses, color="success", icon="badge", hint="times your one CivicLens profile was reused instead of re-typing KYC elsewhere")
+            stat_tile(tr(c, "interop.stat_departments"), diag.distinct_departments, color="primary", icon="apartment", hint=f"across {diag.total_filings} filing(s) through CivicLens")
+            stat_tile(tr(c, "interop.stat_reentries"), diag.profile_reuses, color="success", icon="badge", hint="times your one CivicLens profile was reused instead of re-typing KYC elsewhere")
 
         divider()
-        section_title("Live normalization demo", "Pick a system to see its real (fixture) export shape transform into CivicLens's Common Data Model.")
-        info_banner("These are realistic illustrative fixtures shaped like real system exports, not a live feed — no department has given CivicLens a data-sharing agreement yet. The adapter code itself is real and directly reusable the day one exists.", "blue")
+        section_title(tr(c, "interop.demo_title"), tr(c, "interop.demo_sub"))
+        info_banner(tr(c, "interop.fixtures_note"), "blue")
 
-        sys_select = ui.select({k: v[0] for k, v in SYSTEMS.items()}, value=next(iter(SYSTEMS)), label="Source system").props("outlined dense").classes("w-full max-w-lg")
+        sys_select = ui.select({k: v[0] for k, v in SYSTEMS.items()}, value=next(iter(SYSTEMS)), label=tr(c, "interop.source_system")).props("outlined dense").classes("w-full max-w-lg")
         corrupt = ui.checkbox("Simulate a malformed record (blank required fields, break the status code)")
         out = ui.row().classes("gap-4 w-full flex-wrap items-start q-mt-sm")
 
@@ -1098,11 +1100,11 @@ def register(c: AppContainer) -> None:
             tone = {"excellent": "success", "good": "info", "poor": "warning", "unusable": "danger"}[quality.grade]
             with out:
                 with ui.column().classes("cl-card gap-2").style("flex: 1; min-width: 300px;"):
-                    section_title("Raw payload", "exactly as that system would export it")
+                    section_title(tr(c, "interop.raw_payload"), "exactly as that system would export it")
                     ui.markdown(f"```json\n{_json.dumps(payload, indent=2, ensure_ascii=False)}\n```").classes("cl-mono text-xs w-full")
                 with ui.column().classes("cl-card gap-2").style("flex: 1; min-width: 300px;"):
                     with ui.row().classes("items-center justify-between w-full"):
-                        section_title("Normalized (Common Data Model)")
+                        section_title(tr(c, "interop.normalized"))
                         chip(f"{quality.grade} · {quality.score:.0%}", color=tone)
                     for label, value in (("External ID", record.external_id), ("Category", record.category), ("Status", record.status), ("Title", record.title),
                                          ("Department", record.department), ("Citizen", record.citizen_name), ("Contact", record.citizen_contact),
@@ -1112,15 +1114,15 @@ def register(c: AppContainer) -> None:
                             ui.label(str(value) if value not in (None, "") else "—").classes("text-sm font-medium cl-mono").style("color: var(--cl-fg);")
                     if quality.issues:
                         divider()
-                        ui.label("Data-quality issues detected:").classes("text-xs font-medium").style("color: var(--cl-danger);")
+                        ui.label(tr(c, "interop.dq_issues")).classes("text-xs font-medium").style("color: var(--cl-danger);")
                         for issue in quality.issues:
                             ui.label(f"• {issue}").classes("text-xs").style("color: var(--cl-danger);")
                         if quality.grade in ("poor", "unusable"):
                             def queue_exception() -> None:
                                 c.exceptions.log(source_system=record.source_system, reason="; ".join(quality.issues)[:300], payload=payload)
-                                ui.notify("Queued for admin review under Integration Exceptions.", type="positive")
+                                ui.notify(tr(c, "interop.queued"), type="positive")
 
-                            ui.button("Queue as an integration exception", icon="report_problem", on_click=queue_exception).props("outline dense color=negative")
+                            ui.button(tr(c, "interop.queue_btn"), icon="report_problem", on_click=queue_exception).props("outline dense color=negative")
 
         sys_select.on_value_change(lambda e: draw())
         corrupt.on_value_change(lambda e: draw())
@@ -1161,7 +1163,7 @@ def register(c: AppContainer) -> None:
                 in_app = ui.switch("In-app notifications", value=prefs.in_app).props("color=primary")
                 email = ui.switch("E-mail notifications", value=prefs.email).props("color=primary")
                 if c.mailer is None:
-                    field_hint("E-mail delivery is not configured on this server; e-mail notifications will be recorded as 'not sent'.")
+                    field_hint(tr(c, "set.email_not_configured"))
 
                 def save_prefs() -> None:
                     run_in_uow(c, lambda uow: c.notifications.save_preferences(user.ctx, uow.notifications, in_app=in_app.value, email=email.value, muted_kinds=list(prefs.muted_kinds)))
@@ -1170,29 +1172,29 @@ def register(c: AppContainer) -> None:
                 ui.button(tr(c, "act.save"), on_click=save_prefs).props("outline")
 
             with ui.column().classes("cl-card gap-3 w-full"):
-                section_title("Privacy & AI consent", "You can change these at any time; AI processing never decides outcomes on its own.")
+                section_title(tr(c, "set.privacy_ai"), tr(c, "set.privacy_ai_sub"))
                 consents = c.profiles.consents(user.ctx)
                 for purpose, cstate in consents.items():
                     ui.switch(purpose.replace("_", " ").capitalize(), value=cstate["granted"], on_change=lambda e, p=purpose: (c.profiles.set_consent(user.ctx, p, bool(e.value)), ui.notify(tr(c, "msg.saved"), type="positive"))).props("color=primary")
                 divider()
-                ui.label("Government sharing: nothing is sent to a government platform unless an integration is configured and you consent.").classes("text-xs").style("color: var(--cl-fg-subtle);")
+                ui.label(tr(c, "set.gov_sharing")).classes("text-xs").style("color: var(--cl-fg-subtle);")
                 with ui.row().classes("gap-2 flex-wrap"):
                     for _platform, a in c.adapters.items():
                         chip(f"{a.display_name}: {a.state.value}", color="muted", outline=True)
 
             with ui.column().classes("cl-card gap-3 w-full"):
-                section_title("Appearance & language")
+                section_title(tr(c, "set.appearance_language"))
                 ui.select({k: k.upper() for k in c.ui_text.languages}, value=lang(), label=tr(c, "appLanguage"),
                           on_change=lambda e: (app.storage.user.__setitem__("lang", e.value), c.profiles.update(user.ctx, language=e.value), ui.navigate.reload())).props("outlined dense").classes("w-56")
-                field_hint("Use the sun/moon icon in the top bar to switch between light and dark mode.")
+                field_hint(tr(c, "set.theme_hint"))
 
             with ui.column().classes("cl-card gap-3 w-full"):
                 section_title("Security")
-                ui.label("Manage two-factor authentication and sessions.").classes("text-sm").style("color: var(--cl-fg-muted);")
+                ui.label(tr(c, "set.security_hint")).classes("text-sm").style("color: var(--cl-fg-muted);")
                 ui.button(tr(c, "nav.security"), icon="lock", on_click=lambda: ui.navigate.to("/security")).props("outline")
 
             with ui.column().classes("cl-card gap-3 w-full"):
-                section_title("Linked government IDs (Golden Record)", "Only a one-way hash is ever stored - never the raw number. Linking the same ID twice, even to another account, is blocked.")
+                section_title(tr(c, "set.linked_ids"), tr(c, "set.linked_ids_sub"))
                 ids_list = ui.column().classes("gap-2 w-full")
 
                 def draw_ids() -> None:
@@ -1200,7 +1202,7 @@ def register(c: AppContainer) -> None:
                     items = c.master_data.list_mine(user.ctx)
                     with ids_list:
                         if not items:
-                            ui.label("No IDs linked yet.").classes("text-sm").style("color: var(--cl-fg-subtle);")
+                            ui.label(tr(c, "set.no_ids")).classes("text-sm").style("color: var(--cl-fg-subtle);")
                         for rec in items:
                             with ui.row().classes("items-center justify-between w-full"):
                                 ui.label(f"{rec.id_type.replace('_', ' ').upper()} · ···{rec.last4 or '----'}").classes("text-sm cl-mono").style("color: var(--cl-fg);")
@@ -1211,8 +1213,8 @@ def register(c: AppContainer) -> None:
                 with ui.row().classes("gap-3 items-end w-full flex-wrap"):
                     from app.services.interop_service import ID_TYPES
 
-                    id_type_sel = ui.select({t: t.replace("_", " ").title() for t in ID_TYPES}, value=ID_TYPES[0], label="ID type").props("outlined dense").classes("w-48")
-                    id_value = ui.input("ID value").props("outlined dense").classes("flex-1")
+                    id_type_sel = ui.select({t: t.replace("_", " ").title() for t in ID_TYPES}, value=ID_TYPES[0], label=tr(c, "set.id_type")).props("outlined dense").classes("w-48")
+                    id_value = ui.input(tr(c, "set.id_value")).props("outlined dense").classes("flex-1")
 
                     def link_id() -> None:
                         try:
@@ -1227,7 +1229,7 @@ def register(c: AppContainer) -> None:
                     ui.button("Link", icon="add_link", on_click=link_id).props("outline dense")
 
             with ui.column().classes("cl-card gap-3 w-full"):
-                section_title("Other portals you're tracking manually", "CPGRAMS and most state portals require your own login and expose no public API - track their reference numbers here alongside your live CivicLens filings.")
+                section_title(tr(c, "set.other_portals"), tr(c, "set.other_portals_sub"))
                 links_list = ui.column().classes("gap-2 w-full")
 
                 def draw_links() -> None:
@@ -1235,7 +1237,7 @@ def register(c: AppContainer) -> None:
                     items = c.external_links.list_mine(user.ctx)
                     with links_list:
                         if not items:
-                            ui.label("Nothing tracked yet.").classes("text-sm").style("color: var(--cl-fg-subtle);")
+                            ui.label(tr(c, "set.nothing_tracked")).classes("text-sm").style("color: var(--cl-fg-subtle);")
                         for rec in items:
                             with ui.row().classes("cl-surface-alt q-pa-sm items-center justify-between w-full gap-2"):
                                 with ui.column().classes("gap-0"):
@@ -1246,9 +1248,9 @@ def register(c: AppContainer) -> None:
                 draw_links()
                 divider()
                 with ui.row().classes("gap-3 items-end w-full flex-wrap"):
-                    platform_in = ui.input("Platform (e.g. CPGRAMS)").props("outlined dense").classes("w-40")
-                    ref_in = ui.input("Reference number").props("outlined dense").classes("w-40")
-                    title_in = ui.input("Short title").props("outlined dense").classes("flex-1")
+                    platform_in = ui.input(tr(c, "set.platform_eg")).props("outlined dense").classes("w-40")
+                    ref_in = ui.input(tr(c, "set.ref_number")).props("outlined dense").classes("w-40")
+                    title_in = ui.input(tr(c, "set.short_title")).props("outlined dense").classes("flex-1")
 
                     def add_link() -> None:
                         try:
@@ -1265,7 +1267,7 @@ def register(c: AppContainer) -> None:
     @page(c, "/notifications", "nav.notifications")
     def notifications(c: AppContainer, user: UiUser) -> None:
         page_header(tr(c, "nav.notifications"), icon="notifications",
-                    actions=lambda: ui.button("Mark all read", on_click=lambda: (run_in_uow(c, lambda uow: c.notifications.mark_all_read(user.ctx, uow.notifications)), ui.navigate.reload())).props("outline dense"))
+                    actions=lambda: ui.button(tr(c, "notif.mark_all_read"), on_click=lambda: (run_in_uow(c, lambda uow: c.notifications.mark_all_read(user.ctx, uow.notifications)), ui.navigate.reload())).props("outline dense"))
         items = run_in_uow(c, lambda uow: c.notifications.list_for(user.ctx, uow.notifications, limit=100))
         if not items:
             state_panel(icon="notifications_none", title=tr(c, "msg.no_data"))
@@ -1277,7 +1279,7 @@ def register(c: AppContainer) -> None:
                         ui.label(n.body).classes("text-sm").style("color: var(--cl-fg-muted);")
                         ui.label(n.created_at.strftime("%d %b %Y %H:%M")).classes("text-xs").style("color: var(--cl-fg-subtle);")
                     if not n.read_at:
-                        ui.button("Mark read", on_click=lambda i=n.id: (run_in_uow(c, lambda uow: c.notifications.mark_read(user.ctx, uow.notifications, i)), ui.navigate.reload())).props("flat dense")
+                        ui.button(tr(c, "notif.mark_read"), on_click=lambda i=n.id: (run_in_uow(c, lambda uow: c.notifications.mark_read(user.ctx, uow.notifications, i)), ui.navigate.reload())).props("flat dense")
 
     @page(c, "/documents", "nav.documents")
     def documents(c: AppContainer, user: UiUser) -> None:
@@ -1285,7 +1287,7 @@ def register(c: AppContainer) -> None:
 
         def on_upload(e: Any) -> None:
             if c.ingestor_factory is None:
-                ui.notify("Document ingestion is not configured.", type="negative")
+                ui.notify(tr(c, "doc.not_configured"), type="negative")
                 return
             try:
                 def op(uow):  # type: ignore[no-untyped-def]
@@ -1297,21 +1299,21 @@ def register(c: AppContainer) -> None:
             except CivicLensError as exc:
                 ui.notify(exc.message, type="negative")
                 return
-            ui.notify("Uploaded; processing has been queued.", type="positive")
+            ui.notify(tr(c, "doc.uploaded"), type="positive")
             ui.navigate.reload()
 
-        ui.upload(on_upload=on_upload, auto_upload=True, label="Drop a document (PDF, DOCX, TXT, image), or click to browse").props("flat").classes("cl-dropzone w-full max-w-xl")
+        ui.upload(on_upload=on_upload, auto_upload=True, label=tr(c, "doc.dropzone")).props("flat").classes("cl-dropzone w-full max-w-xl")
         if c.ingestor_factory:
             docs = run_in_uow(c, lambda uow: uow.documents.list_for_owner(user.ctx.user_id))
             if docs:
-                section_title("My documents")
-                data_table([("name", "Name"), ("status", tr(c, "lbl.status")), ("chunks", "Chunks"), ("err", "Error")], [{"id": d.id, "name": d.name, "status": str(d.status), "chunks": d.chunk_count, "err": d.error or ""} for d in docs])
+                section_title(tr(c, "doc.mine"))
+                data_table([("name", tr(c, "col.name")), ("status", tr(c, "lbl.status")), ("chunks", tr(c, "col.chunks")), ("err", tr(c, "col.error"))], [{"id": d.id, "name": d.name, "status": str(d.status), "chunks": d.chunk_count, "err": d.error or ""} for d in docs])
             failed = [d for d in docs if str(d.status) == "failed"]
             for d in failed:
                 ui.button(f"{tr(c, 'act.retry')} {d.name}", on_click=lambda i=d.id: (run_in_uow(c, lambda uow: c.jobs.enqueue(uow, "document.ingest", {"document_id": i}, f"ingest-retry:{i}:{int(c.clock().timestamp())}")), ui.navigate.reload())).props("outline dense")
-        section_title("Search my documents")
+        section_title(tr(c, "doc.search"))
         with ui.row().classes("gap-2 w-full max-w-xl items-center"):
-            q = ui.input("Search my documents").props("outlined dense").classes("flex-1")
+            q = ui.input(tr(c, "doc.search")).props("outlined dense").classes("flex-1")
             ui.button(icon="search", on_click=lambda: search()).props("round unelevated color=primary")
         out = ui.column().classes("w-full max-w-xl gap-2")
 

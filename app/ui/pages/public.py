@@ -57,7 +57,7 @@ def _login_form(c: AppContainer, *, privileged: bool, allowed: tuple[Role, ...] 
             otp_box = ui.column().classes("w-full gap-1")
             with otp_box:
                 otp = ui.input(tr(c, "lbl.otp")).props("outlined dense inputmode=numeric maxlength=12 autofocus").classes("w-full")
-                field_hint("Enter the 6-digit code from your authenticator app.")
+                field_hint(tr(c, "auth.otp_hint"))
             otp_box.set_visibility(False)
             err = ui.row().classes("cl-card w-full items-start gap-2 hidden").style("background: var(--cl-danger-soft); border-color: transparent; padding: 10px 12px;")
             with err:
@@ -232,8 +232,8 @@ def register(c: AppContainer) -> None:
             name = ui.input(tr(c, "fullName")).props("outlined dense").classes("w-full")
             email = ui.input(tr(c, "lbl.email")).props("outlined dense type=email").classes("w-full")
             pw = ui.input(tr(c, "lbl.password"), password=True, password_toggle_button=True).props("outlined dense").classes("w-full")
-            confirm = ui.input("Confirm password", password=True, password_toggle_button=True).props("outlined dense").classes("w-full")
-            field_hint("At least 10 characters.")
+            confirm = ui.input(tr(c, "auth.confirm_password"), password=True, password_toggle_button=True).props("outlined dense").classes("w-full")
+            field_hint(tr(c, "auth.password_rule"))
             err = ui.row().classes("cl-card w-full items-start gap-2 hidden").style("background: var(--cl-danger-soft); border-color: transparent; padding: 10px 12px;")
             with err:
                 ui.icon("error").classes("text-[16px]").style("color: var(--cl-danger);")
@@ -256,7 +256,7 @@ def register(c: AppContainer) -> None:
 
             submit_btn = ui.button(tr(c, "act.register"), icon="person_add", on_click=submit).props("unelevated").classes("w-full q-mt-sm cl-btn-glow")
             with ui.row().classes("justify-center w-full text-sm"):
-                ui.label("Already have an account?").style("color: var(--cl-fg-muted);")
+                ui.label(tr(c, "auth.have_account")).style("color: var(--cl-fg-muted);")
                 ui.link(tr(c, "act.sign_in"), "/login")
 
     @page(c, "/reset-password", "page.forgot", public=True, shell_on=False)
@@ -264,8 +264,8 @@ def register(c: AppContainer) -> None:
         token = ui.context.client.request.query_params.get("token") if ui.context.client.request else None  # type: ignore[union-attr]
         with ui.column().classes("cl-glass w-full max-w-md q-mx-auto gap-3").style("padding: 28px;"):
             if token:
-                ui.label("Choose a new password").classes("text-lg font-bold cl-gradient-text")
-                pw = ui.input("New password", password=True, password_toggle_button=True).props("outlined dense").classes("w-full")
+                ui.label(tr(c, "auth.choose_new_password")).classes("text-lg font-bold cl-gradient-text")
+                pw = ui.input(tr(c, "auth.new_password"), password=True, password_toggle_button=True).props("outlined dense").classes("w-full")
 
                 async def do_reset() -> None:
                     try:
@@ -278,8 +278,8 @@ def register(c: AppContainer) -> None:
 
                 submit_btn = ui.button(tr(c, "act.save"), icon="lock_reset", on_click=do_reset).props("unelevated").classes("w-full cl-btn-glow")
             else:
-                ui.label("Reset your password").classes("text-lg font-bold cl-gradient-text")
-                ui.label("Enter the e-mail on your account and we'll send a reset link if it exists.").classes("text-sm").style("color: var(--cl-fg-muted);")
+                ui.label(tr(c, "auth.reset_title")).classes("text-lg font-bold cl-gradient-text")
+                ui.label(tr(c, "auth.reset_sub")).classes("text-sm").style("color: var(--cl-fg-muted);")
                 email = ui.input(tr(c, "lbl.email")).props("outlined dense type=email").classes("w-full")
 
                 async def ask() -> None:
@@ -291,7 +291,7 @@ def register(c: AppContainer) -> None:
 
                 submit_btn = ui.button(tr(c, "act.submit"), icon="send", on_click=ask).props("unelevated").classes("w-full cl-btn-glow")
                 if c.mailer is None:
-                    info_banner("E-mail delivery is not configured on this server, so reset links cannot be sent. Ask an administrator for help.", "orange")
+                    info_banner(tr(c, "auth.reset_no_email"), "orange")
             with ui.row().classes("justify-center w-full text-sm q-mt-sm"):
                 ui.link(tr(c, "act.sign_in"), "/login")
 
@@ -299,14 +299,14 @@ def register(c: AppContainer) -> None:
     def admin_setup(c: AppContainer, user: UiUser | None) -> None:
         if not c.admin_setup_token:
             with ui.column().classes("w-full max-w-md q-mx-auto q-mt-xl"):
-                state_panel(icon="lock", title="Administrator setup is disabled", body="ADMIN_SETUP_TOKEN is not set on this server.")
+                state_panel(icon="lock", title=tr(c, "auth.setup_disabled_title"), body=tr(c, "auth.setup_disabled_body"))
             return
         with ui.column().classes("cl-glass w-full max-w-md q-mx-auto gap-3").style("padding: 28px;"):
             ui.label(tr(c, "page.setup_admin")).classes("text-lg font-bold cl-gradient-text")
             name = ui.input(tr(c, "fullName")).props("outlined dense").classes("w-full")
             email = ui.input(tr(c, "lbl.email")).props("outlined dense").classes("w-full")
             pw = ui.input(tr(c, "lbl.password"), password=True, password_toggle_button=True).props("outlined dense").classes("w-full")
-            tok = ui.input("Setup token", password=True).props("outlined dense").classes("w-full")
+            tok = ui.input(tr(c, "auth.setup_token"), password=True).props("outlined dense").classes("w-full")
 
             async def go() -> None:
                 try:
@@ -314,7 +314,7 @@ def register(c: AppContainer) -> None:
                 except CivicLensError as exc:
                     ui.notify(exc.message, type="negative")
                     return
-                ui.notify("Administrator created. Sign in and enrol two-factor authentication.", type="positive")
+                ui.notify(tr(c, "auth.admin_created"), type="positive")
                 ui.navigate.to("/admin/login")
 
             submit_btn = ui.button(tr(c, "act.submit"), icon="admin_panel_settings", on_click=go).props("unelevated").classes("w-full cl-btn-glow")
@@ -329,14 +329,14 @@ def register(c: AppContainer) -> None:
     @page(c, "/onboarding", "page.onboarding")
     def onboarding(c: AppContainer, user: UiUser) -> None:
         prof = c.profiles.get(user.ctx)
-        page_header(tr(c, "page.onboarding"), "A minute of setup so CivicLens can route your reports correctly.", icon="waving_hand")
+        page_header(tr(c, "page.onboarding"), tr(c, "onb.help"), icon="waving_hand")
         with ui.column().classes("cl-card w-full max-w-2xl gap-5 q-mt-md"):
-            section_title("Your details")
+            section_title(tr(c, "onb.your_details"))
             with ui.row().classes("gap-3 w-full flex-wrap"):
                 name = ui.input(tr(c, "fullName"), value=prof.full_name).props("outlined dense").classes("w-full sm:flex-1")
                 phone = ui.input(tr(c, "phoneNumber"), value=prof.phone or "").props("outlined dense").classes("w-full sm:flex-1")
             divider()
-            section_title("Location", "Helps route reports to the right ward office.")
+            section_title("Location", tr(c, "onb.ward_hint"))
             with ui.row().classes("gap-3 w-full flex-wrap"):
                 city = ui.input(tr(c, "selectCity"), value=prof.city or "").props("outlined dense").classes("w-full sm:flex-1")
                 ward = ui.input(tr(c, "lbl.ward"), value=prof.ward or "").props("outlined dense").classes("w-full sm:flex-1")
@@ -344,9 +344,9 @@ def register(c: AppContainer) -> None:
             section_title("Language")
             language = ui.select({code: code.upper() for code in c.ui_text.languages}, value=prof.language, label=tr(c, "lbl.language")).props("outlined dense").classes("w-48")
             divider()
-            section_title("AI & data consent", "Optional. You can change any of this later in Settings.")
+            section_title(tr(c, "onb.ai_consent"), tr(c, "onb.ai_consent_sub"))
             boxes = {p: ui.checkbox(p.replace("_", " ").capitalize(), value=c.profiles.consents(user.ctx)[p]["granted"]) for p in CONSENT_PURPOSES}
-            field_hint("AI processing lets a model help classify your complaints; it never decides outcomes on its own.")
+            field_hint(tr(c, "onb.ai_hint"))
 
             def save() -> None:
                 c.profiles.update(user.ctx, full_name=name.value, phone=phone.value or None, city=city.value, ward=ward.value, language=language.value, complete_onboarding=True)
@@ -360,14 +360,14 @@ def register(c: AppContainer) -> None:
     @page(c, "/security", "nav.security")
     def security(c: AppContainer, user: UiUser) -> None:
         enabled = run_in_uow(c, lambda uow: c.mfa_for(uow).is_enabled(user.ctx.user_id))
-        page_header(tr(c, "nav.security"), "Two-factor authentication adds a one-time code to every sign-in.", icon="lock")
+        page_header(tr(c, "nav.security"), tr(c, "mfa.help"), icon="lock")
         if enabled:
             with ui.column().classes("cl-card w-full max-w-md gap-3 q-mt-md"):
                 with ui.row().classes("items-center gap-2"):
                     ui.icon("verified").style("color: var(--cl-success);")
-                    ui.label("Two-factor authentication is ON").classes("text-sm font-semibold").style("color: var(--cl-success);")
+                    ui.label(tr(c, "mfa.is_on")).classes("text-sm font-semibold").style("color: var(--cl-success);")
                 divider()
-                ui.label("Disable it").classes("text-sm font-medium")
+                ui.label(tr(c, "mfa.disable_it")).classes("text-sm font-medium")
                 pw = ui.input(tr(c, "lbl.password"), password=True).props("outlined dense").classes("w-full")
                 code = ui.input(tr(c, "lbl.otp")).props("outlined dense").classes("w-full")
 
@@ -403,13 +403,13 @@ def register(c: AppContainer) -> None:
                         logger.exception("QR rendering failed for MFA enrollment")
                 area.clear()
                 with area:
-                    ui.label("Scan with Google Authenticator (or any TOTP app):").classes("text-sm")
+                    ui.label(tr(c, "mfa.scan")).classes("text-sm")
                     if qr_png is not None:
                         ui.image("data:image/png;base64," + base64.b64encode(qr_png).decode()).classes("w-56 self-center").style("border-radius: var(--cl-radius-md);")
                     else:
-                        state_panel(icon="qr_code_2", title="QR rendering unavailable", body="Enter the key manually below.")
+                        state_panel(icon="qr_code_2", title=tr(c, "mfa.qr_unavailable"), body=tr(c, "mfa.qr_unavailable_body"))
                     with ui.row().classes("items-center gap-2 w-full"):
-                        ui.label("Manual key:").classes("text-xs").style("color: var(--cl-fg-muted);")
+                        ui.label(tr(c, "mfa.manual_key")).classes("text-xs").style("color: var(--cl-fg-muted);")
                         ui.label(e.manual_entry_secret).classes("cl-mono text-xs")
                     code = ui.input(tr(c, "lbl.otp")).props("outlined dense").classes("w-full")
 
@@ -429,8 +429,8 @@ def register(c: AppContainer) -> None:
                             with ui.row().classes("cl-card items-start gap-2 w-full").style("background: var(--cl-success-soft); border-color: transparent;"):
                                 ui.icon("verified").style("color: var(--cl-success);")
                                 with ui.column().classes("gap-1"):
-                                    ui.label("Two-factor authentication is enabled").classes("text-sm font-semibold").style("color: var(--cl-success);")
-                                    ui.label("Save these backup codes now - they are shown once.").classes("text-xs").style("color: var(--cl-success);")
+                                    ui.label(tr(c, "mfa.enabled")).classes("text-sm font-semibold").style("color: var(--cl-success);")
+                                    ui.label(tr(c, "mfa.save_codes")).classes("text-xs").style("color: var(--cl-success);")
                             with ui.column().classes("cl-surface-alt q-pa-md gap-1 w-full"):
                                 for bc in codes:
                                     ui.label(bc).classes("cl-mono text-sm")

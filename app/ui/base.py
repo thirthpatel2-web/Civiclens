@@ -196,8 +196,9 @@ def public_topbar(c: AppContainer, *, home: bool = False) -> None:
         lsel.tooltip(tr(c, "lang.select"))
 
 
-def _role_label(role: Role) -> str:
-    return {Role.CITIZEN: "Citizen", Role.OFFICER: "Officer", Role.ADMIN: "Administrator", Role.SUPER_ADMIN: "Super Admin"}.get(role, role.value.title())
+def _role_label(c: AppContainer, role: Role) -> str:
+    key = {Role.CITIZEN: "role.citizen", Role.OFFICER: "role.officer", Role.ADMIN: "role.admin", Role.SUPER_ADMIN: "role.super_admin"}.get(role)
+    return tr(c, key) if key else role.value.title()
 
 
 def shell(c: AppContainer, user: UiUser, route: str, title_key: str) -> None:
@@ -232,7 +233,7 @@ def shell(c: AppContainer, user: UiUser, route: str, title_key: str) -> None:
         ui.button(icon="menu", on_click=drawer.toggle).props("flat round dense").tooltip(tr(c, "nav.open_menu")).style("color: var(--cl-fg);")
         with ui.column().classes("gap-0 gt-xs q-ml-sm"):
             ui.label(tr(c, title_key)).classes("text-sm font-semibold").style("color: var(--cl-fg); line-height: 1.1;")
-            ui.label(_role_label(user.ctx.role) + (f" · {user.ctx.department_id}" if user.ctx.department_id else "")).classes("text-xs").style("color: var(--cl-fg-muted);")
+            ui.label(_role_label(c, user.ctx.role) + (f" · {user.ctx.department_id}" if user.ctx.department_id else "")).classes("text-xs").style("color: var(--cl-fg-muted);")
         ui.space()
         with ui.row().classes("items-center gt-sm").style("max-width: 320px;"):
             q = ui.input(placeholder=tr(c, "act.search")).props("dense outlined rounded clearable").classes("w-56")
@@ -335,7 +336,7 @@ def page(c: AppContainer, path: str, title_key: str, *, roles: frozenset[Role] |
                     error_banner(exc.message + (f" ({', '.join(f'{k}: {v}' for k, v in exc.details.items())})" if isinstance(exc.details, dict) else ""))
                 except Exception:
                     logger.exception("ui page %s failed", path)
-                    error_banner("Something went wrong. Please try again.")
+                    error_banner(tr(c, "msg.error_generic"))
 
         return wrapper
 
