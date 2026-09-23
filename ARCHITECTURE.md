@@ -32,6 +32,14 @@ provider/detection/confidence/warnings. No engine ⇒ `NOT_CONFIGURED`.
 `GovernmentSubmissionService`: request → consent (`data_sharing_government`) → adapter configured? → queued → submitting → `submitted` only after an adapter SUCCESS, else `failed`/`not_configured`/`consent_required`.
 Canonical payload carries no citizen identity. When a platform's contract is supplied only the adapter mapping changes.
 
+## Interoperability platform (cross-department document exchange)
+`app/interop/mock_systems.py` + `identity_resolution.py` + `connector_registry.py` + `app/services/interop_gateway_service.py` + `app/db/models/interop_platform.py`. Distinct from the citizen-facing fragmentation/Golden-Record
+tools in `app/interop/adapters.py`/`interop_service.py`: this is the middleware demo — three independently-schemad **mock** government systems (`resident_id` / `beneficiary_code` & `application_no` / `grievance_ref`, deliberately
+unrelated identifier vocabularies, clearly labelled "(demo)" everywhere they surface), a confidence-scored `IdentityResolutionService` that links records across them (auto-links ≥0.90, queues an `IdentityMatchCandidate` for manual
+review between 0.55–0.90, never below), fine-grained per-exchange `InteropConsentGrant`s (distinct from the broad `data_sharing_government` consent purpose), and a `ConnectorRegistration` registry with real health checks. The
+gateway orchestrates the full no-reupload scenario — consent check/request → identity resolution across systems → Department A connector call → a document-specific quality check → the `dept_b_receive_document` write (the
+actual no-reupload moment) → `InteropTransaction` + `UnifiedApplicationEvent` + `AuditService` — all tagged with one `correlation_id`. See `docs/INTEROPERABILITY.md` for the full write-up and demo script.
+
 ## Workflow rules (distinct from routing rules and SLA policies)
 `trigger + conditions → action` (`complaint.created | complaint.status_changed | scheduled`; escalate, auto_close, assign_least_loaded, notify_admins, add_internal_note). A pure matcher, an idempotent executor
 (unique rule×complaint), an event on the complaint, an audit record, admin CRUD (organisation-wide admins only) and a scheduled sweep for age-based rules.
