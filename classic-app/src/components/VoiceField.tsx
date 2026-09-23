@@ -7,7 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { MIN_TOUCH } from '../theme.ts';
 import { useTheme } from '../theme/ThemeContext.tsx';
 import { useI18n } from '../i18n/I18nContext.tsx';
-import { useVoiceInput } from '../hooks/useVoiceInput.ts';
+import { useVoiceInput } from '../hooks/useVoiceInput';
 import { isOnline } from '../offline/SyncContext.tsx';
 
 export function VoiceField({ label, value, onChangeText, placeholder, multiline, maxLength }: { label: string; value: string; onChangeText: (text: string) => void; placeholder?: string; multiline?: boolean; maxLength?: number }) {

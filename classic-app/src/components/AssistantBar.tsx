@@ -10,7 +10,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { radius, shadow, withAlpha } from '../theme.ts';
 import { useTheme } from '../theme/ThemeContext.tsx';
 import { useI18n } from '../i18n/I18nContext.tsx';
-import { useVoiceInput } from '../hooks/useVoiceInput.ts';
+import { useVoiceInput } from '../hooks/useVoiceInput';
 import { isOnline } from '../offline/SyncContext.tsx';
 import { endpoints } from '../api/instance.ts';
 import { ApiError } from '../api/errors.ts';

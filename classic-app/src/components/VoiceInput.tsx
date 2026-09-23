@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Text, View } from 'react-native';
-import { useVoiceInput } from '../hooks/useVoiceInput.ts';
+import { useVoiceInput } from '../hooks/useVoiceInput';
 import { AppButton, Body, Card, Chip, ErrorBanner, Field, InfoBanner, Loading } from './ui.tsx';
 import { endpoints } from '../api/instance.ts';
 import { LANGUAGES } from '../i18n/languages.ts';

@@ -15,7 +15,7 @@ import { useAuth } from '../../src/auth/AuthContext.tsx';
 import { useI18n } from '../../src/i18n/I18nContext.tsx';
 import { useTheme } from '../../src/theme/ThemeContext.tsx';
 import { UI_LANGUAGES, LANGUAGES } from '../../src/i18n/languages.ts';
-import { useVoiceInput } from '../../src/hooks/useVoiceInput.ts';
+import { useVoiceInput } from '../../src/hooks/useVoiceInput';
 import { isOnline } from '../../src/offline/SyncContext.tsx';
 import { endpoints } from '../../src/api/instance.ts';
 import type { AssistantDestination, AssistantRouteResult, CitizenDashboard, DirectoryData, Helpline, NotificationItem } from '../../src/api/types.ts';
