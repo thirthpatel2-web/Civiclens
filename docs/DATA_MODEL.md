@@ -204,6 +204,15 @@ exactly as it would treat a real external department it has no schema control ov
 | `issued_at`, `expires_at` | `timestamptz` | 1-hour TTL (`idp.TOKEN_TTL`) |
 | `revoked_at` | `timestamptz`, nullable | Set by `revoke_token` - checked before expiry, so revocation is immediate even for a token that hasn't expired yet |
 
+### Interop events (not a SQL table)
+
+`app/interop/events/` deliberately has no database table - events live in a Redis stream
+(`civiclens:interop:events`, capped at ~10,000 entries) or, without Redis configured, an in-memory
+list that doesn't survive a process restart. This is intentional: the durable, queryable record of
+what happened is already `InteropTransaction` + `UnifiedApplicationEvent` (both real SQL tables,
+above) + the audit log; the event bus's job is notifying *other* consumers in near-real-time, not
+being a second system of record. See `docs/INTEROPERABILITY.md`'s "Event-driven pub/sub" section.
+
 ## Why no `CHECK` constraints on the string enum-ish columns
 
 `status`, `health_state`, `system`, `identifier_type` and similar columns are plain

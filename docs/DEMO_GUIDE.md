@@ -213,3 +213,50 @@ from disabling the connector in the registry) and every gateway call touching De
 failing with `AUTHENTICATION_FAILURE` -
 `tests/integration/test_connectors.py::test_runtime_refuses_a_connector_whose_federation_client_is_disabled`
 exercises exactly this.
+
+## Event bus: watching a real exchange publish, and a subscriber react
+
+Every successful exchange (steps 1-5 above) publishes a real sequence of events to a Redis stream
+(`civiclens:interop:events`) - `IdentityResolved`, `DocumentRequested`, `DocumentVerified`,
+`DocumentTransferred`, `ExchangeCompleted`. Read them back directly, independent of the app:
+
+```bash
+python -c "
+import redis, json
+from app.core.config import Settings
+r = redis.from_url(Settings.load().redis_url)
+for eid, fields in r.xrange('civiclens:interop:events', count=20):
+    e = json.loads(fields[b'data'])
+    print(e['event_type'], e['source_system'], '->', e['destination'], e['correlation_id'][:8])
+"
+```
+
+`NotificationSubscriber` is a real, separate consumer of this same stream - it never talks to the
+gateway directly. Drain it and it turns `ExchangeCompleted` events into real in-app notifications
+for the citizens named in their payload:
+
+```bash
+python -c "
+import redis
+from app.container import build_container
+from app.core.config import Settings
+from app.interop.events.bus import RedisInteropEventBus
+from app.interop.events.subscribers import NotificationSubscriber
+from app.services.notification_service import NotificationService
+
+settings = Settings.load()
+c = build_container(settings)
+bus = RedisInteropEventBus(redis.from_url(settings.redis_url))
+subscriber = NotificationSubscriber(c.uow_factory, NotificationService())
+handled = subscriber.drain(bus, count=1000)
+print('notifications created:', handled)
+"
+```
+
+`tests/integration/test_interop_event_subscriber_e2e.py` runs exactly this - a real exchange, a
+real Redis stream, a real notification row created by a subscriber that has no other coupling to
+the gateway than the event it read - on every test run. (The snippet above drains the *entire*
+stream history, not just your latest exchange; on a dev database that's accumulated a lot of
+throwaway test citizens, that can hit a foreign-key error for a citizen who no longer exists - the
+test file passes `start_id` to scope a drain to only the events one specific run just published,
+which is the pattern a real background consumer would use too.)

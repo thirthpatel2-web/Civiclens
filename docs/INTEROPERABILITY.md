@@ -205,6 +205,38 @@ connector this client represents), `scope`, `issued_at`/`expires_at`. See
 `tests/integration/test_federation_idp.py` for token issuance/validation/expiry/revocation/
 disabled-client coverage, and `docs/DEMO_GUIDE.md` for a live curl walkthrough of the full grant.
 
+## Event-driven pub/sub
+
+`app/interop/events/` — independent from `app.realtime.events.DomainEvent` (the complaint/
+notification WebSocket-delivery domain; see that class's own docstring for why it wasn't reused).
+Redis Streams (`XADD`/`XRANGE`/`XREAD`) when Redis is configured — durable and replayable, unlike
+plain pub/sub, which drops anything published while nobody happens to be listening; an in-memory
+bus otherwise, so the platform still runs, honestly, without Redis.
+
+```
+Dept A -> CivicLens Interop Event Bus -> Dept B / Workflow Engine / Notification Service / Unified Tracker / Audit
+```
+
+All 21 event types from the completion spec are defined (`INTEROP_EVENT_TYPES`) and validated —
+constructing an `InteropEvent` with an unrecognized type raises immediately, it can't reach the
+stream. `InteropGatewayService` publishes real ones at the actual decision points in the live
+no-reupload flow: `IdentityResolved`, `IdentityReviewRequired`, `ConsentRequested`,
+`ConsentGranted`, `ConsentDenied`, `ConsentRevoked`, `DocumentRequested`, `DocumentVerified`,
+`DocumentTransferred`, `ExchangeCompleted`, `ExchangeFailed`. The remaining ten
+(`Application*`, `WorkflowStarted`/`WorkflowStepCompleted`, `ConnectorFailure`/`ConnectorRecovered`,
+`SLAWarning`/`SLABreached`) are real, validated types with no publish call wired to them yet — named
+honestly, not silently missing (see `docs/REQUIREMENT_TRACEABILITY.md`).
+
+**A subscriber actually reacting**, not just a publish log: `NotificationSubscriber`
+(`app/interop/events/subscribers.py`) is entirely decoupled from the gateway — it only knows the
+event bus — and consumes `ExchangeCompleted` to create a real, queryable in-app notification for
+the citizen (reusing the existing `NotificationService`, not a parallel path), deduped by
+correlation id so replaying the same event never double-notifies. Verified end to end against a
+**real** exchange, **real** Postgres, and a **real** Redis stream — not a mocked bus —
+by `tests/integration/test_interop_event_subscriber_e2e.py`, and confirmed live against the
+running server: a genuine HTTP exchange's `ExchangeCompleted` event was read back directly from
+Redis with `redis-cli`-equivalent tooling outside the app process entirely.
+
 ## Connector registry
 
 `app/interop/connector_registry.py` + `ConnectorRegistration` (`interop_connector_registry`).

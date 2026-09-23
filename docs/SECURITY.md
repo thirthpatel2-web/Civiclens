@@ -85,6 +85,16 @@ opaque, hashed at rest (never a JWT the server would need to verify a signature 
 `/api/v1/federation/*` and its own docs are labelled **DEMO / MOCK IDENTITY PROVIDER**; see
 `docs/INTEROPERABILITY.md`'s "Federated identity / SSO" section.
 
+## Event bus
+
+Interop events (`app/interop/events/`) carry no secrets or credentials - `InteropEvent.payload` is
+built explicitly per event type (see `InteropGatewayService`'s publish calls), never a raw dump of
+a database row, so the same data-minimization discipline that governs what reaches Department B
+also governs what reaches the event stream. `NotificationSubscriber`, the one real subscriber
+wired up, only ever reads from the bus - it holds no gateway or connector credentials, and a
+citizen's notification content is derived from the event payload, never from a second lookup of
+data the citizen didn't already authorize being read.
+
 ## What's mock, so nothing here is a real exposure today
 
 The three government systems this platform connects to are demo data (see

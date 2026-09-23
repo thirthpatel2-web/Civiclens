@@ -358,6 +358,9 @@ def build_container(settings: Settings) -> AppContainer:
         container.limiters = {n: ResilientLimiter(RedisFixedWindowLimiter(redis_client, n, lim, 60), container.limiters[n]) for n, lim in (("expensive", 30), ("upload", 20))}  # type: ignore[misc]
         container.login_throttle = ResilientThrottle(RedisFailureThrottle(redis_client, "login"), container.login_throttle)  # type: ignore[assignment]
         container.mfa_throttle = ResilientThrottle(RedisFailureThrottle(redis_client, "mfa"), container.mfa_throttle)  # type: ignore[assignment]
+        from app.interop.events.bus import RedisInteropEventBus
+
+        container.interop_gateway.bus = RedisInteropEventBus(redis_client)
     _attach_documents(container, sf, embedder, settings, SqlChunkStore)
     return container
 

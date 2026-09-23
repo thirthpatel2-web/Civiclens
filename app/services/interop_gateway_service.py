@@ -53,6 +53,8 @@ from app.interop import connector_registry, mock_systems
 from app.interop.canonical.v1.models import Document as CanonicalDocument
 from app.interop.canonical.v1.transform import canonical_document_to_dept_b_fields, dept_a_document_to_canonical
 from app.interop.connectors import runtime as connector_runtime
+from app.interop.events.bus import InMemoryInteropEventBus, InteropEventBus
+from app.interop.events.types import InteropEvent
 from app.interop.identity_resolution import IdentityResolutionService
 from app.services.audit_service import AuditService
 from app.services.uow import UowFactory
@@ -92,8 +94,18 @@ def _document_quality(document: CanonicalDocument) -> tuple[float, list[str]]:
 
 
 class InteropGatewayService:
-    def __init__(self, uow_factory: UowFactory, clock: Callable[[], datetime] | None = None) -> None:
+    def __init__(self, uow_factory: UowFactory, clock: Callable[[], datetime] | None = None, bus: InteropEventBus | None = None) -> None:
         self._uow, self._clock = uow_factory, clock or (lambda: datetime.now(UTC))
+        self.bus: InteropEventBus = bus or InMemoryInteropEventBus()
+
+    def _publish(self, event: InteropEvent) -> None:
+        """A broken event bus must never fail the operation it's describing - the same "publish
+        after commit, and never let a side effect undo the primary result" discipline
+        ComplaintEffects already uses for the complaint domain."""
+        try:
+            self.bus.publish(event)
+        except Exception:  # noqa: BLE001
+            pass
 
     # -----------------------------------------------------------------------------------------
     # The demo scenario
@@ -126,6 +138,7 @@ class InteropGatewayService:
                 # the same still-open transaction, and it would wrongly create a second master.
                 if b_result.candidate_id:
                     uow.commit()
+                    self._publish(InteropEvent(event_type="IdentityReviewRequired", source_system="dept_b", entity_id=b_result.candidate_id, correlation_id=correlation_id, payload={"side": "dept_b", "confidence": b_result.confidence}))
                     return {"status": "identity_ambiguous", "side": "dept_b", "candidate_id": b_result.candidate_id, "confidence": b_result.confidence, "explanation": b_result.matched_on}
                 master_id = b_result.master_id
 
@@ -137,10 +150,12 @@ class InteropGatewayService:
                 a_result = resolver.resolve_person(s, system="dept_a", identifier_type="resident_id", identifier_value=resident.resident_id, name=resident.full_name, mobile=resident.mobile)
                 if a_result.candidate_id:
                     uow.commit()
+                    self._publish(InteropEvent(event_type="IdentityReviewRequired", source_system="dept_a", entity_id=a_result.candidate_id, correlation_id=correlation_id, payload={"side": "dept_a", "confidence": a_result.confidence}))
                     return {"status": "identity_ambiguous", "side": "dept_a", "candidate_id": a_result.candidate_id, "confidence": a_result.confidence, "explanation": a_result.matched_on}
                 if a_result.master_id != master_id:
                     uow.commit()
                     return {"status": "identity_conflict", "detail": "Department A and Department B resolved to two different master identities. Needs manual review."}
+                self._publish(InteropEvent(event_type="IdentityResolved", source_system="civiclens", entity_id=master_id, correlation_id=correlation_id, payload={"dept_a_resident_id": resident.resident_id, "dept_b_beneficiary_code": beneficiary.beneficiary_code}))
 
                 consent = self._find_consent(s, master_id=master_id, data_category=document_type, status="granted")
                 if consent is None or (consent.expires_at is not None and consent.expires_at <= self._clock()):
@@ -156,10 +171,13 @@ class InteropGatewayService:
                         s.add(pending)
                         AuditService(uow.audit, self._clock).record("interop.consent_requested", actor_id=ctx.user_id, resource_type="interop_consent", resource_id=pending.consent_id, metadata={"master_id": master_id, "application_no": application_no, "document_type": document_type})
                     uow.commit()
+                    self._publish(InteropEvent(event_type="ConsentRequested", source_system="dept_b", destination="dept_a", entity_id=pending.consent_id, correlation_id=correlation_id, payload={"master_id": master_id, "application_no": application_no, "data_category": document_type}))
                     return {"status": "consent_required", "consent_id": pending.consent_id, "master_id": master_id}
 
-                result = self._execute_exchange(uow, ctx, master_id=master_id, consent=consent, application_no=application_no, document_type=document_type, resident=resident, correlation_id=correlation_id)
+                result, events = self._execute_exchange(uow, ctx, master_id=master_id, consent=consent, application_no=application_no, document_type=document_type, resident=resident, correlation_id=correlation_id)
                 uow.commit()
+                for event in events:
+                    self._publish(event)
                 return result
         finally:
             correlation_id_var.reset(token)
@@ -172,8 +190,11 @@ class InteropGatewayService:
             candidates = result.data if result.ok else []
         return candidates[0] if candidates else None
 
-    def _execute_exchange(self, uow, ctx: AuthContext, *, master_id: str, consent: InteropConsentGrant, application_no: str, document_type: str, resident, correlation_id: str) -> dict:
+    def _execute_exchange(self, uow, ctx: AuthContext, *, master_id: str, consent: InteropConsentGrant, application_no: str, document_type: str, resident, correlation_id: str) -> tuple[dict, list[InteropEvent]]:
+        """Returns (result, events) - events are published by the caller AFTER uow.commit(), never
+        before, so nothing is ever published for a transaction that then rolls back."""
         s = uow.session
+        events: list[InteropEvent] = []
         unified = self._get_or_create_unified_application(s, master_id=master_id, application_no=application_no)
         self._add_event(s, unified.application_id, step="identity_resolved_cross_system", source_system="civiclens", status="success", correlation_id=correlation_id, detail={"master_id": master_id, "dept_a_resident_id": resident.resident_id})
 
@@ -186,9 +207,11 @@ class InteropGatewayService:
             txn = self._record_transaction(s, correlation_id=correlation_id, source="dept_a", target="dept_b", master_id=master_id, consent_id=consent.consent_id, status="failed", error_code="data_field_not_consented", error_message=f"Fields not authorized by this consent: {', '.join(denied_fields)}.", fields=[], duration_ms=0.0, requested_fields=list(REQUIRED_DOCUMENT_FIELDS), approved_fields=approved_fields, denied_fields=denied_fields)
             self._add_event(s, unified.application_id, step="field_level_consent_check_failed", source_system="civiclens", status="failed", correlation_id=correlation_id, detail={"denied_fields": denied_fields})
             AuditService(uow.audit, self._clock).record("interop.document_exchange_failed", actor_id=ctx.user_id, resource_type="interop_transaction", resource_id=txn.transaction_id, metadata={"reason": "data_field_not_consented", "denied_fields": denied_fields, "application_no": application_no})
-            return {"status": "failed", "reason": "data_field_not_consented", "denied_fields": denied_fields, "transaction_id": txn.transaction_id, "correlation_id": correlation_id}
+            events.append(InteropEvent(event_type="ExchangeFailed", source_system="dept_a", destination="dept_b", entity_id=txn.transaction_id, correlation_id=correlation_id, payload={"reason": "data_field_not_consented", "denied_fields": denied_fields}))
+            return {"status": "failed", "reason": "data_field_not_consented", "denied_fields": denied_fields, "transaction_id": txn.transaction_id, "correlation_id": correlation_id}, events
 
         # Gateway -> Connector Runtime -> GovernmentConnector - never a direct mock-system call.
+        events.append(InteropEvent(event_type="DocumentRequested", source_system="civiclens", destination="dept_a", entity_id=resident.resident_id, correlation_id=correlation_id, payload={"document_type": document_type}))
         fetch_result = connector_runtime.call(s, "dept_a", "fetch_document", resident.resident_id, document_type)
         duration_ms = fetch_result.meta.get("duration_ms", 0.0)
 
@@ -196,7 +219,8 @@ class InteropGatewayService:
             txn = self._record_transaction(s, correlation_id=correlation_id, source="dept_a", target="dept_b", master_id=master_id, consent_id=consent.consent_id, status="failed", error_code="document_not_found", error_message=f"No {document_type} on file for this resident.", fields=[], duration_ms=duration_ms, requested_fields=list(REQUIRED_DOCUMENT_FIELDS), approved_fields=approved_fields, denied_fields=[])
             self._add_event(s, unified.application_id, step="document_fetch_failed", source_system="dept_a", status="failed", correlation_id=correlation_id, detail={"reason": "document_not_found"})
             AuditService(uow.audit, self._clock).record("interop.document_exchange_failed", actor_id=ctx.user_id, resource_type="interop_transaction", resource_id=txn.transaction_id, metadata={"reason": "document_not_found", "application_no": application_no})
-            return {"status": "failed", "reason": "document_not_found", "transaction_id": txn.transaction_id, "correlation_id": correlation_id}
+            events.append(InteropEvent(event_type="ExchangeFailed", source_system="dept_a", destination="dept_b", entity_id=txn.transaction_id, correlation_id=correlation_id, payload={"reason": "document_not_found"}))
+            return {"status": "failed", "reason": "document_not_found", "transaction_id": txn.transaction_id, "correlation_id": correlation_id}, events
 
         # External (Dept A's own row) -> canonical - the quality check and the destination
         # transform both operate on the canonical shape, never on Dept A's native row directly.
@@ -206,9 +230,11 @@ class InteropGatewayService:
             txn = self._record_transaction(s, correlation_id=correlation_id, source="dept_a", target="dept_b", master_id=master_id, consent_id=consent.consent_id, status="failed", error_code="data_quality_failed", error_message="; ".join(quality_issues), fields=[], duration_ms=duration_ms, requested_fields=list(REQUIRED_DOCUMENT_FIELDS), approved_fields=approved_fields, denied_fields=[])
             self._add_event(s, unified.application_id, step="document_quality_check_failed", source_system="dept_a", status="failed", correlation_id=correlation_id, detail={"score": quality_score, "issues": quality_issues})
             AuditService(uow.audit, self._clock).record("interop.document_exchange_failed", actor_id=ctx.user_id, resource_type="interop_transaction", resource_id=txn.transaction_id, metadata={"reason": "data_quality_failed", "issues": quality_issues, "application_no": application_no})
-            return {"status": "failed", "reason": "data_quality_failed", "issues": quality_issues, "transaction_id": txn.transaction_id, "correlation_id": correlation_id}
+            events.append(InteropEvent(event_type="ExchangeFailed", source_system="dept_a", destination="dept_b", entity_id=txn.transaction_id, correlation_id=correlation_id, payload={"reason": "data_quality_failed", "issues": quality_issues}))
+            return {"status": "failed", "reason": "data_quality_failed", "issues": quality_issues, "transaction_id": txn.transaction_id, "correlation_id": correlation_id}, events
 
         self._add_event(s, unified.application_id, step="document_fetched_from_dept_a", source_system="dept_a", status="success", correlation_id=correlation_id, detail={"reference_no": canonical_doc.reference, "quality_score": quality_score})
+        events.append(InteropEvent(event_type="DocumentVerified", source_system="dept_a", entity_id=canonical_doc.reference, correlation_id=correlation_id, payload={"quality_score": quality_score}))
 
         # Canonical -> external (Dept B's own field names): data minimization in practice - Dept B
         # never receives the resident_id or any field outside what canonical_document_to_dept_b_fields declares.
@@ -223,8 +249,13 @@ class InteropGatewayService:
 
         txn = self._record_transaction(s, correlation_id=correlation_id, source="dept_a", target="dept_b", master_id=master_id, consent_id=consent.consent_id, status="success", error_code=None, error_message=None, fields=list(dept_b_fields.keys()), duration_ms=duration_ms, requested_fields=list(REQUIRED_DOCUMENT_FIELDS), approved_fields=approved_fields, denied_fields=[])
         AuditService(uow.audit, self._clock).record("interop.document_exchange_completed", actor_id=ctx.user_id, resource_type="unified_application", resource_id=unified.application_id, metadata={"application_no": application_no, "master_id": master_id, "document_reference": canonical_doc.reference, "quality_score": quality_score, "transaction_id": txn.transaction_id})
+        events.append(InteropEvent(event_type="DocumentTransferred", source_system="dept_a", destination="dept_b", entity_id=application_no, correlation_id=correlation_id, payload={"document_reference": canonical_doc.reference}))
+        events.append(InteropEvent(
+            event_type="ExchangeCompleted", source_system="dept_a", destination="dept_b", entity_id=txn.transaction_id, correlation_id=correlation_id,
+            payload={"citizen_user_id": consent.citizen_user_id, "application_no": application_no, "document_type": document_type, "document_reference": canonical_doc.reference, "quality_score": quality_score},
+        ))
 
-        return {"status": "success", "transaction_id": txn.transaction_id, "application_id": unified.application_id, "document_reference": canonical_doc.reference, "quality_score": quality_score, "correlation_id": correlation_id}
+        return {"status": "success", "transaction_id": txn.transaction_id, "application_id": unified.application_id, "document_reference": canonical_doc.reference, "quality_score": quality_score, "correlation_id": correlation_id}, events
 
     def _get_or_create_unified_application(self, session, *, master_id: str, application_no: str) -> UnifiedApplication:
         existing = session.execute(select(UnifiedApplication).where(UnifiedApplication.external_reference == application_no, UnifiedApplication.primary_system == "dept_b")).scalars().first()
@@ -288,6 +319,7 @@ class InteropGatewayService:
             s.add(grant)
             AuditService(uow.audit, self._clock).record("interop.consent_granted", actor_id=ctx.user_id, resource_type="interop_consent", resource_id=consent_id, metadata={"master_id": grant.master_id, "purpose": grant.purpose, "self_service": ctx.user_id == grant.citizen_user_id})
             uow.commit()
+            self._publish(InteropEvent(event_type="ConsentGranted", source_system=grant.requesting_system, destination=grant.providing_system, entity_id=consent_id, correlation_id=str(uuid.uuid4()), payload={"master_id": grant.master_id}))
             return {"status": "granted", "consent_id": consent_id, "expires_at": grant.expires_at.isoformat()}
 
     def deny_consent(self, ctx: AuthContext, *, consent_id: str) -> dict:
@@ -303,6 +335,7 @@ class InteropGatewayService:
             s.add(grant)
             AuditService(uow.audit, self._clock).record("interop.consent_denied", actor_id=ctx.user_id, resource_type="interop_consent", resource_id=consent_id, metadata={"master_id": grant.master_id, "self_service": ctx.user_id == grant.citizen_user_id})
             uow.commit()
+            self._publish(InteropEvent(event_type="ConsentDenied", source_system=grant.requesting_system, destination=grant.providing_system, entity_id=consent_id, correlation_id=str(uuid.uuid4()), payload={"master_id": grant.master_id}))
             return {"status": "denied", "consent_id": consent_id}
 
     def revoke_consent(self, ctx: AuthContext, *, consent_id: str, reason: str) -> dict:
@@ -318,6 +351,7 @@ class InteropGatewayService:
             s.add(grant)
             AuditService(uow.audit, self._clock).record("interop.consent_revoked", actor_id=ctx.user_id, resource_type="interop_consent", resource_id=consent_id, metadata={"master_id": grant.master_id, "reason": grant.revocation_reason, "self_service": ctx.user_id == grant.citizen_user_id})
             uow.commit()
+            self._publish(InteropEvent(event_type="ConsentRevoked", source_system=grant.requesting_system, destination=grant.providing_system, entity_id=consent_id, correlation_id=str(uuid.uuid4()), payload={"master_id": grant.master_id, "reason": grant.revocation_reason}))
             return {"status": "revoked", "consent_id": consent_id}
 
     def list_consents(self, ctx: AuthContext, *, status: str | None = None) -> list[dict]:
