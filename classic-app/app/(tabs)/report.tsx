@@ -21,7 +21,7 @@ import { useDeviceLocation } from '../../src/hooks/useDeviceLocation.ts';
 import { pickPhotos, takePhoto } from '../../src/hooks/usePhotos.ts';
 import { endpoints } from '../../src/api/instance.ts';
 import type { ClassifyPreview, RtiApplication, RtiCategory } from '../../src/api/types.ts';
-import { fontFamily, radius } from '../../src/theme.ts';
+import { fontFamily, radius, spacing } from '../../src/theme.ts';
 import { useTheme } from '../../src/theme/ThemeContext.tsx';
 import * as Crypto from 'expo-crypto';
 
@@ -282,6 +282,11 @@ export default function FileRequest() {
         </>
       ) : (
         <>
+          <View style={{ borderRadius: radius.lg, padding: spacing.md, borderWidth: 1, backgroundColor: colors.primaryGlow, borderColor: colors.primary, gap: 4 }}>
+            <Text style={{ fontSize: 13, fontWeight: '800', color: colors.text }}>💡 What is an RTI?</Text>
+            <Body soft>{t('rti.plain.intro')}</Body>
+          </View>
+
           <Card>
             <Field label={t('selectDepartment')} value={publicAuthority} onChangeText={setPublicAuthority} placeholder="e.g. BBMP Roads Department" />
             <Text style={{ color: colors.textSoft, fontSize: 13 }}>Category (optional - loads the records this kind of RTI usually needs)</Text>
@@ -308,6 +313,7 @@ export default function FileRequest() {
           {previewing ? <Body soft>🤖 Building your statutory questions…</Body> : previewError ? <ErrorBanner message={previewError} /> : preview.length > 0 ? (
             <Card>
               <Body soft>Statutory questions this RTI will ask ({preview.length})</Body>
+              <Body soft style={{ fontSize: 11.5, fontStyle: 'italic' }}>{t('rti.plain.questions_why')}</Body>
               {preview.map((q, i) => <Body key={i}>{i + 1}. {q}</Body>)}
             </Card>
           ) : null}
