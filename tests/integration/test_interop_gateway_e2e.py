@@ -236,6 +236,27 @@ class DocumentExchangeEndToEndTests(unittest.TestCase):
                     s.execute(delete(MasterEntity).where(MasterEntity.master_id == master_id))
                 uow.commit()
 
+    def test_auditor_can_read_but_never_manage_the_gateway(self) -> None:
+        """The dedicated INTEGRATION_ADMIN/AUDITOR roles (app.core.authorization) against the real
+        permission checks in InteropGatewayService - not just the pure authorization-matrix unit
+        tests, but the actual service methods an AUDITOR would call in production."""
+        integration_admin = AuthContext("ia-live", Role.INTEGRATION_ADMIN, None, mfa_verified=True)
+        auditor = AuthContext("aud-live", Role.AUDITOR, None, mfa_verified=True)
+
+        # Both can read.
+        self.gateway.list_connectors(integration_admin)
+        self.gateway.list_connectors(auditor)
+        self.gateway.list_consents(auditor)
+        self.gateway.list_identity_candidates(auditor)
+
+        # Only INTEGRATION_ADMIN can act - an AUDITOR is read-only by construction.
+        result = self.gateway.connector_health(integration_admin, connector_id="dept_a")
+        self.assertEqual(result["connector_id"], "dept_a")
+        with self.assertRaises(PermissionDenied):
+            self.gateway.connector_health(auditor, connector_id="dept_a")
+        with self.assertRaises(PermissionDenied):
+            self.gateway.set_connector_enabled(auditor, connector_id="dept_a", enabled=True)
+
 
 if __name__ == "__main__":
     unittest.main()

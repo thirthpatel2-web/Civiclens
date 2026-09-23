@@ -12,6 +12,7 @@ from app.core.authorization import (
     AuthContext,
     Permission,
     Role,
+    is_privileged_role,
     require,
     require_mfa_for_privileged,
 )
@@ -252,7 +253,7 @@ class AdminService:
             target = uow.users.get_by_id(user_id)
             if target is None or (ctx.department_id is not None and target.department_id != ctx.department_id):
                 raise NotFound("User not found.")
-            if target.role in (Role.ADMIN, Role.SUPER_ADMIN) and ctx.role is not Role.SUPER_ADMIN:
+            if is_privileged_role(target.role) and ctx.role is not Role.SUPER_ADMIN:
                 raise PermissionDenied("Only a super-admin can reset an administrator's password.")
             token = self._auth(uow).issue_reset_for_user(user_id)
             self._audit(uow, ctx, "admin.password_reset_issued", "user", user_id)

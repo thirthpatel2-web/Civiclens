@@ -31,7 +31,7 @@ from app.schemas.api import (
 )
 
 router = APIRouter(prefix="/auth", tags=["auth"])
-PRIVILEGED = (Role.ADMIN, Role.SUPER_ADMIN)
+PRIVILEGED = (Role.ADMIN, Role.SUPER_ADMIN, Role.INTEGRATION_ADMIN, Role.AUDITOR)
 
 
 def _set_cookie(resp: Response, token: str, c: AppContainer) -> None:

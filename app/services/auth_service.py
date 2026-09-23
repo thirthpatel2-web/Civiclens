@@ -18,7 +18,7 @@ from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
 from typing import Protocol
 
-from app.core.authorization import AuthContext, Role, can_assign_role
+from app.core.authorization import AuthContext, Role, can_assign_role, is_privileged_role
 from app.core.exceptions import (
     AuthenticationFailed,
     Conflict,
@@ -218,7 +218,7 @@ class AuthService:
         user = self._users.get_by_id(user_id)
         if user is None:
             raise ValidationFailed("Unknown user.")
-        if user.role in (Role.ADMIN, Role.SUPER_ADMIN) and actor.role is not Role.SUPER_ADMIN:
+        if is_privileged_role(user.role) and actor.role is not Role.SUPER_ADMIN:
             raise PermissionDenied("Only a super-admin may change a privileged account.")
         if role is Role.OFFICER and not department_id:
             raise ValidationFailed("Officers must belong to a department.", details={"field": "department_id"})
@@ -232,7 +232,7 @@ class AuthService:
         user = self._users.get_by_id(user_id)
         if user is None or user_id == actor.user_id:
             raise ValidationFailed("Cannot change this account.")
-        if user.role in (Role.ADMIN, Role.SUPER_ADMIN) and actor.role is not Role.SUPER_ADMIN:
+        if is_privileged_role(user.role) and actor.role is not Role.SUPER_ADMIN:
             raise PermissionDenied("Only a super-admin may change a privileged account.")
         updated = replace(user, is_active=active)
         self._users.update(updated)

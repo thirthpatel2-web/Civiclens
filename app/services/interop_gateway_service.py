@@ -86,7 +86,7 @@ class InteropGatewayService:
     # -----------------------------------------------------------------------------------------
 
     def request_document_exchange(self, ctx: AuthContext, *, application_no: str, document_type: str = "residence_certificate") -> dict:
-        require(ctx, Permission.ADMIN_INTEGRATIONS)
+        require(ctx, Permission.INTEROP_MANAGE)
         correlation_id = str(uuid.uuid4())
         token = correlation_id_var.set(correlation_id)
         try:
@@ -228,7 +228,7 @@ class InteropGatewayService:
     # -----------------------------------------------------------------------------------------
 
     def grant_consent(self, ctx: AuthContext, *, consent_id: str) -> dict:
-        require(ctx, Permission.ADMIN_INTEGRATIONS)
+        require(ctx, Permission.INTEROP_MANAGE)
         with self._uow() as uow:
             s = uow.session
             grant = s.get(InteropConsentGrant, consent_id)
@@ -243,7 +243,7 @@ class InteropGatewayService:
             return {"status": "granted", "consent_id": consent_id, "expires_at": grant.expires_at.isoformat()}
 
     def deny_consent(self, ctx: AuthContext, *, consent_id: str) -> dict:
-        require(ctx, Permission.ADMIN_INTEGRATIONS)
+        require(ctx, Permission.INTEROP_MANAGE)
         with self._uow() as uow:
             s = uow.session
             grant = s.get(InteropConsentGrant, consent_id)
@@ -258,7 +258,7 @@ class InteropGatewayService:
             return {"status": "denied", "consent_id": consent_id}
 
     def revoke_consent(self, ctx: AuthContext, *, consent_id: str, reason: str) -> dict:
-        require(ctx, Permission.ADMIN_INTEGRATIONS)
+        require(ctx, Permission.INTEROP_MANAGE)
         with self._uow() as uow:
             s = uow.session
             grant = s.get(InteropConsentGrant, consent_id)
@@ -273,7 +273,7 @@ class InteropGatewayService:
             return {"status": "revoked", "consent_id": consent_id}
 
     def list_consents(self, ctx: AuthContext, *, status: str | None = None) -> list[dict]:
-        require(ctx, Permission.ADMIN_INTEGRATIONS)
+        require(ctx, Permission.INTEROP_READ)
         with self._uow() as uow:
             s = uow.session
             q = select(InteropConsentGrant).order_by(InteropConsentGrant.created_at.desc())
@@ -286,7 +286,7 @@ class InteropGatewayService:
     # -----------------------------------------------------------------------------------------
 
     def list_identity_candidates(self, ctx: AuthContext, *, status: str = "pending") -> list[dict]:
-        require(ctx, Permission.ADMIN_INTEGRATIONS)
+        require(ctx, Permission.INTEROP_READ)
         with self._uow() as uow:
             s = uow.session
             return [_row(r) for r in s.execute(select(IdentityMatchCandidate).where(IdentityMatchCandidate.status == status).order_by(IdentityMatchCandidate.created_at.desc())).scalars().all()]
@@ -297,7 +297,7 @@ class InteropGatewayService:
         full confidence, attributed to the officer, not the algorithm. Rejecting creates a fresh
         master entity for that identifier instead of leaving it unlinked, since a reject is itself
         a positive claim: "this is a different person"."""
-        require(ctx, Permission.ADMIN_INTEGRATIONS)
+        require(ctx, Permission.INTEROP_MANAGE)
         with self._uow() as uow:
             s = uow.session
             cand = s.get(IdentityMatchCandidate, candidate_id)
@@ -326,7 +326,7 @@ class InteropGatewayService:
     # -----------------------------------------------------------------------------------------
 
     def get_timeline(self, ctx: AuthContext, *, application_no: str) -> dict:
-        require(ctx, Permission.ADMIN_INTEGRATIONS)
+        require(ctx, Permission.INTEROP_READ)
         with self._uow() as uow:
             s = uow.session
             unified = s.execute(select(UnifiedApplication).where(UnifiedApplication.external_reference == application_no, UnifiedApplication.primary_system == "dept_b")).scalars().first()
@@ -336,25 +336,25 @@ class InteropGatewayService:
             return {"application": _row(unified), "events": [_row(e) for e in events]}
 
     def list_transactions(self, ctx: AuthContext, *, limit: int = 50) -> list[dict]:
-        require(ctx, Permission.ADMIN_INTEGRATIONS)
+        require(ctx, Permission.INTEROP_READ)
         with self._uow() as uow:
             s = uow.session
             return [_row(r) for r in s.execute(select(InteropTransaction).order_by(InteropTransaction.created_at.desc()).limit(limit)).scalars().all()]
 
     def list_connectors(self, ctx: AuthContext) -> list[dict]:
-        require(ctx, Permission.ADMIN_INTEGRATIONS)
+        require(ctx, Permission.INTEROP_READ)
         with self._uow() as uow:
             return [_row(r) for r in connector_registry.list_connectors(uow.session)]
 
     def connector_health(self, ctx: AuthContext, *, connector_id: str) -> dict:
-        require(ctx, Permission.ADMIN_INTEGRATIONS)
+        require(ctx, Permission.INTEROP_MANAGE)
         with self._uow() as uow:
             result = connector_registry.health_check(uow.session, connector_id)
             uow.commit()
             return result
 
     def set_connector_enabled(self, ctx: AuthContext, *, connector_id: str, enabled: bool) -> dict:
-        require(ctx, Permission.ADMIN_INTEGRATIONS)
+        require(ctx, Permission.INTEROP_MANAGE)
         with self._uow() as uow:
             row = connector_registry.set_enabled(uow.session, connector_id, enabled)
             if row is None:

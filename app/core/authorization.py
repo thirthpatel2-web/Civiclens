@@ -17,6 +17,8 @@ class Role(StrEnum):
     OFFICER = "officer"
     ADMIN = "admin"
     SUPER_ADMIN = "super_admin"
+    INTEGRATION_ADMIN = "integration_admin"  # manages the interoperability platform only - not users/departments/routing rules
+    AUDITOR = "auditor"  # read-only across audit trail, interop transactions/timeline, analytics - never a write permission
 
 
 class Permission(StrEnum):
@@ -53,6 +55,11 @@ class Permission(StrEnum):
     ADMIN_MONITORING = "admin.monitoring"
     ANALYTICS_VIEW = "analytics.view"
     COMPLAINT_READ_ALL = "complaint.read_all"
+    # interoperability platform - distinct from ADMIN_INTEGRATIONS (which also gates the older
+    # government-submission/integration-exception surfaces): a citizen/officer never holds these,
+    # and an AUDITOR holds INTEROP_READ without INTEROP_MANAGE
+    INTEROP_MANAGE = "interop.manage"
+    INTEROP_READ = "interop.read"
     # super-admin only
     ROLE_ASSIGN_PRIVILEGED = "role.assign_privileged"
 
@@ -81,18 +88,38 @@ _ADMIN = frozenset(
         P.ADMIN_MONITORING, P.ANALYTICS_VIEW, P.COMPLAINT_READ_ALL, P.COMPLAINT_READ_DEPARTMENT,
         P.COMPLAINT_ASSIGN, P.SLA_VIEW, P.DUPLICATE_REVIEW, P.INVESTIGATION_RUN,
         P.DASHBOARD_DEPARTMENT, P.GIS_VIEW, P.ASSISTANT_USE, P.PROFILE_MANAGE,
-        P.NOTIFICATION_READ_OWN,
+        P.NOTIFICATION_READ_OWN, P.INTEROP_MANAGE, P.INTEROP_READ,
     }
 )  # fmt: skip
+_INTEGRATION_ADMIN = frozenset(
+    {
+        P.INTEROP_MANAGE, P.INTEROP_READ, P.ADMIN_INTEGRATIONS, P.ADMIN_MONITORING,
+        P.GIS_VIEW, P.ASSISTANT_USE, P.PROFILE_MANAGE, P.NOTIFICATION_READ_OWN,
+    }
+)  # fmt: skip - scoped to the interop platform, not admin.users/departments/routing_rules/workflow_rules/audit/config
+_AUDITOR = frozenset(
+    {
+        P.INTEROP_READ, P.ADMIN_AUDIT, P.ANALYTICS_VIEW,
+        P.ASSISTANT_USE, P.PROFILE_MANAGE, P.NOTIFICATION_READ_OWN,
+    }
+)  # fmt: skip - read-only: no INTEROP_MANAGE, no ADMIN_USERS/DEPARTMENTS/*_RULES/CONFIG
 
 ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
     Role.CITIZEN: _CITIZEN,
     Role.OFFICER: _OFFICER,
     Role.ADMIN: _ADMIN,
     Role.SUPER_ADMIN: frozenset(Permission),
+    Role.INTEGRATION_ADMIN: _INTEGRATION_ADMIN,
+    Role.AUDITOR: _AUDITOR,
 }
 
-_PRIVILEGED = {Role.ADMIN, Role.SUPER_ADMIN}
+_PRIVILEGED = {Role.ADMIN, Role.SUPER_ADMIN, Role.INTEGRATION_ADMIN, Role.AUDITOR}
+
+
+def is_privileged_role(role: Role) -> bool:
+    """True for any role that requires MFA this session and extra care assigning/resetting -
+    the single source of truth ``admin_service.py`` and ``require_mfa_for_privileged`` both use."""
+    return role in _PRIVILEGED
 
 
 @dataclass(frozen=True)
@@ -114,8 +141,8 @@ def require(ctx: AuthContext, permission: Permission) -> None:
 
 
 def require_mfa_for_privileged(ctx: AuthContext) -> None:
-    """Admins and super-admins must have completed a second factor this session."""
-    if ctx.role in _PRIVILEGED and not ctx.mfa_verified:
+    """Privileged roles must have completed a second factor this session."""
+    if is_privileged_role(ctx.role) and not ctx.mfa_verified:
         raise PermissionDenied("Two-factor authentication is required for this role.")
 
 
@@ -155,10 +182,14 @@ def require_complaint_access(
         raise PermissionDenied("You do not have access to this record.")
 
 
+_STAFF_MANAGERS = {Role.ADMIN, Role.SUPER_ADMIN}  # who may assign non-privileged roles at all - narrower
+# than is_privileged_role(): an AUDITOR or INTEGRATION_ADMIN must never manage other users' roles
+
+
 def can_assign_role(actor: AuthContext, *, target_user_id: str, new_role: Role) -> bool:
     """No self-promotion; only super-admins grant privileged roles; admins manage below."""
     if actor.user_id == target_user_id:
         return False
-    if new_role in _PRIVILEGED:
+    if is_privileged_role(new_role):
         return actor.role is Role.SUPER_ADMIN
-    return actor.role in _PRIVILEGED
+    return actor.role in _STAFF_MANAGERS
