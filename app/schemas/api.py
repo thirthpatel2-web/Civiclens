@@ -373,6 +373,21 @@ class SetConnectorEnabledBody(Strict):
     enabled: bool
 
 
+class FederationTokenBody(Strict):
+    """OAuth2 client_credentials grant (RFC 6749 s4.4) against the mock Government IdP - see
+    app/interop/federation/idp.py. grant_type is accepted (and validated) for shape-compatibility
+    with real OAuth2 clients even though this demo IdP only implements the one grant type."""
+
+    grant_type: str = Field(default="client_credentials", max_length=40)
+    client_id: str = Field(max_length=60)
+    client_secret: str = Field(max_length=200)
+    scope: str | None = Field(default=None, max_length=200)  # space-separated, OAuth2-style
+
+
+class FederationTokenActionBody(Strict):
+    token: str = Field(max_length=200)
+
+
 class DuplicateDecisionBody(Strict):
     other_complaint_id: str
     decision: str

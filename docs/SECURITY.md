@@ -72,6 +72,19 @@ uses (`app/services/audit_service.py`), not a separate, unaudited path. Every au
 so a reviewer can reconstruct exactly what happened for one exchange without cross-referencing
 timestamps.
 
+## Federated connector authentication (mock Government IdP)
+
+`GovernmentConnector.authenticate()` is a real OAuth2 client_credentials grant against the mock
+Government IdP (`app/interop/federation/idp.py`), not a `return True` stub — and it's enforced:
+`ConnectorRuntime.resolve()` calls it before handing back a connector, refusing with
+`AUTHENTICATION_FAILURE` if the grant fails. Disabling a connector's federation client (distinct
+from the connector-registry `enabled` flag) genuinely blocks every gateway call that would touch
+it, verified by `test_runtime_refuses_a_connector_whose_federation_client_is_disabled`. Tokens are
+opaque, hashed at rest (never a JWT the server would need to verify a signature on), expire after
+1 hour, and revocation is immediate — checked before expiry, not instead of it. Every response from
+`/api/v1/federation/*` and its own docs are labelled **DEMO / MOCK IDENTITY PROVIDER**; see
+`docs/INTEROPERABILITY.md`'s "Federated identity / SSO" section.
+
 ## What's mock, so nothing here is a real exposure today
 
 The three government systems this platform connects to are demo data (see

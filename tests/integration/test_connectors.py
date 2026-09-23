@@ -20,6 +20,7 @@ from app.db.session import make_engine, make_session_factory
 from app.db.uow import SqlUnitOfWork
 from app.interop import connector_registry, mock_systems
 from app.interop.connectors import runtime as connector_runtime
+from app.interop.federation import idp
 from app.interop.connectors.base import GovernmentConnector
 from app.interop.connectors.mock_dept_a import DeptAConnector
 from app.interop.connectors.mock_dept_b import DeptBConnector
@@ -47,6 +48,7 @@ class ConnectorInterfaceConformanceTests(unittest.TestCase):
         with self.uow_factory() as uow:
             mock_systems.seed_if_empty(uow.session)
             connector_registry.seed_if_empty(uow.session)
+            idp.seed_if_empty(uow.session)
             uow.commit()
 
     def test_all_three_are_real_government_connector_subclasses(self):
@@ -137,6 +139,7 @@ class ConnectorRuntimeTests(unittest.TestCase):
         with self.uow_factory() as uow:
             mock_systems.seed_if_empty(uow.session)
             connector_registry.seed_if_empty(uow.session)
+            idp.seed_if_empty(uow.session)
             uow.commit()
 
     def test_runtime_resolves_a_known_enabled_connector(self):
@@ -164,6 +167,38 @@ class ConnectorRuntimeTests(unittest.TestCase):
             with self.uow_factory() as uow:
                 connector_registry.set_enabled(uow.session, "dept_a", True)
                 uow.commit()
+
+    def test_runtime_refuses_a_connector_whose_federation_client_is_disabled(self):
+        """The federation gate (app.interop.connectors.base.authenticate_via_federation) is
+        genuinely enforced by resolve()/call(), not just present in the interface - disabling
+        dept_a's federation client (its own IdP registration, distinct from the connector
+        registry's enabled flag tested above) must refuse it with AUTHENTICATION_FAILURE."""
+        from app.db.models.interop_platform import FederationClient
+
+        with self.uow_factory() as uow:
+            client = uow.session.get(FederationClient, "dept_a")
+            client.enabled = False
+            uow.session.add(client)
+            uow.commit()
+        try:
+            with self.uow_factory() as uow:
+                with self.assertRaises(connector_runtime.ConnectorUnavailable):
+                    connector_runtime.resolve(uow.session, "dept_a")
+                result = connector_runtime.call(uow.session, "dept_a", "health_check")
+                self.assertFalse(result.ok)
+                self.assertEqual(result.error_code, "AUTHENTICATION_FAILURE")
+        finally:
+            with self.uow_factory() as uow:
+                client = uow.session.get(FederationClient, "dept_a")
+                client.enabled = True
+                uow.session.add(client)
+                uow.commit()
+            # A disabled-then-re-enabled client's OLD tokens stay invalid (issued while disabled
+            # never happened; any issued before disabling are now past this test) - re-enabling
+            # only lets it mint fresh ones, which the next real gateway call will do.
+            with self.uow_factory() as uow:
+                connector = connector_runtime.resolve(uow.session, "dept_a")
+                self.assertIsInstance(connector, DeptAConnector)
 
     def test_a_real_call_updates_the_connector_registrys_live_stats(self):
         with self.uow_factory() as uow:

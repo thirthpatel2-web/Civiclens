@@ -42,6 +42,7 @@ from app.db.models.interop_platform import (
 from app.db.session import make_engine, make_session_factory
 from app.db.uow import SqlUnitOfWork
 from app.interop import connector_registry, mock_systems
+from app.interop.federation import idp
 from app.interop.identity_resolution import IdentityResolutionService
 from app.services.interop_gateway_service import InteropGatewayService
 from tests.support_env import CIT
@@ -117,6 +118,7 @@ class DocumentExchangeEndToEndTests(unittest.TestCase):
             s = uow.session
             mock_systems.seed_if_empty(s)
             connector_registry.seed_if_empty(s)
+            idp.seed_if_empty(s)
             s.add(MockDeptAResident(resident_id=self.resident_id, full_name="Kavita Rane", mobile="9812345678", address="12 Test Lane", city="Pune", state="Maharashtra", created_at=now))
             s.flush()
             s.add(MockDeptADocument(document_id=str(uuid.uuid4()), resident_id=self.resident_id, document_type="residence_certificate", status="verified", reference_no=self.reference_no, issued_on=now, created_at=now))

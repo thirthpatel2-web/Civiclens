@@ -7,7 +7,7 @@ from __future__ import annotations
 from sqlalchemy.orm import Session
 
 from app.interop import mock_systems
-from app.interop.connectors.base import ConnectorResult, GovernmentConnector
+from app.interop.connectors.base import ConnectorResult, GovernmentConnector, authenticate_via_federation
 
 _READ_ONLY = ConnectorResult(ok=False, error_code="CONNECTOR_UNAVAILABLE", error_message="Department A (demo) is a read-only connector - it holds records, it does not accept new ones.")
 
@@ -19,7 +19,7 @@ class DeptAConnector(GovernmentConnector):
         self._s = session
 
     def authenticate(self) -> bool:
-        return True  # demo connector: nothing to authenticate against
+        return authenticate_via_federation(self._s, self.connector_id)
 
     def health_check(self) -> ConnectorResult:
         try:

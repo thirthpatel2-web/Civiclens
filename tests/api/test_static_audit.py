@@ -12,7 +12,14 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 API = ROOT / "app/api/v1"
 METHODS = {"get", "post", "put", "delete", "patch"}
-PUBLIC = {("auth", "register"), ("auth", "login"), ("auth", "mobile_login"), ("auth", "admin_login"), ("auth", "forgot"), ("auth", "reset"), ("auth", "bootstrap"), ("misc", "health"), ("misc", "ready"), ("misc", "helplines")}
+PUBLIC = {
+    ("auth", "register"), ("auth", "login"), ("auth", "mobile_login"), ("auth", "admin_login"), ("auth", "forgot"), ("auth", "reset"), ("auth", "bootstrap"),
+    ("misc", "health"), ("misc", "ready"), ("misc", "helplines"),
+    # OAuth2-style mock IdP: the client authenticates itself via client_id/client_secret in the
+    # request body (or a bearer token, for introspect/revoke) - a CivicLens session is not the
+    # right gate for a department system's own token endpoint. See app/api/v1/federation.py.
+    ("federation", "issuer_metadata"), ("federation", "token"), ("federation", "introspect"), ("federation", "revoke"),
+}  # fmt: skip
 
 
 def parse_routes():

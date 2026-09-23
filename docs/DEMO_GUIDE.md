@@ -168,3 +168,48 @@ A different citizen gets `403 permission_denied`. `GET /interop-gateway/my-conse
 citizen's own view of every grant attributed to them - no `INTEROP_READ` permission required.
 `tests/integration/test_interop_gateway_e2e.py::test_citizen_can_grant_their_own_consent_but_not_someone_elses`
 exercises this with two independent citizen accounts.
+
+## Federated identity (mock Government IdP)
+
+**DEMO / MOCK IDENTITY PROVIDER** - not a real government identity federation. This is the OAuth2
+client_credentials grant every connector performs before it's used (`GovernmentConnector.authenticate()`);
+here it is directly, the same way a real department's system would call it. No CivicLens login
+needed - the client authenticates itself:
+
+```bash
+curl -s http://localhost:8080/api/v1/federation/issuer
+```
+
+```json
+{"issuer": "CivicLens Government Identity Federation (demo)", "label": "DEMO / MOCK IDENTITY PROVIDER - not a real government identity federation", "grant_types_supported": ["client_credentials"], "token_endpoint": "/api/v1/federation/token", "introspection_endpoint": "/api/v1/federation/introspect", "revocation_endpoint": "/api/v1/federation/revoke"}
+```
+
+```bash
+curl -s -X POST http://localhost:8080/api/v1/federation/token \
+  -H 'Content-Type: application/json' \
+  -d '{"client_id":"dept_a","client_secret":"dept_a-demo-secret-not-for-production"}'
+```
+
+```json
+{"access_token": "eUCHaN5GILFaBhA4EwcYzICOR-hDmTfsolNmzU1n4qQ", "token_type": "Bearer", "expires_in": 3600, "scope": "interop:read interop:write", "system": "dept_a"}
+```
+
+The wrong secret is refused with `401 authentication_failed` - never a token. Introspect and
+revoke:
+
+```bash
+curl -s -X POST http://localhost:8080/api/v1/federation/introspect -H 'Content-Type: application/json' -d '{"token":"<access_token>"}'
+# {"active": true, "client_id": "dept_a", "system": "dept_a", "scope": [...], "iss": "...", "exp": ...}
+
+curl -s -X POST http://localhost:8080/api/v1/federation/revoke -H 'Content-Type: application/json' -d '{"token":"<access_token>"}'
+# {"revoked": true}
+
+curl -s -X POST http://localhost:8080/api/v1/federation/introspect -H 'Content-Type: application/json' -d '{"token":"<access_token>"}'
+# {"active": false} - RFC 7662's own rule: never explain *why* a token is invalid
+```
+
+This is genuinely load-bearing, not a side demo: disable `dept_a`'s federation client (distinct
+from disabling the connector in the registry) and every gateway call touching Department A starts
+failing with `AUTHENTICATION_FAILURE` -
+`tests/integration/test_connectors.py::test_runtime_refuses_a_connector_whose_federation_client_is_disabled`
+exercises exactly this.

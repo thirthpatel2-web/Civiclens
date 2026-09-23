@@ -39,7 +39,13 @@ class ConnectorUnavailable(Exception):
         self.reason = reason
 
 
-def resolve(session: Session, connector_id: str) -> GovernmentConnector:
+def resolve(session: Session, connector_id: str, *, authenticate: bool = True) -> GovernmentConnector:
+    """``authenticate=True`` (the default, and what ``call()`` always uses) means this also
+    performs the connector's real client_credentials grant against the mock Government IdP
+    (``app.interop.connectors.base.authenticate_via_federation``) and refuses to hand back a
+    connector that failed it - federation genuinely gates connector use, not just describes it.
+    ``authenticate=False`` exists for callers (health checks, tests) that want the connector object
+    without spending a federation round trip."""
     cls = _CONNECTOR_CLASSES.get(connector_id)
     if cls is None:
         raise ConnectorUnavailable(connector_id, "no connector class registered for this id")
@@ -48,19 +54,24 @@ def resolve(session: Session, connector_id: str) -> GovernmentConnector:
         raise ConnectorUnavailable(connector_id, "not present in the connector registry - seed_if_empty may not have run")
     if not row.enabled:
         raise ConnectorUnavailable(connector_id, "disabled in the connector registry")
-    return cls(session)
+    connector = cls(session)
+    if authenticate and not connector.authenticate():
+        raise ConnectorUnavailable(connector_id, "federated authentication failed")
+    return connector
 
 
 def call(session: Session, connector_id: str, operation: str, /, *args, **kwargs) -> ConnectorResult:
-    """Resolve + invoke one operation, timing it and recording the call against the connector
-    registry's live stats (the same accounting ``connector_registry.record_call`` already did for
-    direct mock-system calls) - so switching the gateway onto the runtime doesn't lose the
-    call-count/health data the connector registry screen shows."""
+    """Resolve (including the real federation authenticate() gate) + invoke one operation, timing
+    it and recording the call against the connector registry's live stats (the same accounting
+    ``connector_registry.record_call`` already did for direct mock-system calls) - so switching the
+    gateway onto the runtime doesn't lose the call-count/health data the connector registry screen
+    shows."""
     t0 = time.monotonic()
     try:
         connector = resolve(session, connector_id)
     except ConnectorUnavailable as exc:
-        return ConnectorResult(ok=False, error_code="CONNECTOR_UNAVAILABLE", error_message=str(exc))
+        error_code = "AUTHENTICATION_FAILURE" if exc.reason == "federated authentication failed" else "CONNECTOR_UNAVAILABLE"
+        return ConnectorResult(ok=False, error_code=error_code, error_message=str(exc))
     try:
         result: ConnectorResult = getattr(connector, operation)(*args, **kwargs)
     except Exception as exc:  # noqa: BLE001 - a connector must never crash the gateway

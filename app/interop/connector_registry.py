@@ -64,30 +64,3 @@ def record_call(session: Session, connector_id: str, *, success: bool, duration_
     prev = row.avg_response_ms
     row.avg_response_ms = duration_ms if prev is None else round((prev * (row.total_calls - 1) + duration_ms) / row.total_calls, 2)
     session.add(row)
-
-
-def health_check(session: Session, connector_id: str) -> dict:
-    """A real check: for the mock departments this queries their own tables (they're always
-    reachable - it's the same database process), so 'healthy' reflects the connector actually
-    working end to end, not a hardcoded status string."""
-    row = session.get(ConnectorRegistration, connector_id)
-    if row is None:
-        return {"connector_id": connector_id, "state": "not_configured", "detail": "Unknown connector."}
-    if not row.enabled:
-        return {"connector_id": connector_id, "state": "disabled", "detail": "Disabled by an integration admin."}
-    try:
-        if connector_id == "dept_a":
-            from app.interop import mock_systems
-
-            mock_systems.dept_a_search_residents(session, name_contains=None)
-        elif connector_id == "dept_b":
-            from app.interop import mock_systems
-
-            mock_systems.dept_b_search_beneficiaries(session, name_contains=None)
-        elif connector_id == "dept_c":
-            pass  # no query surface yet beyond seed data; existence of the table is enough
-        record_call(session, connector_id, success=True, duration_ms=1.0)
-        return {"connector_id": connector_id, "state": "healthy", "detail": "Reachable."}
-    except Exception as exc:  # noqa: BLE001 - health check must never raise into the caller
-        record_call(session, connector_id, success=False, duration_ms=1.0)
-        return {"connector_id": connector_id, "state": "unavailable", "detail": str(exc)}

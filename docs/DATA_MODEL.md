@@ -1,7 +1,8 @@
 # Data model — interoperability platform
 
-The 13 tables added by migration `0010` (`app/db/models/interop_platform.py`), plus the 3 columns
-migration `0011` added to `interop_transactions` for field-level consent tracking. Scoped to this
+The 13 tables added by migration `0010` (`app/db/models/interop_platform.py`), the 3 columns
+migration `0011` added to `interop_transactions` for field-level consent tracking, and the 2 mock
+Government IdP tables migration `0012` added. Scoped to this
 subsystem only — the rest of CivicLens's ~40 tables are unrelated to the interop platform and are
 not documented here; see `ARCHITECTURE.md`'s "Data" section for those.
 
@@ -181,6 +182,27 @@ exactly as it would treat a real external department it has no schema control ov
 | `correlation_id` | `String(60)`, nullable | |
 | `detail` | `jsonb` dict | Step-specific facts, e.g. `{"reference_no": "...", "quality_score": 1.0}` |
 | `occurred_at` | `timestamptz` | |
+
+### Mock Government Identity Provider (federated identity / SSO, demo) — migration `0012`
+
+| `interop_federation_clients` | Type | Notes |
+|---|---|---|
+| `client_id` (PK) | `String(60)` | One per connector today, e.g. `dept_a` |
+| `name` | `String(120)` | |
+| `client_secret_hash` | `String(255)` | Argon2id - never the raw secret |
+| `system` | `String(40)` | Which connector/department this federation client represents - the role/department mapping a token's claims carry |
+| `allowed_scopes` | `jsonb` list | e.g. `["interop:read", "interop:write"]` - a token can only ever be issued a subset of this |
+| `enabled` | `bool` | Disabling a client invalidates its already-issued tokens too (`validate_token` re-checks the client, not just the token row) |
+| `created_at` | `timestamptz` | |
+
+| `interop_federation_tokens` | Type | Notes |
+|---|---|---|
+| `token_id` (PK) | `uuid` | |
+| `token_hash` (unique) | `String(64)` | sha256 hex of the raw bearer token - only the hash is ever stored, same as session tokens |
+| `client_id` (FK, CASCADE) | → `interop_federation_clients` | |
+| `scope` | `jsonb` list | The actually-granted scope for this token (may be narrower than the client's `allowed_scopes` if a narrower scope was requested) |
+| `issued_at`, `expires_at` | `timestamptz` | 1-hour TTL (`idp.TOKEN_TTL`) |
+| `revoked_at` | `timestamptz`, nullable | Set by `revoke_token` - checked before expiry, so revocation is immediate even for a token that hasn't expired yet |
 
 ## Why no `CHECK` constraints on the string enum-ish columns
 

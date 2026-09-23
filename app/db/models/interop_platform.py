@@ -242,3 +242,37 @@ class UnifiedApplicationEvent(Base):
     detail: Mapped[dict] = jsonb(dict)
     occurred_at: Mapped[datetime] = created_at()
     __table_args__ = (Index("ix_interop_unified_application_events_application_id", "application_id"),)
+
+
+# ---------------------------------------------------------------------------------------------
+# Mock Government Identity Provider (federated identity / SSO, demo) - an OAuth2
+# client_credentials-style authorization server every connector authenticates against before
+# it's used. See app/interop/federation/idp.py. Every row here is DEMO data for the mock IdP -
+# never a real government identity provider credential.
+# ---------------------------------------------------------------------------------------------
+
+
+class FederationClient(Base):
+    __tablename__ = "interop_federation_clients"
+    client_id: Mapped[str] = mapped_column(String(60), primary_key=True)  # e.g. "dept_a" - one per connector
+    name: Mapped[str] = mapped_column(String(120), nullable=False)
+    client_secret_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+    system: Mapped[str] = mapped_column(String(40), nullable=False)  # which connector/department this client represents
+    allowed_scopes: Mapped[list] = jsonb(list)
+    enabled: Mapped[bool] = mapped_column(nullable=False, default=True)
+    created_at: Mapped[datetime] = created_at()
+
+
+class FederationToken(Base):
+    __tablename__ = "interop_federation_tokens"
+    token_id: Mapped[str] = uuid_pk()
+    token_hash: Mapped[str] = mapped_column(String(64), nullable=False)  # sha256 hex of the raw bearer token - only the hash is ever stored
+    client_id: Mapped[str] = mapped_column(ForeignKey("interop_federation_clients.client_id", ondelete="CASCADE"), nullable=False)
+    scope: Mapped[list] = jsonb(list)
+    issued_at: Mapped[datetime] = created_at()
+    expires_at: Mapped[datetime] = tstz(False)
+    revoked_at: Mapped[datetime | None] = tstz()
+    __table_args__ = (
+        UniqueConstraint("token_hash", name="uq_interop_federation_tokens_token_hash"),
+        Index("ix_interop_federation_tokens_client_id", "client_id"),
+    )

@@ -166,6 +166,45 @@ refuses `submit`/`update` honestly (`CONNECTOR_UNAVAILABLE`, "read-only"); `Dept
 is the actual no-reupload write; `DeptCConnector` is read-only and not part of the headline demo.
 See `tests/integration/test_connectors.py` for interface-conformance and registry-gating coverage.
 
+## Federated identity / SSO — **DEMO / MOCK IDENTITY PROVIDER**
+
+`app/interop/federation/idp.py`. Not connected to any real government identity federation — every
+client, secret and token here is demo data. A real, working OAuth2 client_credentials authorization
+server (RFC 6749 §4.4): `FederationClient`/`FederationToken` (`interop_federation_clients`/
+`interop_federation_tokens`, migration `0012`), opaque bearer tokens hashed at rest (the same
+discipline `app.core.security.hash_token` already uses for session tokens — no new crypto
+dependency, no JWT signing), 1-hour expiry, and revocation.
+
+```
+Mock Government IdP -> OAuth2 client_credentials grant -> CivicLens connector -> Dept A / B / C
+```
+
+`GovernmentConnector.authenticate()` (previously a `return True` stub) is now real:
+`authenticate_via_federation()` (`app/interop/connectors/base.py`) performs the actual grant for
+the connector's own seeded demo client, and `ConnectorRuntime.resolve()` **enforces** it — a
+connector whose federation client is disabled or whose grant fails is refused with
+`AUTHENTICATION_FAILURE` before any operation runs, not just described as a stub in the interface.
+Every connector call in the live no-reupload demo goes through this gate today (verified: all
+existing tests — including the full end-to-end demo — stayed green after wiring it in as a hard
+gate, and `test_runtime_refuses_a_connector_whose_federation_client_is_disabled` proves it actually
+blocks a disabled client, not just a disabled connector-registry row, which is a separate check).
+
+REST surface (`app/api/v1/federation.py`, intentionally **not** gated by a CivicLens session — a
+department's own system authenticates as itself via its client_id/client_secret, exactly like a
+real OAuth2 token endpoint):
+
+| Method | Path | Does |
+|---|---|---|
+| `GET` | `/federation/issuer` | Issuer metadata (clearly labelled mock/demo) |
+| `POST` | `/federation/token` | The client_credentials grant — client_id + client_secret → access_token |
+| `POST` | `/federation/introspect` | RFC 7662-shaped `{"active": bool, ...}` — never explains *why* a token is invalid |
+| `POST` | `/federation/revoke` | "Logout" for a federated client — immediate, even before expiry |
+
+Claims carried on every issued token: `client_id`, `system` (the role/department mapping — which
+connector this client represents), `scope`, `issued_at`/`expires_at`. See
+`tests/integration/test_federation_idp.py` for token issuance/validation/expiry/revocation/
+disabled-client coverage, and `docs/DEMO_GUIDE.md` for a live curl walkthrough of the full grant.
+
 ## Connector registry
 
 `app/interop/connector_registry.py` + `ConnectorRegistration` (`interop_connector_registry`).

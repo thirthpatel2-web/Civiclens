@@ -44,8 +44,10 @@ class GovernmentConnector(ABC):
     @abstractmethod
     def health_check(self) -> ConnectorResult:
         """A real check - for the demo connectors, an actual query against their own tables, not a
-        hardcoded status string. See app.interop.connector_registry.health_check for the caller
-        that records this against the connector registry's live stats."""
+        hardcoded status string. Called through ``app.interop.connectors.runtime.call`` (see
+        ``InteropGatewayService.connector_health``), which records the result against the
+        connector registry's live stats and, via ``resolve()``, has already required this
+        connector to pass its federation ``authenticate()`` first."""
 
     @abstractmethod
     def get_entity(self, entity_type: str, entity_id: str) -> ConnectorResult:
@@ -85,3 +87,17 @@ class GovernmentConnector(ABC):
 
     def handle_error(self, exc: Exception) -> ConnectorResult:
         return ConnectorResult(ok=False, error_code="REMOTE_SYSTEM_ERROR", error_message=str(exc))
+
+
+def authenticate_via_federation(session: Any, connector_id: str) -> bool:
+    """Shared authenticate() implementation for the demo connectors: a real client_credentials
+    grant (RFC 6749 s4.4) against the mock Government IdP (app.interop.federation.idp) - not a
+    stub. Each demo connector's federation client secret is a fixed, publicly-documented demo
+    value (idp.demo_client_secret); a real connector would hold its own real secret instead."""
+    from app.interop.federation import idp
+
+    try:
+        idp.issue_token(session, client_id=connector_id, client_secret=idp.demo_client_secret(connector_id))
+        return True
+    except idp.InvalidClient:
+        return False

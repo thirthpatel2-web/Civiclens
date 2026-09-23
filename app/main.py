@@ -29,10 +29,12 @@ def _seed_interop_demo_data(container: AppContainer) -> None:
     this is demo/mock government data, not anything a real citizen submitted."""
     try:
         from app.interop import connector_registry, mock_systems
+        from app.interop.federation import idp
 
         with container.uow_factory() as uow:
             mock_systems.seed_if_empty(uow.session)
             connector_registry.seed_if_empty(uow.session)
+            idp.seed_if_empty(uow.session)
             uow.commit()
     except Exception:
         logger.warning("interop demo data seeding failed")

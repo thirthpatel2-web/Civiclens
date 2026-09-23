@@ -407,11 +407,21 @@ class InteropGatewayService:
             return [_row(r) for r in connector_registry.list_connectors(uow.session)]
 
     def connector_health(self, ctx: AuthContext, *, connector_id: str) -> dict:
+        """Routed through the connector runtime (Section 2/9: never a direct mock-system call,
+        and this now genuinely exercises the connector's real federated authenticate() - a
+        connector whose federation client got disabled shows up as unavailable here, not just
+        'healthy' because its tables happen to still be reachable)."""
         require(ctx, Permission.INTEROP_MANAGE)
         with self._uow() as uow:
-            result = connector_registry.health_check(uow.session, connector_id)
+            s = uow.session
+            row = connector_registry.get(s, connector_id)
+            if row is None:
+                return {"connector_id": connector_id, "state": "not_configured", "detail": "Unknown connector."}
+            if not row.enabled:
+                return {"connector_id": connector_id, "state": "disabled", "detail": "Disabled by an integration admin."}
+            result = connector_runtime.call(s, connector_id, "health_check")
             uow.commit()
-            return result
+            return {"connector_id": connector_id, "state": "healthy" if result.ok else "unavailable", "detail": "Reachable." if result.ok else (result.error_message or "Unavailable.")}
 
     def set_connector_enabled(self, ctx: AuthContext, *, connector_id: str, enabled: bool) -> dict:
         require(ctx, Permission.INTEROP_MANAGE)
