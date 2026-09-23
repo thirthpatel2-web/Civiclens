@@ -208,9 +208,9 @@ reachable. Run it with `pytest tests/integration/test_interop_gateway_e2e.py -v`
 Named here rather than left silently missing, per this project's rule against claiming
 "implemented" for a placeholder:
 
-- Login-routing UI for `INTEGRATION_ADMIN`/`AUDITOR` (they authenticate and hold the right
-  permissions over the REST API today; no dedicated dashboard/menu exists yet in classic-app or
-  the legacy NiceGUI web admin for either role specifically)
+- A `INTEGRATION_ADMIN`/`AUDITOR` login door in the legacy NiceGUI web admin (`app/ui/pages/public.py`)
+  — classic-app routes both roles to a working home (the Interop Gateway screen) on login, but no
+  screens exist for either role in the older NiceGUI admin app specifically
 - A connector health *dashboard* (the data exists via `GET /connectors`; no charts/SLA view yet)
 - Routing real interop events through the WebSocket event bus (`app/realtime/events.py`) — it's
   tightly coupled to the complaint/notification domain; this milestone uses the dedicated
