@@ -54,7 +54,7 @@ from app.db.models.interop_platform import (
     WorkflowStepExecution,
 )
 from app.db.models.ops import AuditLogModel
-from app.interop import connector_registry, mock_systems
+from app.interop import catalog, connector_registry, mock_systems
 from app.interop.monitoring import alerts as connector_alerts
 from app.interop.canonical.v1.models import Document as CanonicalDocument
 from app.interop.canonical.v1.transform import canonical_document_to_dept_b_fields, dept_a_document_to_canonical
@@ -602,3 +602,19 @@ class InteropGatewayService:
             if not (transactions or exceptions or events or audit_entries):
                 raise NotFound("No activity recorded for this correlation id.")
             return {"correlation_id": correlation_id, "transactions": transactions, "exceptions": exceptions, "events": events, "audit_entries": audit_entries}
+
+    # -----------------------------------------------------------------------------------------
+    # Service catalog & field mapping catalog (Section 8/22-23) - read-only surfaces over the
+    # directory of cross-department services this platform exposes and the field-level mappings
+    # each one actually performs. See app/interop/catalog.py.
+    # -----------------------------------------------------------------------------------------
+
+    def list_service_catalog(self, ctx: AuthContext, *, active: bool | None = None) -> list[dict]:
+        require(ctx, Permission.INTEROP_READ)
+        with self._uow() as uow:
+            return [_row(r) for r in catalog.list_services(uow.session, active=active)]
+
+    def list_field_mappings(self, ctx: AuthContext, *, service_id: str | None = None, system_id: str | None = None) -> list[dict]:
+        require(ctx, Permission.INTEROP_READ)
+        with self._uow() as uow:
+            return [_row(r) for r in catalog.list_field_mappings(uow.session, service_id=service_id, system_id=system_id)]

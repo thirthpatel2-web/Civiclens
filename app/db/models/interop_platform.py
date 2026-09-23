@@ -395,3 +395,39 @@ class ConnectorAlert(Base):
         Index("ix_interop_connector_alerts_connector_id", "connector_id"),
         Index("ix_interop_connector_alerts_acknowledged", "acknowledged"),
     )
+
+
+# ---------------------------------------------------------------------------------------------
+# Service catalog & field mapping catalog (Section 8/22-23): a queryable directory of the
+# cross-department services this platform exposes, and the field-level mappings each one actually
+# performs - the code in app.interop.canonical.v1.transform remains what EXECUTES a transform;
+# this is the DATA describing what it does, so an admin (or this test suite, cross-checking
+# against real function output) can see it without reading Python.
+# ---------------------------------------------------------------------------------------------
+
+
+class ServiceCatalogEntry(Base):
+    __tablename__ = "interop_service_catalog"
+    service_id: Mapped[str] = mapped_column(String(80), primary_key=True)  # e.g. "residence_certificate_verification"
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    description: Mapped[str] = mapped_column(String(500), nullable=False)
+    source_system: Mapped[str] = mapped_column(ForeignKey("interop_connector_registry.connector_id"), nullable=False)
+    target_system: Mapped[str] = mapped_column(ForeignKey("interop_connector_registry.connector_id"), nullable=False)
+    data_category: Mapped[str] = mapped_column(String(80), nullable=False)  # matches InteropConsentGrant.data_category
+    workflow_id: Mapped[str | None] = mapped_column(ForeignKey("interop_workflow_definitions.workflow_id"), nullable=True)
+    active: Mapped[bool] = mapped_column(nullable=False, default=True)
+    created_at: Mapped[datetime] = created_at()
+
+
+class FieldMapping(Base):
+    __tablename__ = "interop_field_mappings"
+    mapping_id: Mapped[str] = mapped_column(String(120), primary_key=True)  # e.g. "dept_a_document:document_type_to_canonical"
+    service_id: Mapped[str | None] = mapped_column(ForeignKey("interop_service_catalog.service_id"), nullable=True)
+    direction: Mapped[str] = mapped_column(String(30), nullable=False)  # "external_to_canonical" | "canonical_to_external"
+    system_id: Mapped[str] = mapped_column(ForeignKey("interop_connector_registry.connector_id"), nullable=False)
+    entity: Mapped[str] = mapped_column(String(60), nullable=False)  # canonical entity name, e.g. "Document"
+    source_field: Mapped[str] = mapped_column(String(80), nullable=False)
+    target_field: Mapped[str] = mapped_column(String(80), nullable=False)
+    transform_note: Mapped[str | None] = mapped_column(String(300), nullable=True)  # e.g. "verbatim" or a value-mapping description
+    created_at: Mapped[datetime] = created_at()
+    __table_args__ = (Index("ix_interop_field_mappings_service_id", "service_id"),)

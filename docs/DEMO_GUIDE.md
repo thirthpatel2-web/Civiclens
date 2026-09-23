@@ -352,3 +352,32 @@ curl -s -b cookies.txt http://localhost:8080/api/v1/interop-gateway/trace/<corre
 
 An unknown correlation id is a clean 404 ("No activity recorded for this correlation id"), not an
 empty 200 pretending there was something to show.
+
+## Service catalog & field mapping catalog
+
+```bash
+curl -s -b cookies.txt http://localhost:8080/api/v1/interop-gateway/service-catalog | python -m json.tool
+```
+
+```json
+{"items": [{"service_id": "residence_certificate_verification", "name": "Residence certificate verification", "description": "Satisfies a Department B application's residence-document requirement from a resident's existing, already-verified Department A record - the no-reupload scenario.", "source_system": "dept_a", "target_system": "dept_b", "data_category": "residence_certificate", "workflow_id": "residence_certificate_verification", "active": true, "created_at": "..."}]}
+```
+
+Every field mapping that one service actually performs — seeded from, and cross-checked against,
+`transform.py`'s real functions (`docs/INTEROPERABILITY.md`'s "Service catalog & field mapping
+catalog" section):
+
+```bash
+curl -s -b cookies.txt "http://localhost:8080/api/v1/interop-gateway/field-mappings?service_id=residence_certificate_verification" | python -m json.tool
+```
+
+```json
+{"items": [
+  {"mapping_id": "dept_a_document_to_canonical:reference", "direction": "external_to_canonical", "system_id": "dept_a", "entity": "Document", "source_field": "reference_no", "target_field": "reference", "transform_note": "renamed (Dept A calls it reference_no)"},
+  {"mapping_id": "canonical_document_to_dept_b_fields:reference", "direction": "canonical_to_external", "system_id": "dept_b", "entity": "Document", "source_field": "reference", "target_field": "document_reference", "transform_note": "verbatim"},
+  ...
+]}
+```
+
+7 mappings total for this service. `?system_id=dept_b` narrows to just the 2 rows describing what
+gets written into Department B's application.

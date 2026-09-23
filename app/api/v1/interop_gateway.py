@@ -156,3 +156,14 @@ def acknowledge_alert(alert_id: str, ctx: AuthContext = MANAGE, c: AppContainer 
 @router.get("/trace/{correlation_id}")
 def get_trace(correlation_id: str, ctx: AuthContext = READ, c: AppContainer = Depends(get_container)) -> dict:
     return to_jsonable(c.interop_gateway.get_trace(ctx, correlation_id=correlation_id))
+
+
+# ---- service catalog & field mapping catalog (Section 8/22-23)
+@router.get("/service-catalog")
+def list_service_catalog(active: bool | None = None, ctx: AuthContext = READ, c: AppContainer = Depends(get_container)) -> dict:
+    return {"items": to_jsonable(c.interop_gateway.list_service_catalog(ctx, active=active))}
+
+
+@router.get("/field-mappings")
+def list_field_mappings(service_id: str | None = None, system_id: str | None = None, ctx: AuthContext = READ, c: AppContainer = Depends(get_container)) -> dict:
+    return {"items": to_jsonable(c.interop_gateway.list_field_mappings(ctx, service_id=service_id, system_id=system_id))}

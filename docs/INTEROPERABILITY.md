@@ -333,6 +333,29 @@ audit trail too. An unknown correlation id (nothing recorded under it) is a clea
 `GET /interop-gateway/trace/{correlation_id}` — `INTEROP_READ`-gated, same as the rest of this
 router.
 
+## Service catalog & field mapping catalog
+
+`app/interop/catalog.py` (Section 8/22-23): a queryable directory of the cross-department
+services this platform exposes (`ServiceCatalogEntry`, `interop_service_catalog`, migration
+`0016`) and the field-level mappings each one actually performs (`FieldMapping`,
+`interop_field_mappings`). The one real service wired into the live demo —
+`residence_certificate_verification` (source `dept_a`, target `dept_b`, linked to the same
+`workflow_id` as the configurable-workflow engine) — is seeded with its exact 7 field mappings.
+
+This catalog is deliberately not a second, independently-maintained description that could
+silently drift from `app.interop.canonical.v1.transform`'s real functions (the code that actually
+executes a transform, unchanged by this section): `tests/unit/test_field_mapping_catalog.py`
+cross-checks every seeded row against `dept_a_document_to_canonical`/
+`canonical_document_to_dept_b_fields`'s real output on realistic fixture input — e.g. the row
+claiming Dept A's `reference_no` maps to canonical `reference` is verified by actually calling the
+function and checking `canonical.reference == fixture.reference_no`, not just asserted in parallel.
+A future non-mock adapter's mappings would be seeded here the same way, describing whatever real
+transform function backs it.
+
+Read surface: `GET /interop-gateway/service-catalog` (filterable by `active`),
+`GET /interop-gateway/field-mappings` (filterable by `service_id`/`system_id`) —
+`INTEROP_READ`-gated. No admin UI to view or edit either catalog yet — named as deferred below.
+
 ## Generic data quality engine
 
 `app/interop/quality/engine.py` — a reusable, rule-driven `DataQualityEngine` rather than the
@@ -481,6 +504,8 @@ never make one. See `app/core/authorization.py`. The three consent-decision rout
 | `GET` | `/alerts` | Connector SLA/health alert log (filterable) |
 | `POST` | `/alerts/{id}/acknowledge` | Acknowledge an alert |
 | `GET` | `/trace/{correlation_id}` | Every transaction/exception/event/audit row sharing one correlation id |
+| `GET` | `/service-catalog` | Cross-department services this platform exposes (filterable by `active`) |
+| `GET` | `/field-mappings` | Field-level mappings each service performs (filterable by `service_id`/`system_id`) |
 
 ## Running the demo yourself
 
@@ -541,5 +566,8 @@ Named here rather than left silently missing, per this project's rule against cl
 - Routing real interop events through the WebSocket event bus (`app/realtime/events.py`) — it's
   tightly coupled to the complaint/notification domain; this milestone uses the dedicated
   `InteropTransaction`/`UnifiedApplicationEvent` tables as the interop-specific record instead
-- Field-mapping UI / service catalog / a fourth+ mock system
-- `docs/CONNECTOR_GUIDE.md`, `docs/WORKFLOW_GUIDE.md`, and the full requirement traceability matrix
+- Admin UI to view or edit the service catalog / field mapping catalog (`GET /service-catalog`,
+  `GET /field-mappings` are real and seeded from the actual transform functions - see "Service
+  catalog & field mapping catalog" above; no classic-app screen calls them yet) / a fourth+ mock
+  system
+- `docs/CONNECTOR_GUIDE.md`, `docs/WORKFLOW_GUIDE.md`

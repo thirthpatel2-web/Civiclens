@@ -28,7 +28,7 @@ def _seed_interop_demo_data(container: AppContainer) -> None:
     """Idempotent: only inserts rows the first time (checked per-table). Safe to run every boot -
     this is demo/mock government data, not anything a real citizen submitted."""
     try:
-        from app.interop import connector_registry, mock_systems
+        from app.interop import catalog, connector_registry, mock_systems
         from app.interop.federation import idp
         from app.interop.workflow.definitions import register_default_workflows
 
@@ -37,6 +37,7 @@ def _seed_interop_demo_data(container: AppContainer) -> None:
             connector_registry.seed_if_empty(uow.session)
             idp.seed_if_empty(uow.session)
             register_default_workflows(uow.session)
+            catalog.seed_if_empty(uow.session)
             uow.commit()
     except Exception:
         logger.warning("interop demo data seeding failed")

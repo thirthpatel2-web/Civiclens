@@ -162,6 +162,35 @@ Created only on a genuine state transition (`app/interop/monitoring/alerts.py::r
 never once per subsequent failed call for the same ongoing breach - see
 `docs/INTEROPERABILITY.md`'s "SLA thresholds & alerting" section.
 
+### Service catalog & field mapping catalog — migration `0016`
+
+| `interop_service_catalog` | Type | Notes |
+|---|---|---|
+| `service_id` (PK) | `String(80)` | e.g. `residence_certificate_verification` |
+| `name`, `description` | `String` | |
+| `source_system`, `target_system` (FK) | → `interop_connector_registry` | |
+| `data_category` | `String(80)` | Matches `InteropConsentGrant.data_category` |
+| `workflow_id` (FK, nullable) | → `interop_workflow_definitions` | |
+| `active` | `bool` | |
+| `created_at` | `timestamptz` | |
+
+| `interop_field_mappings` | Type | Notes |
+|---|---|---|
+| `mapping_id` (PK) | `String(120)` | e.g. `dept_a_document_to_canonical:reference` |
+| `service_id` (FK, nullable, indexed) | → `interop_service_catalog` | |
+| `direction` | `String(30)` | `external_to_canonical` \| `canonical_to_external` |
+| `system_id` (FK) | → `interop_connector_registry` | |
+| `entity` | `String(60)` | Canonical entity name, e.g. `Document` |
+| `source_field`, `target_field` | `String(80)` | |
+| `transform_note` | `String(300)`, nullable | e.g. `verbatim`, or a renamed/converted-value description |
+| `created_at` | `timestamptz` | |
+
+Seeded (`app/interop/catalog.py::seed_if_empty`) from what `app.interop.canonical.v1.transform`'s
+real functions actually do for the one live-wired service — not a parallel, independently-authored
+description. `tests/unit/test_field_mapping_catalog.py` cross-checks every seeded row against the
+real transform functions' output on fixture input, so this table can't silently drift from the code
+it describes.
+
 ### Transaction and timeline
 
 | `interop_transactions` | Type | Notes |
