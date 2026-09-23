@@ -140,3 +140,19 @@ def resolve_exception(exception_id: str, ctx: AuthContext = MANAGE, c: AppContai
 @router.post("/exceptions/{exception_id}/mark-dead")
 def mark_exception_dead(exception_id: str, body: MarkExceptionDeadBody, ctx: AuthContext = MANAGE, c: AppContainer = Depends(get_container)) -> dict:
     return to_jsonable(c.interop_gateway.mark_exception_dead(ctx, exception_id=exception_id, reason=body.reason))
+
+
+# ---- monitoring: SLA/alerts (Section 19-20) + distributed transaction tracing (Section 21)
+@router.get("/alerts")
+def list_alerts(connector_id: str | None = None, acknowledged: bool | None = None, limit: int = 100, ctx: AuthContext = READ, c: AppContainer = Depends(get_container)) -> dict:
+    return {"items": to_jsonable(c.interop_gateway.list_alerts(ctx, connector_id=connector_id, acknowledged=acknowledged, limit=limit))}
+
+
+@router.post("/alerts/{alert_id}/acknowledge")
+def acknowledge_alert(alert_id: str, ctx: AuthContext = MANAGE, c: AppContainer = Depends(get_container)) -> dict:
+    return to_jsonable(c.interop_gateway.acknowledge_alert(ctx, alert_id=alert_id))
+
+
+@router.get("/trace/{correlation_id}")
+def get_trace(correlation_id: str, ctx: AuthContext = READ, c: AppContainer = Depends(get_container)) -> dict:
+    return to_jsonable(c.interop_gateway.get_trace(ctx, correlation_id=correlation_id))

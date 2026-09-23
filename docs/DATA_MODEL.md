@@ -142,6 +142,25 @@ exactly as it would treat a real external department it has no schema control ov
 | `total_calls`, `total_failures` | `int` | |
 | `avg_response_ms` | `float`, nullable | Running average, updated on every real call |
 | `created_at` | `timestamptz` | |
+| `sla_max_avg_response_ms`, `sla_min_success_rate` | `float`, nullable — migration `0015` | This connector's own SLA thresholds; `NULL` falls back to `app.interop.monitoring.sla`'s defaults (1000ms / 95%) |
+| `sla_status` | `String(20)` — migration `0015` | `met` \| `breached` \| `unknown` — recomputed on every real call inside `record_call`, never a separate simulated pass |
+
+### Connector alerts — migration `0015`
+
+| `interop_connector_alerts` | Type | Notes |
+|---|---|---|
+| `alert_id` (PK) | `uuid` | |
+| `connector_id` (FK) | → `interop_connector_registry` | |
+| `alert_type` | `String(40)` | `SLA_BREACHED` \| `CONNECTOR_UNAVAILABLE` |
+| `severity` | `String(10)` | `warning` \| `critical` |
+| `message` | `String(300)` | |
+| `created_at` | `timestamptz` | |
+| `acknowledged` | `bool`, indexed | |
+| `acknowledged_at`, `acknowledged_by` | `timestamptz`/`String(36)`, nullable | |
+
+Created only on a genuine state transition (`app/interop/monitoring/alerts.py::raise_alert_if_needed`),
+never once per subsequent failed call for the same ongoing breach - see
+`docs/INTEROPERABILITY.md`'s "SLA thresholds & alerting" section.
 
 ### Transaction and timeline
 

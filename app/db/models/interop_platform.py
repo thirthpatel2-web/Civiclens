@@ -185,6 +185,11 @@ class ConnectorRegistration(Base):
     total_failures: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     avg_response_ms: Mapped[float | None] = mapped_column(Float, nullable=True)
     created_at: Mapped[datetime] = created_at()
+    # SLA (Section 19) - a connector without explicit thresholds falls back to
+    # app.interop.monitoring.sla's defaults, not an unenforced NULL.
+    sla_max_avg_response_ms: Mapped[float | None] = mapped_column(Float, nullable=True)
+    sla_min_success_rate: Mapped[float | None] = mapped_column(Float, nullable=True)
+    sla_status: Mapped[str] = mapped_column(String(20), nullable=False, default="unknown")  # met | breached | unknown
 
 
 # ---------------------------------------------------------------------------------------------
@@ -366,4 +371,27 @@ class InteropException(Base):
     __table_args__ = (
         Index("ix_interop_exceptions_correlation_id", "correlation_id"),
         Index("ix_interop_exceptions_resolution_state", "resolution_state"),
+    )
+
+
+# ---------------------------------------------------------------------------------------------
+# Monitoring: SLA thresholds live on ConnectorRegistration itself (above); this table is the
+# alert history a breach produces - see app/interop/monitoring/ (Section 19-20).
+# ---------------------------------------------------------------------------------------------
+
+
+class ConnectorAlert(Base):
+    __tablename__ = "interop_connector_alerts"
+    alert_id: Mapped[str] = uuid_pk()
+    connector_id: Mapped[str] = mapped_column(ForeignKey("interop_connector_registry.connector_id"), nullable=False)
+    alert_type: Mapped[str] = mapped_column(String(40), nullable=False)  # SLA_BREACHED | CONNECTOR_UNAVAILABLE
+    severity: Mapped[str] = mapped_column(String(10), nullable=False)  # warning | critical
+    message: Mapped[str] = mapped_column(String(300), nullable=False)
+    created_at: Mapped[datetime] = created_at()
+    acknowledged: Mapped[bool] = mapped_column(nullable=False, default=False)
+    acknowledged_at: Mapped[datetime | None] = tstz()
+    acknowledged_by: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    __table_args__ = (
+        Index("ix_interop_connector_alerts_connector_id", "connector_id"),
+        Index("ix_interop_connector_alerts_acknowledged", "acknowledged"),
     )

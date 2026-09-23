@@ -294,6 +294,45 @@ the business logic that calls them: `enabled`/`disabled` without touching the ga
 actual invocation — not a simulated heartbeat), and a manual `POST
 /interop-gateway/connectors/{id}/health-check` that genuinely queries the connector's own tables.
 
+## SLA thresholds & alerting
+
+`app/interop/monitoring/` (Section 19-20). `sla.evaluate_sla(row)` is a pure function computing
+`met | breached | unknown` from a connector's real call history — `unknown` until it's been
+called at least once (never defaults to "met" for a connector nobody has exercised yet), otherwise
+`breached` when either its rolling `avg_response_ms` exceeds a threshold or its success rate drops
+below one. Each connector can set its own `sla_max_avg_response_ms`/`sla_min_success_rate`
+(`ConnectorRegistration`, migration `0015`); left `NULL`, it falls back to the module's defaults
+(1000ms / 95%).
+
+`sla_status` is recomputed on **every** real connector call, inside
+`connector_registry.record_call` — the same single choke point every invocation already flows
+through via `ConnectorRuntime.call()`. An alert (`ConnectorAlert`, `interop_connector_alerts`) is
+created only on a genuine state **transition** — SLA just breached, or the connector just became
+unavailable — never once per subsequent failed call, which would flood the alert log with
+duplicates for the same ongoing problem; recovering and then breaching again correctly raises a
+*new* alert. The two conditions (SLA breach, health unavailable) are evaluated independently, not
+as an `if`/`elif` — a real bug caught during development: an earlier version used `elif` and
+silently dropped one of the two alerts when both transitions happened on the same call (see
+`app/interop/monitoring/alerts.py`'s docstring).
+
+Read/act surface: `GET /interop-gateway/alerts` (filterable by `connector_id`/`acknowledged`),
+`POST /interop-gateway/alerts/{id}/acknowledge` — same `INTEROP_READ`/`INTEROP_MANAGE` gating as
+the rest of this router.
+
+## Distributed transaction tracing
+
+`InteropGatewayService.get_trace(ctx, correlation_id=...)` (Section 21) — every row across the
+platform's tables sharing one `correlation_id`, pulled back together: `InteropTransaction`,
+`InteropException`, `UnifiedApplicationEvent`, and `audit_logs`. No new plumbing was needed to make
+this queryable — `correlation_id_var` (`app/core/logging.py`) is already set for the duration of
+every gateway call and `AuditService.record` already stamps every audit row with its value, so the
+same id that already threads through the transaction/exception/event rows threads through the
+audit trail too. An unknown correlation id (nothing recorded under it) is a clean 404, not an empty
+200 pretending there was something to show.
+
+`GET /interop-gateway/trace/{correlation_id}` — `INTEROP_READ`-gated, same as the rest of this
+router.
+
 ## Generic data quality engine
 
 `app/interop/quality/engine.py` — a reusable, rule-driven `DataQualityEngine` rather than the
@@ -439,6 +478,9 @@ never make one. See `app/core/authorization.py`. The three consent-decision rout
 | `POST` | `/exceptions/{id}/retry` | Manual retry attempt |
 | `POST` | `/exceptions/{id}/resolve` | Mark resolved |
 | `POST` | `/exceptions/{id}/mark-dead` | Operator dead-letters it directly |
+| `GET` | `/alerts` | Connector SLA/health alert log (filterable) |
+| `POST` | `/alerts/{id}/acknowledge` | Acknowledge an alert |
+| `GET` | `/trace/{correlation_id}` | Every transaction/exception/event/audit row sharing one correlation id |
 
 ## Running the demo yourself
 
@@ -486,12 +528,16 @@ Named here rather than left silently missing, per this project's rule against cl
 - A `INTEGRATION_ADMIN`/`AUDITOR` login door in the legacy NiceGUI web admin (`app/ui/pages/public.py`)
   — classic-app routes both roles to a working home (the Interop Gateway screen) on login, but no
   screens exist for either role in the older NiceGUI admin app specifically
-- A connector health *dashboard* (the data exists via `GET /connectors`; no charts/SLA view yet)
+- A connector health *dashboard* — the data is real and now includes SLA status/thresholds
+  (`GET /connectors`) and a real alert log (`GET /alerts`); no charts or a visual SLA view exist yet
 - Loading `QualityRuleSet` rows from the database into the gateway's quality check — the table,
   the engine that would execute them, and the API surface to author them are all real; the gateway
   still evaluates a fixed Python list of `QualityRule` objects, not a stored, versioned rule set
 - An admin UI screen for the central exception queue (`GET/POST /interop-gateway/exceptions*` work
   over plain HTTP; no classic-app screen calls them yet)
+- An admin UI screen for the alert log or the transaction trace view (`GET /alerts`,
+  `POST /alerts/{id}/acknowledge`, `GET /trace/{correlation_id}` all work over plain HTTP; no
+  classic-app screen calls any of them yet)
 - Routing real interop events through the WebSocket event bus (`app/realtime/events.py`) — it's
   tightly coupled to the complaint/notification domain; this milestone uses the dedicated
   `InteropTransaction`/`UnifiedApplicationEvent` tables as the interop-specific record instead

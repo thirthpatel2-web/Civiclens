@@ -11,6 +11,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.db.models.interop_platform import ConnectorRegistration
+from app.interop.monitoring import alerts as connector_alerts
+from app.interop.monitoring import sla
 
 DEFAULT_CONNECTORS: tuple[dict, ...] = (
     {"connector_id": "dept_a", "name": "Maharashtra Revenue Records System (demo)", "department": "Revenue Department", "supported_operations": ["get_entity", "fetch_document", "health_check"]},
@@ -47,10 +49,13 @@ def set_enabled(session: Session, connector_id: str, enabled: bool) -> Connector
 
 def record_call(session: Session, connector_id: str, *, success: bool, duration_ms: float) -> None:
     """Every real connector invocation updates its own registry row - health/metrics come from
-    what actually happened, not a separate simulated 'monitoring' pass."""
+    what actually happened, not a separate simulated 'monitoring' pass. Also evaluates SLA
+    (Section 19) and raises an alert (Section 20) on a genuine state transition - never on every
+    call after the first breach, which would flood the alert log."""
     row = session.get(ConnectorRegistration, connector_id)
     if row is None:
         return
+    previous_sla_status, previous_health_state = row.sla_status, row.health_state
     now = datetime.now(UTC)
     row.total_calls += 1
     row.last_health_check = now
@@ -63,4 +68,6 @@ def record_call(session: Session, connector_id: str, *, success: bool, duration_
         row.health_state = "degraded" if row.total_calls and row.total_failures / row.total_calls < 0.5 else "unavailable"
     prev = row.avg_response_ms
     row.avg_response_ms = duration_ms if prev is None else round((prev * (row.total_calls - 1) + duration_ms) / row.total_calls, 2)
+    row.sla_status = sla.evaluate_sla(row)
     session.add(row)
+    connector_alerts.raise_alert_if_needed(session, row, previous_sla_status=previous_sla_status, previous_health_state=previous_health_state)

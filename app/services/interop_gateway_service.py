@@ -44,6 +44,7 @@ from app.core.logging import correlation_id_var
 from app.db.models.interop_platform import (
     IdentityMatchCandidate,
     InteropConsentGrant,
+    InteropException,
     InteropTransaction,
     MasterEntity,
     UnifiedApplication,
@@ -52,7 +53,9 @@ from app.db.models.interop_platform import (
     WorkflowExecution,
     WorkflowStepExecution,
 )
+from app.db.models.ops import AuditLogModel
 from app.interop import connector_registry, mock_systems
+from app.interop.monitoring import alerts as connector_alerts
 from app.interop.canonical.v1.models import Document as CanonicalDocument
 from app.interop.canonical.v1.transform import canonical_document_to_dept_b_fields, dept_a_document_to_canonical
 from app.interop.connectors import runtime as connector_runtime
@@ -559,3 +562,43 @@ class InteropGatewayService:
             row = _row(record)
             uow.commit()
             return row
+
+    # -----------------------------------------------------------------------------------------
+    # Monitoring (Section 19-21): SLA/alerts are evaluated as a side effect of every real
+    # connector call (app.interop.connector_registry.record_call) - this is only the read/act
+    # surface over that real state. Distributed transaction tracing pulls every row across the
+    # platform's tables that shares one correlation_id back together.
+    # -----------------------------------------------------------------------------------------
+
+    def list_alerts(self, ctx: AuthContext, *, connector_id: str | None = None, acknowledged: bool | None = None, limit: int = 100) -> list[dict]:
+        require(ctx, Permission.INTEROP_READ)
+        with self._uow() as uow:
+            return [_row(a) for a in connector_alerts.list_alerts(uow.session, connector_id=connector_id, acknowledged=acknowledged, limit=limit)]
+
+    def acknowledge_alert(self, ctx: AuthContext, *, alert_id: str) -> dict:
+        require(ctx, Permission.INTEROP_MANAGE)
+        with self._uow() as uow:
+            record = connector_alerts.acknowledge(uow.session, alert_id, actor_id=ctx.user_id, clock=self._clock)
+            if record is None:
+                raise NotFound("No alert with that id.")
+            AuditService(uow.audit, self._clock).record("interop.alert_acknowledged", actor_id=ctx.user_id, resource_type="interop_connector_alert", resource_id=alert_id, metadata={})
+            row = _row(record)
+            uow.commit()
+            return row
+
+    def get_trace(self, ctx: AuthContext, *, correlation_id: str) -> dict:
+        """Every row across the platform's tables sharing this one correlation_id, pulled back
+        together - what a distributed trace means here, without the operational overhead of an
+        actual tracing backend. `AuditService.record` already stamps every audit row with
+        `correlation_id_var`'s value for the duration of a gateway call, so no extra plumbing was
+        needed to make it queryable this way."""
+        require(ctx, Permission.INTEROP_READ)
+        with self._uow() as uow:
+            s = uow.session
+            transactions = [_row(r) for r in s.execute(select(InteropTransaction).where(InteropTransaction.correlation_id == correlation_id).order_by(InteropTransaction.created_at)).scalars().all()]
+            exceptions = [_row(r) for r in s.execute(select(InteropException).where(InteropException.correlation_id == correlation_id).order_by(InteropException.created_at)).scalars().all()]
+            events = [_row(r) for r in s.execute(select(UnifiedApplicationEvent).where(UnifiedApplicationEvent.correlation_id == correlation_id).order_by(UnifiedApplicationEvent.occurred_at)).scalars().all()]
+            audit_entries = [_row(r) for r in s.execute(select(AuditLogModel).where(AuditLogModel.correlation_id == correlation_id).order_by(AuditLogModel.occurred_at)).scalars().all()]
+            if not (transactions or exceptions or events or audit_entries):
+                raise NotFound("No activity recorded for this correlation id.")
+            return {"correlation_id": correlation_id, "transactions": transactions, "exceptions": exceptions, "events": events, "audit_entries": audit_entries}

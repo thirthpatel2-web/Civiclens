@@ -299,3 +299,56 @@ just fail again) - `POST .../exceptions/{id}/retry` refuses it and returns `null
 `max_retries` it moves to `dead` (the dead-letter state) automatically - or an operator can
 dead-letter one directly with `POST .../exceptions/{id}/mark-dead`. Acting on an unknown or
 malformed exception id is a safe 404, never a 500.
+
+## SLA, alerts, and distributed transaction tracing
+
+Every real connector call now carries a live SLA status:
+
+```bash
+curl -s -b cookies.txt http://localhost:8080/api/v1/interop-gateway/connectors | python -m json.tool
+```
+
+```json
+{"connector_id": "dept_a", "health_state": "healthy", "total_calls": 407, "total_failures": 0, "avg_response_ms": 52.24, "sla_max_avg_response_ms": null, "sla_min_success_rate": null, "sla_status": "met"}
+```
+
+`sla_max_avg_response_ms`/`sla_min_success_rate` are `null` here — this connector was never given
+its own thresholds, so it's evaluated against `app.interop.monitoring.sla`'s defaults (1000ms /
+95% success rate). A connector that's never been called shows `sla_status: "unknown"`, not `"met"`
+by default.
+
+Driving a connector into an actual breach and back out again (enough repeated failures, then
+enough recoveries to see exactly one alert per real transition, never one per failed call) needs
+more calls than a short curl walkthrough can usefully show — that's exactly what
+`tests/integration/test_monitoring_live.py::MonitoringLiveTests` does against a real, disposable
+test connector row: 10 real failures breach the SLA and raise exactly one `SLA_BREACHED` alert and
+one `CONNECTOR_UNAVAILABLE` alert (not two of each), 300 real successes recover it, and 10 more
+failures after that raise a genuinely new alert. Run it directly:
+
+```bash
+DATABASE_URL=postgresql+psycopg://postgres:PASSWORD@localhost:5432/civiclens \
+  .venv/Scripts/python.exe -m pytest tests/integration/test_monitoring_live.py -v
+```
+
+The alert log and acknowledge action are real HTTP endpoints regardless:
+
+```bash
+curl -s -b cookies.txt http://localhost:8080/api/v1/interop-gateway/alerts | python -m json.tool
+curl -s -b cookies.txt -X POST http://localhost:8080/api/v1/interop-gateway/alerts/<alert_id>/acknowledge \
+  -H "X-CSRF-Token: $CSRF"
+```
+
+Distributed transaction tracing pulls every row across the platform's tables sharing one
+`correlation_id` back together — the same id already returned on every exchange result, failure,
+and audit entry:
+
+```bash
+curl -s -b cookies.txt http://localhost:8080/api/v1/interop-gateway/trace/<correlation_id> | python -m json.tool
+```
+
+```json
+{"correlation_id": "<uuid>", "transactions": [...], "exceptions": [...], "events": [...], "audit_entries": [...]}
+```
+
+An unknown correlation id is a clean 404 ("No activity recorded for this correlation id"), not an
+empty 200 pretending there was something to show.
