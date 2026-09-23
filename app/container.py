@@ -25,12 +25,13 @@ from app.legal.precedents import PrecedentIndex
 from app.providers.geocoding import NominatimProvider
 from app.providers.push import ExpoPushSender
 from app.providers.speech import BHASHINI_DEFAULT_LANGUAGES, BhashiniConfig, BhashiniProvider
-from app.providers.stt import SpeechToTextProvider, TranslationProvider, WhisperProvider
+from app.providers.stt import GroqWhisperProvider, SpeechToTextProvider, TranslationProvider, WhisperProvider
 from app.providers.vision import OllamaVisionProvider, VisionProvider
 from app.rag.bm25 import BM25Index
 from app.rag.grounded_generation import GroundedGenerator
 from app.rag.hybrid_retrieval import HybridRetriever, RetrievalConfig
 from app.rag.index import RagIndex
+from app.rag.groq import GroqChatProvider
 from app.rag.ollama import (
     EmbeddingProvider,
     OllamaChatProvider,
@@ -309,13 +310,17 @@ def build_container(settings: Settings) -> AppContainer:
     # room for the load plus even a short generation, so warm-up and first-request calls were degrading
     # to "unavailable" before the model ever finished loading.
     ollama = OllamaClient(settings.ollama_base_url, timeout=180) if settings.ollama_base_url and (settings.ollama_model or settings.ollama_embedding_model or settings.ollama_vision_model) else None
-    llm = OllamaChatProvider(ollama, settings.ollama_model) if ollama and settings.ollama_model else None
+    # Groq (cloud, LPU-hosted) takes over chat/generation when configured - dramatically faster than
+    # this machine's CPU-only Ollama inference. Embeddings/OCR vision stay on Ollama either way.
+    llm = GroqChatProvider(settings.groq_api_key, settings.groq_model) if settings.groq_api_key and settings.groq_model else (OllamaChatProvider(ollama, settings.ollama_model) if ollama and settings.ollama_model else None)
     embedder = OllamaEmbeddingProvider(ollama, settings.ollama_embedding_model, settings.embedding_dimensions) if ollama and settings.ollama_embedding_model else None
     vision = OllamaVisionProvider(ollama, settings.ollama_vision_model) if ollama and settings.ollama_vision_model else None
     asr_langs = frozenset(x.strip() for x in _env("BHASHINI_ASR_LANGUAGES").split(",") if x.strip()) or BHASHINI_DEFAULT_LANGUAGES
     bhashini = BhashiniProvider(BhashiniConfig(settings.bhashini_user_id, settings.bhashini_api_key, _env("BHASHINI_PIPELINE_ID"), asr_languages=asr_langs)) if settings.bhashini_enabled and _env("BHASHINI_PIPELINE_ID") else None
     speech: SpeechToTextProvider | None = None
-    if settings.stt_provider == "whisper" and settings.whisper_model:
+    if settings.stt_provider == "groq_whisper" and settings.groq_api_key:
+        speech = GroqWhisperProvider(settings.groq_api_key, settings.groq_whisper_model)  # cloud-hosted - doesn't compete with this machine's CPU/RAM
+    elif settings.stt_provider == "whisper" and settings.whisper_model:
         speech = WhisperProvider(settings.whisper_model)  # NotConfigured if faster-whisper is not installed: fail loudly at start
     elif settings.stt_provider in ("bhashini", "auto") and bhashini:
         speech = bhashini

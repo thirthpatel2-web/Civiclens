@@ -75,6 +75,11 @@ class Settings:
     ollama_model: str = ""
     ollama_embedding_model: str = ""
     ollama_vision_model: str = ""
+    # Groq Cloud (LPU-hosted, OpenAI-compatible chat completions) - when set, this replaces Ollama
+    # for chat/generation only; embeddings and OCR vision stay on Ollama (Groq doesn't offer them).
+    groq_api_key: str = field(default="", repr=False)
+    groq_model: str = ""
+    groq_whisper_model: str = "whisper-large-v3-turbo"
     embedding_dimensions: int = 0
     rag_top_k: int = 5
     bm25_k1: float = 1.5
@@ -94,7 +99,7 @@ class Settings:
     rti_response_days: int = 30
     rti_life_liberty_hours: int = 48
     rti_pdf_font: str = ""
-    stt_provider: str = "auto"  # auto | bhashini | whisper | none
+    stt_provider: str = "auto"  # auto | bhashini | whisper | groq_whisper | none
     whisper_model: str = ""
     expo_push_enabled: bool = False
     ocr_provider: str = "none"  # none | tesseract | ollama_vision
@@ -142,6 +147,9 @@ class Settings:
             ollama_model=e.get("OLLAMA_MODEL", "").strip(),
             ollama_embedding_model=e.get("OLLAMA_EMBEDDING_MODEL", "").strip(),
             ollama_vision_model=e.get("OLLAMA_VISION_MODEL", "").strip(),
+            groq_api_key=e.get("GROQ_API_KEY", "").strip(),
+            groq_model=e.get("GROQ_MODEL", "").strip(),
+            groq_whisper_model=e.get("GROQ_WHISPER_MODEL", "whisper-large-v3-turbo").strip(),
             embedding_dimensions=_int(e, "EMBEDDING_DIMENSIONS", 0),
             rag_top_k=_int(e, "RAG_TOP_K", 5),
             bm25_k1=_float(e, "BM25_K1", 1.5),
@@ -174,10 +182,12 @@ class Settings:
 
     def _validate(self) -> None:
         problems: list[str] = []
-        if self.stt_provider not in ("auto", "bhashini", "whisper", "none"):
-            problems.append("STT_PROVIDER must be auto, bhashini, whisper or none")
+        if self.stt_provider not in ("auto", "bhashini", "whisper", "groq_whisper", "none"):
+            problems.append("STT_PROVIDER must be auto, bhashini, whisper, groq_whisper or none")
         if self.stt_provider == "whisper" and not self.whisper_model:
             problems.append("STT_PROVIDER=whisper requires WHISPER_MODEL")
+        if self.stt_provider == "groq_whisper" and not (self.groq_api_key and self.groq_whisper_model):
+            problems.append("STT_PROVIDER=groq_whisper requires GROQ_API_KEY and GROQ_WHISPER_MODEL")
         if self.ocr_provider not in ("none", "tesseract", "ollama_vision"):
             problems.append("OCR_PROVIDER must be none, tesseract or ollama_vision")
         if self.bm25_k1 <= 0 or not 0 <= self.bm25_b <= 1:
