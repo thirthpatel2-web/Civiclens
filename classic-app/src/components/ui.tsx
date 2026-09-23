@@ -14,7 +14,11 @@ const CONTENT_MAX_WIDTH = 1080;
 
 export function Screen({ children, scroll = true, style }: { children: React.ReactNode; scroll?: boolean; style?: ViewStyle }) {
   const { colors } = useTheme();
-  const body = <View style={[{ width: '100%', maxWidth: CONTENT_MAX_WIDTH, padding: spacing.lg, gap: spacing.md }, style]}>{children}</View>;
+  // scroll=false screens (the map) have content that wants to flex-grow to fill the viewport - that
+  // only works if this wrapper itself stretches full height, not just its outer parent. Without
+  // `flex: 1` here, a child's own `flex: 1` (e.g. the map) has no sized ancestor to grow into and
+  // just falls back to its minHeight, leaving a large empty gap below it.
+  const body = <View style={[{ width: '100%', maxWidth: CONTENT_MAX_WIDTH, padding: spacing.lg, gap: spacing.md }, !scroll && { flex: 1 }, style]}>{children}</View>;
   return scroll ? (
     <ScrollView style={{ flex: 1, backgroundColor: colors.bg }} contentContainerStyle={{ flexGrow: 1, alignItems: 'center' }} keyboardShouldPersistTaps="handled">{body}</ScrollView>
   ) : (

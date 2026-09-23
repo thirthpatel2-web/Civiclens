@@ -31,6 +31,7 @@ export function useVoiceInput(initialLanguage: LanguageCode | 'auto', _isOnline:
   const recognitionRef = useRef<any>(null);
   const transcriptRef = useRef('');
   const confidenceRef = useRef<{ sum: number; n: number }>({ sum: 0, n: 0 });
+  const safetyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const finish = useCallback((failMessage?: string) => {
     const s = stateRef.current;
@@ -78,15 +79,22 @@ export function useVoiceInput(initialLanguage: LanguageCode | 'auto', _isOnline:
     recognition.onerror = (event: any) => {
       if (event.error === 'not-allowed' || event.error === 'service-not-allowed') dispatch({ type: 'PERMISSION_DENIED' });
       else if (event.error === 'no-speech' || event.error === 'aborted') { /* onend handles this */ }
+      else if (event.error === 'network') dispatch({ type: 'FAILED', message: 'Could not reach the browser speech service (network error). Check your connection, or type instead.' });
       else dispatch({ type: 'FAILED', message: `Voice recognition error: ${event.error}` });
     };
-    recognition.onend = () => finish();
+    recognition.onend = () => { if (safetyTimer.current) clearTimeout(safetyTimer.current); finish(); };
     recognitionRef.current = recognition;
+    // continuous mode (needed so a multi-sentence complaint isn't cut off after the first pause)
+    // has no built-in max duration - without this, a session that never gets an explicit Stop
+    // (a missed click, a stalled tab) would listen forever instead of failing visibly.
+    if (safetyTimer.current) clearTimeout(safetyTimer.current);
+    safetyTimer.current = setTimeout(() => recognitionRef.current?.stop(), 60_000);
     try { recognition.start(); } catch (e: any) { dispatch({ type: 'FAILED', message: e?.message ?? 'Could not start voice recognition.' }); }
   }, [finish]);
 
   const stop = useCallback(async () => { recognitionRef.current?.stop(); }, []);
   const cancel = useCallback(async () => {
+    if (safetyTimer.current) clearTimeout(safetyTimer.current);
     if (recognitionRef.current) { recognitionRef.current.onend = null; recognitionRef.current.stop(); }
     dispatch({ type: 'CANCEL' });
   }, []);

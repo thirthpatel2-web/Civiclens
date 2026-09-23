@@ -6,7 +6,7 @@
 // than faked: "Fragmentation Diagnostic" -> Monitoring (real integration-health diagnostics), and
 // the zip's local classifier -> the real rules-based IntentRouter.
 import React, { useEffect, useState } from 'react';
-import { Linking, Modal, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Linking, Modal, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -289,7 +289,17 @@ export default function HomeScreen() {
             <Text style={{ fontSize: 10, fontWeight: '700', color: colors.primaryLight }}>{!dashboard ? '...' : dashboard.has_data ? `${dashboard.total} filed` : 'No data yet'}</Text>
           </View>
         </View>
-        {!dashboard ? null : !dashboard.has_data ? (
+        {!dashboard ? (
+          // Reserve the same shape while loading, instead of rendering nothing - an empty card that
+          // suddenly grows once data arrives reads as the card "collapsing" rather than loading.
+          <View style={{ flexDirection: 'row', gap: 6 }}>
+            {[colors.accentEmerald, colors.accentRose, colors.accentAmber].map((c, i) => (
+              <View key={i} style={{ flex: 1, borderRadius: radius.md, padding: 6, alignItems: 'center', backgroundColor: withAlpha(c, 0.08), minHeight: 40, justifyContent: 'center' }}>
+                <ActivityIndicator size="small" color={c} />
+              </View>
+            ))}
+          </View>
+        ) : !dashboard.has_data ? (
           <Text style={{ fontSize: 11, color: colors.textMuted, textAlign: 'center', paddingVertical: 10 }}>You haven't filed anything yet. Report an issue or RTI and this dashboard reflects it instantly.</Text>
         ) : (
           <View style={{ flexDirection: 'row', gap: 6 }}>

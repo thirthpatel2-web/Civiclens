@@ -3,7 +3,8 @@
 // describes their issue once, picks Civic or RTI, and everything (category, department, RTI
 // records checklist) is suggested inline instead of gating progress behind a wizard.
 import React, { useEffect, useRef, useState } from 'react';
-import { Image, Pressable, Text, View } from 'react-native';
+import { Image, Linking, Pressable, Text, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { AppButton, Body, Card, Chip, Disclosure, ErrorBanner, Field, H1, InfoBanner, Screen } from '../../src/components/ui.tsx';
 import { VoiceInput } from '../../src/components/VoiceInput.tsx';
@@ -270,6 +271,14 @@ export default function FileRequest() {
 
           {civicError ? <ErrorBanner message={civicError} /> : null}
           <AppButton label={online ? t('act.submit') : 'Save to send later'} icon="➤" onPress={submitCivic} busy={civicBusy} disabled={!canSubmitCivic} />
+          <Pressable accessibilityRole="button" onPress={() => Linking.openURL('https://pgportal.gov.in')}
+            style={{ flexDirection: 'row', alignItems: 'center', padding: 12, borderRadius: radius.md, borderWidth: 1, backgroundColor: colors.surfaceElevated, borderColor: colors.border }}>
+            <Ionicons name="open-outline" size={16} color={colors.textSoft} />
+            <View style={{ flex: 1, marginLeft: 8 }}>
+              <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text }}>File directly on CPGRAMS instead</Text>
+              <Text style={{ fontSize: 10.5, marginTop: 2, color: colors.textMuted }}>The Govt of India's own Centralized Public Grievance Redress portal - separate from this app, opens in a new tab</Text>
+            </View>
+          </Pressable>
         </>
       ) : (
         <>
@@ -309,6 +318,15 @@ export default function FileRequest() {
             {rtiError ? <ErrorBanner message={rtiError} /> : null}
             <AppButton label={t('generateLetterBtn')} onPress={submitRti} busy={rtiBusy} disabled={!canSubmitRti} />
           </Card>
+
+          <Pressable accessibilityRole="button" onPress={() => Linking.openURL('https://rtionline.gov.in')}
+            style={{ flexDirection: 'row', alignItems: 'center', padding: 12, borderRadius: radius.md, borderWidth: 1, backgroundColor: colors.surfaceElevated, borderColor: colors.border }}>
+            <Ionicons name="open-outline" size={16} color={colors.textSoft} />
+            <View style={{ flex: 1, marginLeft: 8 }}>
+              <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text }}>File directly on RTI Online instead</Text>
+              <Text style={{ fontSize: 10.5, marginTop: 2, color: colors.textMuted }}>The Govt of India's own RTI portal for central authorities - separate from this app, opens in a new tab</Text>
+            </View>
+          </Pressable>
 
           {rtiItems.length > 0 ? (
             <>
