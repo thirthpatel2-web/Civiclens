@@ -44,8 +44,9 @@ function Gate() {
 }
 
 function ThemedStatusBar() {
-  const { resolvedMode, colors } = useTheme();
-  return <StatusBar style={resolvedMode === 'dark' ? 'light' : 'dark'} backgroundColor={colors.bg} />;
+  const { resolvedMode } = useTheme();
+  // backgroundColor was dropped from expo-status-bar's props (Android now always renders edge-to-edge).
+  return <StatusBar style={resolvedMode === 'dark' ? 'light' : 'dark'} />;
 }
 
 export default function RootLayout() {

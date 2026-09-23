@@ -8,7 +8,9 @@ import { useTheme } from '../theme/ThemeContext.tsx';
 // Capped-width, centered content column - on a wide desktop browser, an unbounded flex layout
 // stretches every card and banner edge-to-edge, which reads as broken rather than "responsive".
 // Mobile/native is unaffected: below the cap, width: '100%' just fills the (already narrow) screen.
-const CONTENT_MAX_WIDTH = 720;
+// 720 read as a cramped, over-centered column on a normal desktop viewport - widened so grids
+// (dashboard stats, queue lists) actually use the screen instead of leaving huge side margins.
+const CONTENT_MAX_WIDTH = 1080;
 
 export function Screen({ children, scroll = true, style }: { children: React.ReactNode; scroll?: boolean; style?: ViewStyle }) {
   const { colors } = useTheme();

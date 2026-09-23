@@ -40,13 +40,22 @@ export default function CivicLocator() {
   useEffect(() => { endpoints.directory().then(setD).catch((e: any) => setError(e?.message ?? 'Could not load offices.')); }, []);
   useEffect(() => { loc.request(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Offices are seeded across many cities nationwide, so without a radius cutoff a "nearby offices"
+  // screen ends up listing every office in the country, just sorted - the near ones buried under a
+  // long scroll of ones hundreds of km away. 50km covers a metro area; if nothing is that close
+  // (the device is somewhere outside the demo dataset's coverage), fall back to the 10 nearest so
+  // the screen never looks empty.
+  const NEARBY_RADIUS_M = 50_000;
   const offices = useMemo(() => {
     if (!d) return [];
     const filtered = dept ? d.offices.filter((o) => o.department_code === dept) : d.offices;
     if (loc.state.kind !== 'ok') return filtered.map((o) => ({ ...o, distanceM: null as number | null }));
     const { lat, lng } = loc.state;
-    return filtered.map((o) => ({ ...o, distanceM: haversineMeters(lat, lng, o.lat, o.lng) })).sort((a, b) => (a.distanceM ?? Infinity) - (b.distanceM ?? Infinity));
+    const withDistance = filtered.map((o) => ({ ...o, distanceM: haversineMeters(lat, lng, o.lat, o.lng) })).sort((a, b) => (a.distanceM ?? Infinity) - (b.distanceM ?? Infinity));
+    const nearby = withDistance.filter((o) => (o.distanceM ?? Infinity) <= NEARBY_RADIUS_M);
+    return nearby.length > 0 ? nearby : withDistance.slice(0, 10);
   }, [d, dept, loc.state]);
+  const showingFarFallback = loc.state.kind === 'ok' && offices.length > 0 && (offices[0].distanceM ?? 0) > NEARBY_RADIUS_M;
 
   return (
     <Screen>
@@ -71,6 +80,7 @@ export default function CivicLocator() {
         </View>
       </View>
       {loc.state.kind === 'denied' ? <ErrorBanner message="Location permission was denied - offices are shown unsorted. You can still open any office in Maps." onRetry={loc.request} /> : null}
+      {showingFarFallback ? <Body soft>No office is within 50 km of your location - showing the 10 nearest instead.</Body> : null}
 
       {d ? (
         <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>

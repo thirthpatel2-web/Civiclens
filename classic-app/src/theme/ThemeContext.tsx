@@ -1,5 +1,6 @@
 import React, { createContext, useCallback, useContext, useMemo, useState, useEffect } from 'react';
 import { Appearance } from 'react-native';
+import type { ColorSchemeName } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { DARK, LIGHT, statusColorFor } from '../theme.ts';
 import type { ThemeColors } from '../theme.ts';
@@ -19,7 +20,7 @@ export const useTheme = () => { const c = useContext(Ctx); if (!c) throw new Err
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [system, setSystem] = useState(() => Appearance.getColorScheme());
-  useEffect(() => { const sub = Appearance.addChangeListener(({ colorScheme }: { colorScheme: 'light' | 'dark' | null }) => setSystem(colorScheme)); return () => sub.remove(); }, []);
+  useEffect(() => { const sub = Appearance.addChangeListener(({ colorScheme }: { colorScheme: ColorSchemeName }) => setSystem(colorScheme)); return () => sub.remove(); }, []);
   const [mode, setModeState] = useState<ThemeMode>('system');
   useEffect(() => { AsyncStorage.getItem(KEY).then((v: string | null) => { if (v === 'light' || v === 'dark' || v === 'system') setModeState(v); }); }, []);
   const setMode = useCallback(async (m: ThemeMode) => { setModeState(m); await AsyncStorage.setItem(KEY, m); }, []);

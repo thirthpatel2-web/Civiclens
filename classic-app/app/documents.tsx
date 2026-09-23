@@ -64,7 +64,7 @@ export default function Documents() {
 
       <View style={[{ borderRadius: radius.lg, padding: spacing.md, borderWidth: 1, alignItems: 'center', backgroundColor: colors.card, borderColor: colors.border }, shadow.sm]}>
         <View style={{ alignItems: 'center', paddingVertical: 16 }}>
-          <Ionicons name="document-scanner-outline" size={48} color={colors.primary} />
+          <Ionicons name="scan-outline" size={48} color={colors.primary} />
           <Text style={{ fontFamily: fontFamily.bodyExtraBold, fontSize: 14, marginTop: 10, color: colors.text }}>Snap or Upload an Official Document</Text>
           <Text style={{ fontSize: 11, textAlign: 'center', marginTop: 4, paddingHorizontal: 20, color: colors.textMuted }}>Traffic challans, municipal notices, FIR copies, utility bills, or a photo of the civic problem itself</Text>
         </View>

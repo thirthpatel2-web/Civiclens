@@ -20,7 +20,7 @@ import { useDeviceLocation } from '../../src/hooks/useDeviceLocation.ts';
 import { pickPhotos, takePhoto } from '../../src/hooks/usePhotos.ts';
 import { endpoints } from '../../src/api/instance.ts';
 import type { ClassifyPreview, RtiApplication, RtiCategory } from '../../src/api/types.ts';
-import { radius } from '../../src/theme.ts';
+import { fontFamily, radius } from '../../src/theme.ts';
 import { useTheme } from '../../src/theme/ThemeContext.tsx';
 import * as Crypto from 'expo-crypto';
 
@@ -58,7 +58,7 @@ export default function FileRequest() {
     setDescription(v.text);
     if (!title.trim()) setTitle(v.text.length > 60 ? `${v.text.slice(0, 57)}...` : v.text);
     if (v.language) setLanguage(v.language);
-    setVoice({ voiceId: v.voiceId, transcript: v.edited ? null : v.text, audio: null });
+    setVoice({ voiceId: v.voiceId || null, transcript: v.edited ? null : v.text, audio: null }); // web speech recognition has no server-side voice record, so its id is ''
   }
   async function onQueueOffline(uri: string, l: LanguageCode | 'auto') {
     const file = await persistLocalFile({ uri, name: 'voice.m4a', type: 'audio/mp4' });
@@ -318,6 +318,20 @@ export default function FileRequest() {
                   <Text style={{ fontWeight: '700', color: colors.text }}>{a.reference ?? 'draft'} · {a.status}</Text>
                   <Body>{a.draft.subject}</Body>
                   {a.due_at ? <Body soft>Deadline: {new Date(a.due_at).toLocaleDateString()}</Body> : null}
+                  {a.generated_text ? (
+                    <Disclosure label="View the generated RTI letter" defaultOpen>
+                      <View style={{ borderRadius: radius.md, padding: 12, backgroundColor: colors.surfaceElevated, borderWidth: 1, borderColor: colors.border }}>
+                        <Text selectable style={{ fontFamily: fontFamily.body, fontSize: 13, lineHeight: 19, color: colors.text }}>{a.generated_text}</Text>
+                      </View>
+                      <AppButton
+                        label="Copy letter text" kind="secondary"
+                        onPress={() => {
+                          const nav: any = typeof navigator !== 'undefined' ? navigator : null;
+                          if (nav?.clipboard?.writeText) nav.clipboard.writeText(a.generated_text ?? '');
+                        }}
+                      />
+                    </Disclosure>
+                  ) : a.status === 'generated' ? <Body soft>The letter was generated but its text isn't available - try regenerating.</Body> : null}
                   {a.status === 'generated' ? <AppButton label="Mark as filed" kind="secondary" onPress={async () => { await endpoints.fileRti(a.id); const r = await endpoints.listRti(); setRtiItems(r.items); }} /> : null}
                 </Card>
               ))}

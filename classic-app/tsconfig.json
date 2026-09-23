@@ -5,6 +5,7 @@
     "allowImportingTsExtensions": true,
     "noEmit": true,
     "resolveJsonModule": true,
+    "types": ["node"],
     "paths": {
       "@/*": [
         "./src/*"
@@ -14,5 +15,9 @@
   "include": [
     "**/*.ts",
     "**/*.tsx"
+  ],
+  "exclude": [
+    "node_modules",
+    "tools/ambient-stubs.d.ts"
   ]
 }

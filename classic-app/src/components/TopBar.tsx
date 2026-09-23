@@ -5,6 +5,7 @@ import React, { useState } from 'react';
 import { Modal, Pressable, Text, View } from 'react-native';
 import type { ViewStyle } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter, useSegments } from 'expo-router';
 import { useTheme } from '../theme/ThemeContext.tsx';
 import type { ThemeColors } from '../theme.ts';
 import { useI18n } from '../i18n/I18nContext.tsx';
@@ -12,12 +13,20 @@ import { LANGUAGES, UI_LANGUAGES } from '../i18n/languages.ts';
 import { radius, shadow } from '../theme.ts';
 
 const overlay: ViewStyle = { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', alignItems: 'center', padding: 20 };
+// The tab roots have their own bottom/side tab navigation to move between them, so a back arrow
+// there would be redundant (and "back" from a tab root is a confusing no-op); everywhere else
+// (Settings, detail pages, admin screens, ...) was only reachable by pushing forward, with no way
+// back in the UI at all - the browser back button worked, but nothing on-screen told you that.
+const TAB_ROOTS = new Set(['(tabs)', '(officer)']);
 
 export function TopBar() {
   const { colors, mode, resolvedMode, setMode } = useTheme();
   const { t, lang, setLang } = useI18n();
   const [langOpen, setLangOpen] = useState(false);
   const [guideOpen, setGuideOpen] = useState(false);
+  const router = useRouter();
+  const segments = useSegments();
+  const canGoBack = router.canGoBack() && !(segments.length <= 2 && TAB_ROOTS.has(segments[0] as string));
 
   const cycleTheme = () => setMode(mode === 'system' ? 'light' : mode === 'light' ? 'dark' : 'system');
   const themeIcon = mode === 'system' ? 'phone-portrait-outline' : resolvedMode === 'dark' ? 'moon' : 'sunny';
@@ -27,6 +36,11 @@ export function TopBar() {
     <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 16, paddingVertical: 10, backgroundColor: colors.card, borderBottomWidth: 1, borderBottomColor: colors.border }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%', maxWidth: 900 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          {canGoBack ? (
+            <Pressable accessibilityRole="button" accessibilityLabel="Go back" onPress={() => router.back()} style={{ width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center', marginRight: 2 }}>
+              <Ionicons name="arrow-back" size={20} color={colors.text} />
+            </Pressable>
+          ) : null}
           <Ionicons name="shield-checkmark" size={18} color={colors.primary} />
           <Text style={{ fontWeight: '800', color: colors.text, fontSize: 15 }}>{t('brand')}</Text>
         </View>
