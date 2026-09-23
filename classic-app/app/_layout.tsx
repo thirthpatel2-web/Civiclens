@@ -24,7 +24,10 @@ function Gate() {
     const inAuth = segments[0] === '(auth)';
     const inOfficerArea = segments[0] === '(officer)';
     const inCitizenArea = segments[0] === '(tabs)';
-    if (!user && !inAuth) router.replace('/(auth)/login');
+    // Emergency helplines are real, public data (GET /emergency/helplines needs no auth server-side
+    // too) - gating them behind sign-in would be actively harmful in a real emergency.
+    const inEmergency = segments[0] === 'emergency';
+    if (!user && !inAuth && !inEmergency) router.replace('/(auth)/landing');
     else if (user && inAuth) router.replace(homeFor(user.role));
     // A citizen who somehow lands on the officer tabs (or vice versa) gets redirected home for
     // their real role - the API already enforces this server-side; this just keeps the UI honest.

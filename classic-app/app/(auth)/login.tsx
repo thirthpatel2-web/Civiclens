@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
-import { Link } from 'expo-router';
+import { Link, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { AppButton, Body, Card, ErrorBanner, Field, H1, InfoBanner, Screen } from '../../src/components/ui.tsx';
 import { useAuth } from '../../src/auth/AuthContext.tsx';
@@ -16,7 +16,8 @@ export default function Login() {
   const { signIn } = useAuth();
   const { t } = useI18n();
   const { colors } = useTheme();
-  const [portal, setPortal] = useState<Portal>('citizen');
+  const { portal: portalParam } = useLocalSearchParams<{ portal?: string }>();
+  const [portal, setPortal] = useState<Portal>(portalParam === 'official' ? 'official' : 'citizen');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [otp, setOtp] = useState('');
