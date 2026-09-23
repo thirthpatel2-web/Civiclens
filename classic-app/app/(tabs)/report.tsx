@@ -26,12 +26,7 @@ import { useTheme } from '../../src/theme/ThemeContext.tsx';
 import * as Crypto from 'expo-crypto';
 
 const CATEGORIES = ['roads', 'water', 'electricity', 'sanitation', 'drainage', 'encroachment', 'police'];
-const QUICK_EXAMPLES = [
-  'Deep pothole on the main road causing accidents for 2 weeks',
-  'Garbage dump overflowing near the school gate',
-  'Low voltage power supply and transformer sparks',
-  'Contaminated, muddy drinking water from the pipeline',
-];
+const QUICK_EXAMPLE_KEYS = ['report.example.pothole', 'report.example.garbage', 'report.example.power', 'report.example.water'];
 
 type Tab = 'civic' | 'rti';
 
@@ -216,11 +211,14 @@ export default function FileRequest() {
         <Field label={t('lbl.title')} value={title} onChangeText={setTitle} maxLength={200} />
         <Field label={`${t('lbl.description')} (${LANGUAGES[language].native})`} value={description} onChangeText={setDescription} multiline maxLength={5000} />
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
-          {QUICK_EXAMPLES.map((ex) => (
-            <Pressable key={ex} accessibilityRole="button" onPress={() => useExample(ex)} style={{ borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingHorizontal: 10, paddingVertical: 6, maxWidth: 220 }}>
-              <Text style={{ color: colors.textSoft, fontSize: 11 }} numberOfLines={1}>💡 {ex}</Text>
-            </Pressable>
-          ))}
+          {QUICK_EXAMPLE_KEYS.map((key) => {
+            const ex = t(key);
+            return (
+              <Pressable key={key} accessibilityRole="button" onPress={() => useExample(ex)} style={{ borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingHorizontal: 10, paddingVertical: 6, maxWidth: 220 }}>
+                <Text style={{ color: colors.textSoft, fontSize: 11 }} numberOfLines={1}>💡 {ex}</Text>
+              </Pressable>
+            );
+          })}
         </View>
         <Text style={{ color: colors.textSoft, fontSize: 13 }}>{t('lbl.language')}</Text>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>{Object.values(LANGUAGES).map((l) => <Chip key={l.code} label={l.native} selected={language === l.code} onPress={() => setLanguage(l.code)} />)}</View>

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Platform, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 import { useVoiceInput } from '../hooks/useVoiceInput.ts';
 import { AppButton, Body, Card, Chip, ErrorBanner, Field, InfoBanner, Loading } from './ui.tsx';
 import { endpoints } from '../api/instance.ts';
@@ -13,12 +13,6 @@ import { useI18n } from '../i18n/I18nContext.tsx';
 export interface VoiceAccepted { text: string; voiceId: string; language: LanguageCode | null; detectedBy: string | null; edited: boolean }
 interface Props { initialLanguage: LanguageCode; onAccept(v: VoiceAccepted): void; onQueueOffline?(audioUri: string, language: LanguageCode | 'auto'): void }
 
-// On web, voice input runs entirely in the browser (useVoiceInput.web.ts, the SpeechRecognition
-// API) and never touches the server, so the server's transcription-configured check doesn't apply -
-// only whether this browser supports speech recognition at all.
-const WEB_OFFERED: Array<LanguageCode | 'auto'> = ['auto', ...(Object.keys(LANGUAGES) as LanguageCode[])];
-const hasWebSpeechApi = () => typeof window !== 'undefined' && !!((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition);
-
 /** Speak -> text in the language spoken (native script). Shows the language, lets the citizen edit, and never translates. */
 export function VoiceInput({ initialLanguage, onAccept, onQueueOffline }: Props) {
   const { t } = useI18n();
@@ -26,23 +20,21 @@ export function VoiceInput({ initialLanguage, onAccept, onQueueOffline }: Props)
   const [capsError, setCapsError] = useState<string | null>(null);
   const v = useVoiceInput(initialLanguage, isOnline);
 
-  useEffect(() => { if (Platform.OS !== 'web') endpoints.voiceLanguages().then(setCaps).catch((e) => setCapsError(e?.message ?? 'Could not check voice support.')); }, []);
+  // Web and native both upload real audio to the same server-side /voice/transcribe now, so both
+  // depend on the same server-declared capabilities - no platform split needed here any more.
+  useEffect(() => { endpoints.voiceLanguages().then(setCaps).catch((e) => setCapsError(e?.message ?? 'Could not check voice support.')); }, []);
 
-  if (Platform.OS === 'web') {
-    if (!hasWebSpeechApi()) return <InfoBanner tone="warn" message="Voice input needs a browser with speech recognition support (Chrome or Edge). You can still type." />;
-  } else {
-    if (capsError) return <InfoBanner tone="warn" message={`Voice input is unavailable right now (${capsError}). You can still type.`} />;
-    if (!caps) return <Loading label={t('msg.loading')} />;
-    if (caps.state !== 'CONFIGURED') return <InfoBanner tone="warn" message="Voice transcription is not configured on this server. You can still type your complaint." />;
-  }
+  if (capsError) return <InfoBanner tone="warn" message={`Voice input is unavailable right now (${capsError}). You can still type.`} />;
+  if (!caps) return <Loading label={t('msg.loading')} />;
+  if (caps.state !== 'CONFIGURED') return <InfoBanner tone="warn" message="Voice transcription is not configured on this server. You can still type your complaint." />;
 
-  const offered = Platform.OS === 'web' ? WEB_OFFERED : offeredLanguages(caps);
+  const offered = offeredLanguages(caps);
   const s = v.state;
   const langLabel = (l: LanguageCode | 'auto') => (l === 'auto' ? 'Auto-detect' : `${LANGUAGES[l].native} (${LANGUAGES[l].name})`);
 
   return (
     <Card>
-      <Text accessibilityRole="header" style={{ fontWeight: '700', fontSize: 16 }}>🎤 Voice</Text>
+      <Text accessibilityRole="header" style={{ fontWeight: '700', fontSize: 16 }}>🎤 {t('voice.header')}</Text>
       {s.kind === 'idle' || s.kind === 'error' || s.kind === 'review' || s.kind === 'queued_offline' ? (
         <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
           {offered.map((l) => <Chip key={l} label={langLabel(l)} selected={s.language === l} onPress={() => v.selectLanguage(l)} />)}

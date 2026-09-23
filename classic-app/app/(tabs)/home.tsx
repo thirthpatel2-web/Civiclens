@@ -232,17 +232,17 @@ export default function HomeScreen() {
 
       {/* 3. Quick services -------------------------------------------------------------------------- */}
       <View style={{ flexDirection: 'row', gap: 8 }}>
-        <QuickService icon="call" iconColor="#5568D6" bg="rgba(53,71,168,0.15)" label="Directory" sub="Departments" colors={colors} onPress={() => router.push('/directory')} />
-        <QuickService icon="navigate" iconColor="#2E9E63" bg="rgba(46,158,99,0.15)" label="GPS Offices" sub="Nearest" colors={colors} onPress={() => router.push('/locator')} />
-        <QuickService icon="scan" iconColor="#3B8FA8" bg="rgba(59,143,168,0.15)" label="OCR Scan" sub="Notices/FIR" colors={colors} onPress={() => router.push('/documents')} />
-        <QuickService icon="scale" iconColor="#7A5FB0" bg="rgba(122,95,176,0.15)" label="Legal Guide" sub="Ask a question" colors={colors} onPress={() => router.push('/legal')} />
-        <QuickService icon="chatbubbles" iconColor="#BF6B3D" bg="rgba(191,107,61,0.15)" label="Civic Saathi" sub="Ask anything" colors={colors} onPress={() => router.push('/(tabs)/copilot')} />
+        <QuickService icon="call" iconColor="#5568D6" bg="rgba(53,71,168,0.15)" label={t('home.directory')} sub={t('home.directory_sub')} colors={colors} onPress={() => router.push('/directory')} />
+        <QuickService icon="navigate" iconColor="#2E9E63" bg="rgba(46,158,99,0.15)" label={t('home.gps_offices')} sub={t('home.gps_offices_sub')} colors={colors} onPress={() => router.push('/locator')} />
+        <QuickService icon="scan" iconColor="#3B8FA8" bg="rgba(59,143,168,0.15)" label={t('home.ocr_scan')} sub={t('home.ocr_scan_sub')} colors={colors} onPress={() => router.push('/documents')} />
+        <QuickService icon="scale" iconColor="#7A5FB0" bg="rgba(122,95,176,0.15)" label={t('home.legal_guide')} sub={t('home.legal_guide_sub')} colors={colors} onPress={() => router.push('/legal')} />
+        <QuickService icon="chatbubbles" iconColor="#BF6B3D" bg="rgba(191,107,61,0.15)" label={t('nav.copilot')} sub={t('home.civic_saathi_sub')} colors={colors} onPress={() => router.push('/(tabs)/copilot')} />
       </View>
 
       {/* 4. City selector -------------------------------------------------------------------------- */}
       {directory && directory.cities.length > 0 ? (
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-          <Text style={{ fontSize: 11, fontWeight: '700', textTransform: 'uppercase', color: colors.textMuted }}>City:</Text>
+          <Text style={{ fontSize: 11, fontWeight: '700', textTransform: 'uppercase', color: colors.textMuted }}>{t('home.city_label')}</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
             {directory.cities.map((c) => {
               const selected = c.code === selectedCity;
@@ -260,21 +260,21 @@ export default function HomeScreen() {
       {/* 5. Core pillars grid ------------------------------------------------------------------------ */}
       <View style={{ gap: 10 }}>
         <View style={{ flexDirection: 'row', gap: 10 }}>
-          <Pillar icon="document-text" iconColor="#5568D6" bg="rgba(53,71,168,0.15)" title="File a Complaint" sub="AI-classified civic complaint, routed to the right department" tag="Statutory Letter" tagColor={colors.primaryLight} tagBg={colors.primaryGlow} colors={colors} onPress={() => router.push('/(tabs)/report?tab=civic')} />
-          <Pillar icon="business" iconColor="#BF6B3D" bg="rgba(191,107,61,0.15)" title="File an RTI" sub="Section 6(1)/7(1) application with precision questionnaires" tag="RTI Act 2005" tagColor="#BF6B3D" tagBg="rgba(191,107,61,0.12)" colors={colors} onPress={() => router.push('/(tabs)/report?tab=rti')} />
+          <Pillar icon="document-text" iconColor="#5568D6" bg="rgba(53,71,168,0.15)" title={t('home.pillar.complaint.title')} sub={t('home.pillar.complaint.sub')} tag={t('home.pillar.complaint.tag')} tagColor={colors.primaryLight} tagBg={colors.primaryGlow} colors={colors} onPress={() => router.push('/(tabs)/report?tab=civic')} />
+          <Pillar icon="business" iconColor="#BF6B3D" bg="rgba(191,107,61,0.15)" title={t('home.pillar.rti.title')} sub={t('home.pillar.rti.sub')} tag={t('home.pillar.rti.tag')} tagColor="#BF6B3D" tagBg="rgba(191,107,61,0.12)" colors={colors} onPress={() => router.push('/(tabs)/report?tab=rti')} />
         </View>
         <View style={{ flexDirection: 'row', gap: 10 }}>
-          <Pillar icon="git-network" iconColor={colors.primaryLight} bg={colors.primaryGlow} title="Interoperability Layer" sub="Real government data formats normalized into one schema" tag="System Integration" tagColor={colors.primaryLight} tagBg={colors.primaryGlow} colors={colors} onPress={() => router.push('/interop')} />
-          <Pillar icon="pulse" iconColor="#2E9E63" bg="rgba(46,158,99,0.15)" title="Integration Monitoring" sub="Live health of every connected government platform" tag="Data-Backed" tagColor="#2E9E63" tagBg="rgba(46,158,99,0.12)" colors={colors} onPress={() => router.push('/monitoring')} />
+          <Pillar icon="git-network" iconColor={colors.primaryLight} bg={colors.primaryGlow} title={t('home.pillar.interop.title')} sub={t('home.pillar.interop.sub')} tag={t('home.pillar.interop.tag')} tagColor={colors.primaryLight} tagBg={colors.primaryGlow} colors={colors} onPress={() => router.push('/interop')} />
+          <Pillar icon="pulse" iconColor="#2E9E63" bg="rgba(46,158,99,0.15)" title={t('home.pillar.monitoring.title')} sub={t('home.pillar.monitoring.sub')} tag={t('home.pillar.monitoring.tag')} tagColor="#2E9E63" tagBg="rgba(46,158,99,0.12)" colors={colors} onPress={() => router.push('/monitoring')} />
         </View>
         <View style={{ flexDirection: 'row', gap: 10 }}>
-          <Pillar icon="analytics" iconColor="#EC4899" bg="rgba(236,72,153,0.15)" title="Track Grievance" sub="Every filing, its timeline and officer remarks in one place" tag="Unified Tracker" tagColor="#EC4899" tagBg="rgba(236,72,153,0.12)" colors={colors} onPress={() => router.push('/(tabs)/track')} />
-          <Pillar icon="speedometer" iconColor="#BF6B3D" bg="rgba(191,107,61,0.15)" title="Officer Desk" sub="Department resolution queue - sign in with an officer account" tag="Govt Portal" tagColor="#BF6B3D" tagBg="rgba(191,107,61,0.15)" colors={colors} borderColor="#BF6B3D" onPress={async () => { await signOut(); router.replace('/(auth)/login'); }} />
+          <Pillar icon="analytics" iconColor="#EC4899" bg="rgba(236,72,153,0.15)" title={t('home.pillar.track.title')} sub={t('home.pillar.track.sub')} tag={t('home.pillar.track.tag')} tagColor="#EC4899" tagBg="rgba(236,72,153,0.12)" colors={colors} onPress={() => router.push('/(tabs)/track')} />
+          <Pillar icon="speedometer" iconColor="#BF6B3D" bg="rgba(191,107,61,0.15)" title={t('home.pillar.officer.title')} sub={t('home.pillar.officer.sub')} tag={t('home.pillar.officer.tag')} tagColor="#BF6B3D" tagBg="rgba(191,107,61,0.15)" colors={colors} borderColor="#BF6B3D" onPress={async () => { await signOut(); router.replace('/(auth)/login'); }} />
         </View>
-        <Text style={{ fontSize: 10, fontWeight: '800', letterSpacing: 0.8, color: colors.textMuted, marginTop: 4 }}>LEGAL RESOURCES</Text>
+        <Text style={{ fontSize: 10, fontWeight: '800', letterSpacing: 0.8, color: colors.textMuted, marginTop: 4 }}>{t('home.legal_resources_header')}</Text>
         <View style={{ flexDirection: 'row', gap: 10 }}>
-          <Pillar icon="scale" iconColor="#7A5FB0" bg="rgba(122,95,176,0.15)" title="Case Analyzer" sub="Judicial outcome patterns & verified court precedents" tag="Precedents" tagColor="#7A5FB0" tagBg="rgba(122,95,176,0.12)" colors={colors} onPress={() => router.push('/legal')} />
-          <Pillar icon="map" iconColor="#2E9E63" bg="rgba(46,158,99,0.15)" title="Community Heatmap" sub="Real report density from complaints citizens actually filed" tag="Real Data" tagColor="#2E9E63" tagBg="rgba(46,158,99,0.12)" colors={colors} onPress={() => router.push('/map')} />
+          <Pillar icon="scale" iconColor="#7A5FB0" bg="rgba(122,95,176,0.15)" title={t('home.pillar.legal.title')} sub={t('home.pillar.legal.sub')} tag={t('home.pillar.legal.tag')} tagColor="#7A5FB0" tagBg="rgba(122,95,176,0.12)" colors={colors} onPress={() => router.push('/legal')} />
+          <Pillar icon="map" iconColor="#2E9E63" bg="rgba(46,158,99,0.15)" title={t('home.pillar.heatmap.title')} sub={t('home.pillar.heatmap.sub')} tag={t('home.pillar.heatmap.tag')} tagColor="#2E9E63" tagBg="rgba(46,158,99,0.12)" colors={colors} onPress={() => router.push('/map')} />
         </View>
       </View>
 
