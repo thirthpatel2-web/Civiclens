@@ -80,11 +80,11 @@ export function AssistantBar() {
 
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.surfaceElevated, borderRadius: radius.full, borderWidth: 1, borderColor: colors.border, paddingLeft: 16, paddingRight: 6, paddingVertical: 6 }}>
         <TextInput
-          value={text}
+          value={s.kind === 'recording' && v.interimText ? v.interimText : text}
           onChangeText={setText}
           placeholder={t('assistant.placeholder')}
           placeholderTextColor={colors.textMuted}
-          style={{ flex: 1, color: colors.text, fontSize: 15, paddingVertical: 6 }}
+          style={{ flex: 1, color: s.kind === 'recording' ? colors.textSoft : colors.text, fontSize: 15, paddingVertical: 6, fontStyle: s.kind === 'recording' ? 'italic' : 'normal' }}
           onSubmitEditing={() => doRoute(text)}
           returnKeyType="send"
           editable={s.kind !== 'recording' && s.kind !== 'transcribing'}

@@ -50,7 +50,12 @@ export function VoiceField({ label, value, onChangeText, placeholder, multiline,
           {micBusy ? <ActivityIndicator color="#fff" size="small" /> : <Ionicons name={s.kind === 'recording' ? 'stop' : 'mic'} size={18} color="#fff" />}
         </Pressable>
       </View>
-      {s.kind === 'recording' ? <Text style={{ color: colors.bad, fontSize: 12 }}>● {t('assistant.listening')}</Text> : null}
+      {s.kind === 'recording' ? (
+        <View style={{ gap: 2 }}>
+          <Text style={{ color: colors.bad, fontSize: 12 }}>● {t('assistant.listening')}</Text>
+          {v.interimText ? <Text style={{ color: colors.textSoft, fontSize: 12, fontStyle: 'italic' }}>{v.interimText}</Text> : null}
+        </View>
+      ) : null}
       {s.kind === 'error' ? <Text style={{ color: colors.bad, fontSize: 12 }}>{s.permissionDenied ? t('assistant.mic_denied') : s.notConfigured ? t('assistant.mic_off') : `${t('assistant.mic_failed')} (${s.message})`}</Text> : null}
     </View>
   );

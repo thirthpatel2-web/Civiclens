@@ -60,5 +60,7 @@ export function useVoiceInput(initialLanguage: LanguageCode | 'auto', isOnline: 
   }, [transcribe]);
 
   useEffect(() => () => { if (recorder.isRecording) recorder.stop().catch(() => undefined); }, [recorder]);
-  return { state, start, stop, cancel, retry, edit: (text: string) => dispatch({ type: 'EDIT', text }), selectLanguage: (language: LanguageCode | 'auto') => dispatch({ type: 'SELECT_LANGUAGE', language }) };
+  // interimText: web shows live captions while recording (see useVoiceInput.web.ts); native has no
+  // equivalent live-partial API from expo-audio, so this always stays empty - same return shape either way.
+  return { state, start, stop, cancel, retry, interimText: '', edit: (text: string) => dispatch({ type: 'EDIT', text }), selectLanguage: (language: LanguageCode | 'auto') => dispatch({ type: 'SELECT_LANGUAGE', language }) };
 }

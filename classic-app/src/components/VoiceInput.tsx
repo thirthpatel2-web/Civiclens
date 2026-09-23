@@ -42,7 +42,14 @@ export function VoiceInput({ initialLanguage, onAccept, onQueueOffline }: Props)
       ) : null}
       {s.kind === 'idle' ? <AppButton label={`Speak — ${langLabel(s.language)}`} icon="🎤" onPress={v.start} /> : null}
       {s.kind === 'requesting_permission' ? <Loading label="Waiting for microphone permission…" /> : null}
-      {s.kind === 'recording' ? (<View style={{ gap: 8 }}><Body>🔴 Listening… speak in {langLabel(s.language)}</Body><AppButton label="Stop" onPress={v.stop} /><AppButton label="Cancel" kind="secondary" onPress={v.cancel} /></View>) : null}
+      {s.kind === 'recording' ? (
+        <View style={{ gap: 8 }}>
+          <Body>🔴 Listening… speak in {langLabel(s.language)}</Body>
+          {v.interimText ? <Body soft style={{ fontStyle: 'italic' }}>{v.interimText}</Body> : null}
+          <AppButton label="Stop" onPress={v.stop} />
+          <AppButton label="Cancel" kind="secondary" onPress={v.cancel} />
+        </View>
+      ) : null}
       {s.kind === 'transcribing' ? (<View><Loading label="Converting your speech to text…" /><AppButton label="Cancel" kind="secondary" onPress={v.cancel} /></View>) : null}
       {s.kind === 'queued_offline' ? (
         <View style={{ gap: 8 }}>

@@ -16,13 +16,7 @@ import { useI18n } from '../src/i18n/I18nContext.tsx';
 import { fontFamily, radius, shadow, spacing, withAlpha } from '../src/theme.ts';
 import { useTheme } from '../src/theme/ThemeContext.tsx';
 
-const CASE_EXAMPLES = [
-  'Friend issued a cheque which bounced due to insufficient funds',
-  'Builder delayed flat possession by 2 years and refusing to pay interest',
-  'Landlord refusing to refund security deposit after lease ended',
-  'Police station refusing to register a Zero FIR for theft',
-  'Employer terminated me without notice and withheld salary and PF',
-];
+const CASE_EXAMPLE_KEYS = ['legal.example.cheque', 'legal.example.builder', 'legal.example.deposit', 'legal.example.fir', 'legal.example.employer'];
 const TABS = ['assessment', 'statutes', 'bias', 'precedents'] as const;
 const TAB_LABEL: Record<(typeof TABS)[number], string> = { assessment: 'Assessment', statutes: 'Applicable Statutes', bias: 'Coverage & Bias', precedents: 'Precedents' };
 const CONFIDENCE_STYLE: Record<string, { label: string }> = { none: { label: 'No verified match' }, low: { label: 'Low (metadata-only match)' }, medium: { label: 'Medium (grounded in real judgment text)' } };
@@ -51,13 +45,16 @@ export default function Legal() {
 
       <View style={[{ borderRadius: radius.lg, padding: spacing.md, borderWidth: 1, backgroundColor: colors.card, borderColor: colors.border, gap: 8 }, shadow.sm]}>
         <VoiceField label={t('caseInputLabel')} value={text} onChangeText={setText} multiline placeholder={t('caseInputPlaceholder')} />
-        <Text style={{ fontSize: 11, fontWeight: '600', color: colors.textMuted }}>Sample dispute scenarios:</Text>
+        <Text style={{ fontSize: 11, fontWeight: '600', color: colors.textMuted }}>{t('legal.sample_scenarios_label')}</Text>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-          {CASE_EXAMPLES.map((ex) => (
-            <Pressable key={ex} accessibilityRole="button" onPress={() => { setText(ex); run(ex); }} style={{ paddingHorizontal: 10, paddingVertical: 6, borderRadius: radius.sm, borderWidth: 1, borderColor: colors.border, maxWidth: 260 }}>
-              <Text numberOfLines={1} style={{ fontSize: 11, color: colors.textSoft }}>{ex}</Text>
-            </Pressable>
-          ))}
+          {CASE_EXAMPLE_KEYS.map((key) => {
+            const ex = t(key);
+            return (
+              <Pressable key={key} accessibilityRole="button" onPress={() => { setText(ex); run(ex); }} style={{ paddingHorizontal: 10, paddingVertical: 6, borderRadius: radius.sm, borderWidth: 1, borderColor: colors.border, maxWidth: 260 }}>
+                <Text numberOfLines={1} style={{ fontSize: 11, color: colors.textSoft }}>{ex}</Text>
+              </Pressable>
+            );
+          })}
         </View>
         <View style={{ flexDirection: 'row', gap: 8 }}>
           <AppButton label={busy ? 'Analyzing…' : t('act.submit')} icon="⚖️" onPress={() => run()} busy={busy} disabled={text.trim().length < 5} />
@@ -69,6 +66,14 @@ export default function Legal() {
 
       {r ? (
         <View style={{ gap: 10 }}>
+          <View style={[{ borderRadius: radius.lg, padding: spacing.md, borderWidth: 1.5, backgroundColor: withAlpha(confColor, 0.08), borderColor: confColor, gap: 4 }]}>
+            <Text style={{ fontSize: 13, fontWeight: '800', color: colors.text }}>💬 {t('legal.plain.header')}</Text>
+            <Body>
+              {r.interpretation ? t('legal.plain.grounded') : r.precedents.length > 0 || r.full_text_excerpts.length > 0 ? t('legal.plain.precedents_only') : t('legal.plain.no_match')}
+            </Body>
+            {r.interpretation ? <Body soft style={{ marginTop: 4 }}>{r.interpretation}</Body> : null}
+          </View>
+
           <View style={{ flexDirection: 'row', gap: 8 }}>
             {TABS.map((tk) => {
               const selected = tab === tk;

@@ -179,9 +179,10 @@ export default function HomeScreen() {
         <View style={{ flexDirection: 'row', alignItems: 'center', borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surfaceElevated, paddingHorizontal: spacing.sm, height: 44 }}>
           <Ionicons name="search" size={16} color={colors.textMuted} style={{ marginRight: 6 }} />
           <TextInput
-            style={{ flex: 1, fontFamily: fontFamily.body, fontSize: 13, height: '100%', color: colors.text }}
+            style={{ flex: 1, fontFamily: fontFamily.body, fontSize: 13, height: '100%', color: voice.state.kind === 'recording' ? colors.textMuted : colors.text, fontStyle: voice.state.kind === 'recording' ? 'italic' : 'normal' }}
             placeholder="Describe your issue, in any language..." placeholderTextColor={colors.textMuted}
-            value={searchQuery} onChangeText={setSearchQuery} returnKeyType="search"
+            value={voice.state.kind === 'recording' && voice.interimText ? voice.interimText : searchQuery} onChangeText={setSearchQuery} returnKeyType="search"
+            editable={voice.state.kind !== 'recording'}
           />
           {searchQuery.length > 0 ? (
             <Pressable accessibilityRole="button" onPress={() => { setSearchQuery(''); setClassified(null); }} style={{ padding: 4, marginRight: 2 }}>
