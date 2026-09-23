@@ -545,6 +545,20 @@ covers:
 - A citizen without `INTEROP_MANAGE` cannot grant consent; an `AUDITOR` (real, live database) can
   read every surface but is refused by every mutating call, including the connector health check.
 
+**Phase 11 — full-platform live verification.** Beyond each phase's own live HTTP checks (run
+individually as each phase landed), a single continuous session was run against the live server
+end to end, exercising every phase together rather than in isolation: register two throwaway
+accounts (an `INTEGRATION_ADMIN` with real TOTP MFA, a plain `CITIZEN`) → a real federated-identity
+token issue/introspect/revoke round trip → the connector registry with live SLA status → the full
+no-reupload exchange (consent → grant → success/already-completed) → the cross-department timeline
+→ the workflow engine's read surfaces → a real, honest `document_not_found` failure → distributed
+transaction tracing on the successful exchange's correlation id (confirmed it pulls back the real
+`InteropTransaction` row and all 3 `UnifiedApplicationEvent` rows together) → the exception log and
+alert log → the service catalog and its 7 field mappings → RBAC boundaries (the citizen account
+refused on every `INTEROP_READ`/`INTEROP_MANAGE` route, but able to reach its own consent view) →
+cleanup. All 31 checks passed in one run, backed by the full automated suite (720 tests) passing
+with zero regressions in the same session.
+
 Every row the test creates is deleted in `tearDown`, scoped narrowly by the master entity ids and
 fixture ids the test itself created — repeated runs stay deterministic and the shared dev database
 is never left with accumulating test junk. It skips (not fails) cleanly if no live database is

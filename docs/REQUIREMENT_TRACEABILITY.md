@@ -14,11 +14,12 @@ mapping catalog, and the UI surfacing all of it. Rows for capabilities not yet s
 not listed here yet rather than pre-emptively marked DEFERRED, to keep this matrix an accurate
 snapshot of what exists rather than a checklist of everything asked for.
 
-As of Phase 9: 31 rows **DONE**, 5 rows real-but-narrower (**PARTIAL**, or **DONE** with a named
-**PARTIAL**/**DEFERRED** qualifier on one specific sub-part), 1 row genuinely not started
-(**DEFERRED** — legacy/modern connector transport types beyond the session-based demo connectors).
-Every non-DONE row's Notes column names exactly what's missing and why, per this project's rule
-against silent gaps.
+As of Phase 11 (34 rows total): 31 rows **DONE** (25 fully, 6 with an explicitly narrower
+sub-part named in Notes — e.g. the data quality engine is DONE but its rule storage is unread by
+the gateway), 2 rows **PARTIAL** (a connector health dashboard's missing charts; the ~40-screens
+ask deliberately met with one dense console instead), 1 row genuinely not started (**DEFERRED** —
+legacy/modern connector transport types beyond the session-based demo connectors). Every non-fully-DONE row's
+Notes column names exactly what's missing and why, per this project's rule against silent gaps.
 
 Legend: **DONE** · **PARTIAL** (real, narrower than the spec's full ask — explained in Notes) ·
 **DEFERRED** (not built; named so it isn't silently missing).
@@ -56,6 +57,7 @@ Legend: **DONE** · **PARTIAL** (real, narrower than the spec's full ask — exp
 | Documentation (README/ARCHITECTURE/**INTEROPERABILITY**/API/**DEMO_GUIDE**/**SECURITY**/**DATA_MODEL**/**CONNECTOR_GUIDE**/**WORKFLOW_GUIDE**) | **DONE** | All nine written and kept current every phase: `docs/INTEROPERABILITY.md`, `docs/DEMO_GUIDE.md`, `docs/DATA_MODEL.md`, `docs/SECURITY.md`, `docs/CONNECTOR_GUIDE.md`, `docs/WORKFLOW_GUIDE.md`, `ARCHITECTURE.md`, `README.md`, `docs/API_CONTRACT.md` | — | — | — | — | `CONNECTOR_GUIDE.md`/`WORKFLOW_GUIDE.md` written in Phase 10, covering how to add a connector/workflow and the real government-system honesty rule (never a fabricated `healthy` for an unconfigured adapter) |
 | Architecture diagrams (10) | **DONE** | `docs/ARCHITECTURE_DIAGRAMS.md` - 10 Mermaid diagrams (system context, canonical transform, identity resolution, consent lifecycle, federated auth sequence, event bus, workflow engine state machine, data quality + exception dead-letter state machine, SLA/alerting flow, tracing ERD) | — | — | — | — | Mermaid, not exported image files - renders inline on GitHub/most Markdown viewers without a separate asset to keep in sync with the code |
 | The required end-to-end test | **DONE** | `tests/integration/test_interop_gateway_e2e.py` | — | exercises the real API surface via the service layer | — | itself | Runs against live PostgreSQL (the one deliberate exception to this suite's in-memory-doubles convention); found and fixed a real autoflush bug during development |
+| Full-platform live verification (Phase 11) | **DONE** | A single continuous live-HTTP session exercising every phase together (federated auth round trip, no-reupload exchange, timeline, workflow read surfaces, a real gateway failure, distributed tracing, exception/alert/catalog reads, RBAC boundaries) - see `docs/INTEROPERABILITY.md`'s "Tests" section for the full step list | — | every `/interop-gateway/*` and `/federation/*` route exercised in one run | — | 31/31 checks passed; full automated suite (720 tests) green in the same session | Distinct from the per-phase live checks run as each phase landed (Phases 6-9) - this is the one END-TO-END pass proving every phase works together, not just individually |
 | "Do not fabricate analytics" / honest degraded states | **DONE** | Every gateway response is a real outcome (`consent_required`, `identity_ambiguous`, `identity_conflict`, `source_record_not_found`, `failed` with a reason, `already_completed`, `success`) — no code path fabricates a success | — | — | each status has distinct, honest UI copy | `test_interop_gateway_e2e.py` asserts on real statuses, not mocked ones | |
 
 ## Reading this table
