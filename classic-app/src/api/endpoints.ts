@@ -120,6 +120,20 @@ export function createEndpoints(api: ApiClient) {
     updateExternalLink: (id: string, status_note: string) => api.put(`/interop/external-links/${id}`, { status_note }),
     removeExternalLink: (id: string) => api.del(`/interop/external-links/${id}`),
 
+    // ---- interop gateway: the no-reupload cross-department demo (admin/integration console) --------
+    requestDocumentExchange: (application_no: string, document_type?: string) => api.post<T.ExchangeResult>('/interop-gateway/document-exchange', { application_no, document_type: document_type || 'residence_certificate' }),
+    interopTimeline: (application_no: string) => api.get<T.TimelineResult>(`/interop-gateway/timeline/${application_no}`),
+    interopTransactions: (limit?: number) => api.get<{ items: T.InteropTransactionView[] }>('/interop-gateway/transactions', limit ? { limit } : undefined),
+    interopConsents: (status?: string | null) => api.get<{ items: T.InteropConsent[] }>('/interop-gateway/consents', status ? { status } : undefined),
+    grantConsent: (consent_id: string) => api.post<T.ExchangeResult>(`/interop-gateway/consents/${consent_id}/grant`, {}),
+    denyConsent: (consent_id: string) => api.post<T.ExchangeResult>(`/interop-gateway/consents/${consent_id}/deny`, {}),
+    revokeConsent: (consent_id: string, reason: string) => api.post<T.ExchangeResult>(`/interop-gateway/consents/${consent_id}/revoke`, { reason }),
+    interopIdentityCandidates: (status?: string) => api.get<{ items: T.IdentityMatchCandidateView[] }>('/interop-gateway/identity-candidates', status ? { status } : undefined),
+    resolveIdentityCandidate: (candidate_id: string, approve: boolean) => api.post<T.ExchangeResult>(`/interop-gateway/identity-candidates/${candidate_id}/resolve`, { approve }),
+    interopConnectors: () => api.get<{ items: T.ConnectorView[] }>('/interop-gateway/connectors'),
+    interopConnectorHealthCheck: (connector_id: string) => api.post<Record<string, unknown>>(`/interop-gateway/connectors/${connector_id}/health-check`, {}),
+    setConnectorEnabled: (connector_id: string, enabled: boolean) => api.put(`/interop-gateway/connectors/${connector_id}/enabled`, { enabled }),
+
     // ---- monitoring / integrations (admin) --------------------------------------------------------
     integrationStatus: () => api.get<{ items: T.IntegrationHealth[] }>('/integrations'),
     integrationCheck: () => api.post<{ items: T.IntegrationHealth[] }>('/integrations/check', {}),

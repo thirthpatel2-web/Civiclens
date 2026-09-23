@@ -109,6 +109,36 @@ export interface IntegrationException {
 export interface ExternalIdLink { id: string; user_id: string; id_type: string; id_hash: string; last4: string | null; linked_at: string }
 export interface ExternalServiceLink { id: string; user_id: string; platform: string; external_reference: string; title: string; created_at: string; updated_at: string; status_note: string }
 
+// ---- interop gateway (the no-reupload cross-department demo) -----------------------------------
+export type ExchangeStatus = 'consent_required' | 'identity_ambiguous' | 'identity_conflict' | 'source_record_not_found' | 'already_completed' | 'success' | 'failed';
+export interface ExchangeResult {
+  status: ExchangeStatus; consent_id?: string; master_id?: string; side?: string; confidence?: number; explanation?: string;
+  detail?: string; transaction_id?: string; application_id?: string; document_reference?: string; quality_score?: number;
+  correlation_id?: string; reason?: string; issues?: string[];
+}
+export interface InteropConsent {
+  consent_id: string; master_id: string; citizen_user_id: string; requesting_system: string; providing_system: string;
+  purpose: string; data_category: string; fields: string[]; status: 'pending' | 'granted' | 'denied' | 'expired' | 'revoked';
+  created_at: string; expires_at: string | null; decided_at: string | null; revoked_at: string | null; revocation_reason: string | null;
+}
+export interface IdentityMatchCandidateView {
+  id: string; master_id: string; system: string; identifier_type: string; identifier_value: string; score: number;
+  explanation: string; status: 'pending' | 'confirmed' | 'rejected'; resolved_by: string | null; resolved_at: string | null; created_at: string;
+}
+export interface ConnectorView {
+  connector_id: string; name: string; department: string; version: string; supported_operations: string[]; enabled: boolean;
+  health_state: 'healthy' | 'degraded' | 'unavailable' | 'not_configured' | 'unknown'; last_health_check: string | null;
+  last_success_at: string | null; last_failure_at: string | null; total_calls: number; total_failures: number; avg_response_ms: number | null;
+}
+export interface UnifiedApplicationEventView { id: string; application_id: string; step: string; source_system: string; status: string; correlation_id: string | null; detail: Record<string, unknown>; occurred_at: string }
+export interface UnifiedApplicationView { application_id: string; reference: string; master_id: string; service_type: string; primary_system: string; external_reference: string | null; status: string; created_at: string; updated_at: string }
+export interface TimelineResult { application: UnifiedApplicationView; events: UnifiedApplicationEventView[] }
+export interface InteropTransactionView {
+  transaction_id: string; correlation_id: string; operation: string; source_system: string; target_system: string;
+  master_id: string | null; consent_id: string | null; status: string; error_code: string | null; error_message: string | null;
+  fields_exchanged: string[]; duration_ms: number | null; created_at: string;
+}
+
 // ---- monitoring / integrations (admin) --------------------------------------------------------
 export interface IntegrationHealth {
   platform: string; display_name: string; state: string; detail: string; checked_at: string;

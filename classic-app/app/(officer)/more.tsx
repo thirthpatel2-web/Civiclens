@@ -11,7 +11,7 @@ const items: Array<[string, string, string]> = [
   ['/interop', 'nav.interop', '🔗'], ['/copilot', 'nav.copilot', '🤖'], ['/map', 'nav.gis', '🗺️'], ['/settings', 'nav.settings', '⚙️'],
 ];
 const adminItems: Array<[string, string, string]> = [
-  ['/monitoring', 'nav.monitoring', '🩺'], ['/workflow-rules', 'nav.workflow', '⚙️'],
+  ['/monitoring', 'nav.monitoring', '🩺'], ['/workflow-rules', 'nav.workflow', '⚙️'], ['/interop-gateway', 'nav.interop_gateway', '🔄'],
 ];
 export default function OfficerMore() {
   const { t } = useI18n();
