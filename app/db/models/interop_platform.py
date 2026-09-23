@@ -204,7 +204,10 @@ class InteropTransaction(Base):
     status: Mapped[str] = mapped_column(String(30), nullable=False)  # success | failed | pending_consent | rejected
     error_code: Mapped[str | None] = mapped_column(String(60), nullable=True)
     error_message: Mapped[str | None] = mapped_column(String(400), nullable=True)
-    fields_exchanged: Mapped[list] = jsonb(list)
+    fields_exchanged: Mapped[list] = jsonb(list)  # the destination system's own field names for what was actually written
+    requested_fields: Mapped[list] = jsonb(list)  # canonical field names this operation needed to read from the source
+    approved_fields: Mapped[list] = jsonb(list)  # consent.fields at the moment this transaction ran - the field-level authorization actually checked
+    denied_fields: Mapped[list] = jsonb(list)  # requested_fields not in approved_fields - non-empty only when status="failed", error_code="data_field_not_consented"
     duration_ms: Mapped[float | None] = mapped_column(Float, nullable=True)
     created_at: Mapped[datetime] = created_at()
     __table_args__ = (Index("ix_interop_transactions_correlation_id", "correlation_id"), Index("ix_interop_transactions_master_id", "master_id"))

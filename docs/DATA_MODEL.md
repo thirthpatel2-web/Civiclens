@@ -1,6 +1,7 @@
 # Data model — interoperability platform
 
-The 13 tables added by migration `0010` (`app/db/models/interop_platform.py`). Scoped to this
+The 13 tables added by migration `0010` (`app/db/models/interop_platform.py`), plus the 3 columns
+migration `0011` added to `interop_transactions` for field-level consent tracking. Scoped to this
 subsystem only — the rest of CivicLens's ~40 tables are unrelated to the interop platform and are
 not documented here; see `ARCHITECTURE.md`'s "Data" section for those.
 
@@ -153,7 +154,10 @@ exactly as it would treat a real external department it has no schema control ov
 | `consent_id` (FK, nullable) | → `interop_consent_grants` | |
 | `status` | `String(30)` | `success` \| `failed` \| `pending_consent` \| `rejected` |
 | `error_code`, `error_message` | `String`, nullable | Populated only on failure — never both null and status=failed |
-| `fields_exchanged` | `jsonb` list | Empty on failure |
+| `fields_exchanged` | `jsonb` list | The destination system's own field names for what was actually written (e.g. `["document_reference", "document_status"]`). Empty on failure |
+| `requested_fields` | `jsonb` list | Canonical field names (migration `0011`) this operation needed to read from the source - `["reference", "status", "issued_on"]` for the document exchange |
+| `approved_fields` | `jsonb` list | `consent.fields` at the moment this transaction ran - the field-level authorization actually checked, not just what the consent record says today |
+| `denied_fields` | `jsonb` list | `requested_fields` not in `approved_fields` - non-empty only when `status="failed"`, `error_code="data_field_not_consented"` |
 | `duration_ms` | `float`, nullable | Real elapsed time of the connector call |
 | `created_at` | `timestamptz` | |
 

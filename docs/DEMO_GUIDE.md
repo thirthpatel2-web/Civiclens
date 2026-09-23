@@ -123,3 +123,48 @@ leaves an identifier silently unlinked after a human has looked at it.
 
 `tests/integration/test_interop_gateway_e2e.py::test_ambiguous_identity_match_requires_manual_review_before_anything_proceeds`
 exercises this exact path automatically, against a real database, on every test run.
+
+## Field-level consent (a narrower grant genuinely blocks the exchange)
+
+To see the field-level enforcement Section 7 of the completion spec asks for: after step 3 above
+(consent requested, not yet granted), narrow what's authorized before granting it -
+
+```bash
+curl -s -b cookies.txt -X GET http://localhost:8080/api/v1/interop-gateway/consents?status=pending
+# find the consent_id from step 3, then, directly in the database (there's no "edit fields" UI
+# yet - the enforcement is on the backend, this is just how to demonstrate it today):
+# UPDATE interop_consent_grants SET fields = '["reference", "status"]' WHERE consent_id = '...';
+```
+
+Grant it, then request the exchange again:
+
+```bash
+curl -s -b cookies.txt -X POST http://localhost:8080/api/v1/interop-gateway/document-exchange \
+  -H 'Content-Type: application/json' -H "X-CSRF-Token: $CSRF" \
+  -d '{"application_no":"APP-MH-2026-5501"}'
+```
+
+```json
+{"status": "failed", "reason": "data_field_not_consented", "denied_fields": ["issued_on"], "transaction_id": "...", "correlation_id": "..."}
+```
+
+Nothing was read from Department A - the check runs before the connector is called. The
+`InteropTransaction` row for this attempt has `requested_fields: ["reference", "status", "issued_on"]`,
+`approved_fields: ["reference", "status"]`, `denied_fields: ["issued_on"]`.
+`tests/integration/test_interop_gateway_e2e.py::test_field_level_consent_refuses_an_exchange_missing_an_authorized_field`
+exercises this automatically.
+
+## Citizen-controlled consent
+
+Any authenticated citizen who owns a consent grant can act on it directly, without
+`INTEROP_MANAGE`:
+
+```bash
+curl -s -b citizen_cookies.txt -X POST http://localhost:8080/api/v1/interop-gateway/consents/{consent_id}/grant \
+  -H 'Content-Type: application/json' -H "X-CSRF-Token: $CITIZEN_CSRF" -d '{}'
+```
+
+A different citizen gets `403 permission_denied`. `GET /interop-gateway/my-consents` is the
+citizen's own view of every grant attributed to them - no `INTEROP_READ` permission required.
+`tests/integration/test_interop_gateway_e2e.py::test_citizen_can_grant_their_own_consent_but_not_someone_elses`
+exercises this with two independent citizen accounts.

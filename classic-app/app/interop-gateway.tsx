@@ -124,7 +124,7 @@ export default function InteropGateway() {
             </View>
           ) : null}
           {result.status === 'identity_ambiguous' ? <Body soft>Confidence: {Math.round((result.confidence ?? 0) * 100)}% — {result.explanation}</Body> : null}
-          {result.status === 'failed' && result.reason ? <Body soft>Reason: {result.reason}{result.issues?.length ? ` (${result.issues.join('; ')})` : ''}</Body> : null}
+          {result.status === 'failed' && result.reason ? <Body soft>Reason: {result.reason}{result.issues?.length ? ` (${result.issues.join('; ')})` : ''}{result.denied_fields?.length ? ` — not authorized: ${result.denied_fields.join(', ')}` : ''}</Body> : null}
           {result.status === 'success' ? <Body soft>Document reference: {result.document_reference} · quality {Math.round((result.quality_score ?? 0) * 100)}%</Body> : null}
         </Card>
       ) : null}

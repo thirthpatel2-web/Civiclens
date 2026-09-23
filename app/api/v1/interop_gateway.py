@@ -6,10 +6,14 @@ exchange, act on the consent it requires, resolve ambiguous identity matches, an
 connector registry / transaction / timeline history that resulted. See
 app/services/interop_gateway_service.py for what each endpoint actually does.
 
-Two permissions gate this router (held by ADMIN/SUPER_ADMIN, and by the dedicated
+Two permissions gate most of this router (held by ADMIN/SUPER_ADMIN, and by the dedicated
 INTEGRATION_ADMIN/AUDITOR roles - see app/core/authorization.py): INTEROP_READ for every GET here,
 INTEROP_MANAGE for anything that changes state (an AUDITOR holds only the former - it can watch
-every exchange, consent and identity decision, but can never make one).
+every exchange, consent and identity decision, but can never make one). The three consent-decision
+routes (grant/deny/revoke) are the one exception: they accept any authenticated caller, because
+InteropGatewayService itself enforces the real rule (Section 8, citizen-controlled consent) - an
+INTEROP_MANAGE holder OR the citizen the grant is attributed to, never anyone else. /my-consents is
+the citizen-facing list, gated on PROFILE_MANAGE (every role holds it) rather than INTEROP_READ.
 """
 
 from __future__ import annotations
@@ -19,7 +23,7 @@ from fastapi import APIRouter, Depends
 from app.api.serialize import to_jsonable
 from app.container import AppContainer
 from app.core.authorization import AuthContext, Permission
-from app.core.dependencies import get_container, guard
+from app.core.dependencies import get_container, get_ctx, guard
 from app.schemas.api import (
     RequestDocumentExchangeBody,
     ResolveIdentityCandidateBody,
@@ -53,18 +57,23 @@ def list_consents(status: str | None = None, ctx: AuthContext = READ, c: AppCont
     return {"items": to_jsonable(c.interop_gateway.list_consents(ctx, status=status))}
 
 
+@router.get("/my-consents")
+def list_my_consents(status: str | None = None, ctx: AuthContext = Depends(guard(Permission.PROFILE_MANAGE)), c: AppContainer = Depends(get_container)) -> dict:
+    return {"items": to_jsonable(c.interop_gateway.list_my_consents(ctx, status=status))}
+
+
 @router.post("/consents/{consent_id}/grant")
-def grant_consent(consent_id: str, ctx: AuthContext = MANAGE, c: AppContainer = Depends(get_container)) -> dict:
+def grant_consent(consent_id: str, ctx: AuthContext = Depends(get_ctx), c: AppContainer = Depends(get_container)) -> dict:
     return to_jsonable(c.interop_gateway.grant_consent(ctx, consent_id=consent_id))
 
 
 @router.post("/consents/{consent_id}/deny")
-def deny_consent(consent_id: str, ctx: AuthContext = MANAGE, c: AppContainer = Depends(get_container)) -> dict:
+def deny_consent(consent_id: str, ctx: AuthContext = Depends(get_ctx), c: AppContainer = Depends(get_container)) -> dict:
     return to_jsonable(c.interop_gateway.deny_consent(ctx, consent_id=consent_id))
 
 
 @router.post("/consents/{consent_id}/revoke")
-def revoke_consent(consent_id: str, body: RevokeConsentBody, ctx: AuthContext = MANAGE, c: AppContainer = Depends(get_container)) -> dict:
+def revoke_consent(consent_id: str, body: RevokeConsentBody, ctx: AuthContext = Depends(get_ctx), c: AppContainer = Depends(get_container)) -> dict:
     return to_jsonable(c.interop_gateway.revoke_consent(ctx, consent_id=consent_id, reason=body.reason))
 
 

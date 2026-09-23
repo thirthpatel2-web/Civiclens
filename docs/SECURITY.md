@@ -81,14 +81,39 @@ gating, confidence-scored resolution, least-privilege RBAC, audit trail) are the
 that would apply unchanged the day a real department connector is added; only
 `app/interop/mock_systems.py`'s query functions would be replaced with real calls.
 
+## Field-level consent enforcement
+
+`InteropGatewayService._execute_exchange` checks `REQUIRED_DOCUMENT_FIELDS` (the canonical fields
+this exchange needs - `reference`, `status`, `issued_on`) against `consent.fields` **before**
+calling the Department A connector at all - not after, and not just hiding denied fields from the
+UI. A consent narrower than what the operation needs refuses the exchange with
+`data_field_not_consented` and the exact denied field names, recorded on the `InteropTransaction`
+row (`requested_fields`/`approved_fields`/`denied_fields` columns, migration `0011`) alongside
+everything else about that attempt. Verified live:
+`test_field_level_consent_refuses_an_exchange_missing_an_authorized_field`.
+
+## Citizen-controlled consent
+
+`InteropGatewayService.grant_consent`/`deny_consent`/`revoke_consent` accept the citizen a grant is
+attributed to (`InteropConsentGrant.citizen_user_id == ctx.user_id`) as well as an
+`INTEROP_MANAGE`-holding integration admin - checked in the service layer
+(`_require_consent_actor`), since real authorization here is a data-dependent question ("is this
+your consent?"), not a static role permission. The three routes accept any authenticated caller at
+the API layer and rely on the service to refuse the wrong citizen; `GET /my-consents` is the
+citizen-facing list, gated on `PROFILE_MANAGE` (every role holds it) rather than `INTEROP_READ`.
+Every decision's audit record notes whether it was `self_service` or made on the citizen's behalf.
+Verified live: `test_citizen_can_grant_their_own_consent_but_not_someone_elses` (two independent
+CITIZEN-role accounts, neither holding any interop permission at all).
+
+**Known limitation**: today's demo flow sets `citizen_user_id` to whoever calls
+`request_document_exchange` (an `INTEROP_MANAGE` holder), since the mock demo personas (Priya
+Deshmukh, Arjun Patil) aren't linked to real CivicLens accounts. The self-service *mechanism* above
+is real and independently tested; end-to-end "a real citizen requests data sharing about
+themselves" would need that identity linkage - the existing Golden Record feature
+(`app.services.interop_service.MasterDataService`) is the natural place to build it, not yet done.
+
 ## Known gaps (named, not hidden)
 
-- `InteropConsentGrant.fields` is a declared list of what would be shared, but nothing in this
-  milestone enforces that only those fields are actually read from the mock connector — the
-  connector functions (`mock_systems.dept_a_find_document`, etc.) return whatever columns exist on
-  the row. Field-level enforcement matters once a real connector can return more than a demo
-  fixture holds; it wasn't built this milestone (see the traceability matrix's "field-mapping UI"
-  deferred item).
 - Connector-level rate limiting / abuse protection isn't implemented separately for this
   subsystem — it inherits whatever the surrounding request goes through
   (`app/core/rate_limit.py`), not a per-connector budget.

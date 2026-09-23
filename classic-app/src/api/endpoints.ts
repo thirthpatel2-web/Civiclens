@@ -125,6 +125,7 @@ export function createEndpoints(api: ApiClient) {
     interopTimeline: (application_no: string) => api.get<T.TimelineResult>(`/interop-gateway/timeline/${application_no}`),
     interopTransactions: (limit?: number) => api.get<{ items: T.InteropTransactionView[] }>('/interop-gateway/transactions', limit ? { limit } : undefined),
     interopConsents: (status?: string | null) => api.get<{ items: T.InteropConsent[] }>('/interop-gateway/consents', status ? { status } : undefined),
+    myConsents: (status?: string | null) => api.get<{ items: T.InteropConsent[] }>('/interop-gateway/my-consents', status ? { status } : undefined),
     grantConsent: (consent_id: string) => api.post<T.ExchangeResult>(`/interop-gateway/consents/${consent_id}/grant`, {}),
     denyConsent: (consent_id: string) => api.post<T.ExchangeResult>(`/interop-gateway/consents/${consent_id}/deny`, {}),
     revokeConsent: (consent_id: string, reason: string) => api.post<T.ExchangeResult>(`/interop-gateway/consents/${consent_id}/revoke`, { reason }),

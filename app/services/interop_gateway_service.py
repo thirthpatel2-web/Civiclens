@@ -39,7 +39,7 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy import inspect, select
 
 from app.core.authorization import AuthContext, Permission, require
-from app.core.exceptions import NotFound, ValidationFailed
+from app.core.exceptions import NotFound, PermissionDenied, ValidationFailed
 from app.core.logging import correlation_id_var
 from app.db.models.interop_platform import (
     IdentityMatchCandidate,
@@ -58,6 +58,13 @@ from app.services.audit_service import AuditService
 from app.services.uow import UowFactory
 
 CONSENT_VALIDITY = timedelta(days=30)
+
+# Canonical field names (app.interop.canonical.v1.models.Document) this exchange needs to read
+# from Department A - the field-level consent vocabulary a citizen actually authorizes against.
+# Enforced in _execute_exchange before any of these fields are used for anything, per the
+# completion spec's field-level consent requirement: an unconsented field is refused, not hidden
+# by the UI and quietly read anyway.
+REQUIRED_DOCUMENT_FIELDS = ("reference", "status", "issued_on")
 
 
 def _row(obj) -> dict | None:
@@ -143,7 +150,7 @@ class InteropGatewayService:
                             consent_id=str(uuid.uuid4()), master_id=master_id, citizen_user_id=ctx.user_id,
                             requesting_system="dept_b", providing_system="dept_a",
                             purpose=f"Verify {document_type.replace('_', ' ')} for application {application_no}",
-                            data_category=document_type, fields=["full_name", "reference_no", "issued_on", "status"],
+                            data_category=document_type, fields=list(REQUIRED_DOCUMENT_FIELDS),
                             status="pending", created_at=self._clock(),
                         )
                         s.add(pending)
@@ -170,12 +177,23 @@ class InteropGatewayService:
         unified = self._get_or_create_unified_application(s, master_id=master_id, application_no=application_no)
         self._add_event(s, unified.application_id, step="identity_resolved_cross_system", source_system="civiclens", status="success", correlation_id=correlation_id, detail={"master_id": master_id, "dept_a_resident_id": resident.resident_id})
 
+        # Field-level consent enforcement (Section 7): checked before ANY field is read, not just
+        # hidden from the UI afterwards. approved_fields is what the citizen actually authorized on
+        # this exact grant, which may be narrower than what a later version of this operation needs.
+        approved_fields = list(consent.fields or [])
+        denied_fields = [f for f in REQUIRED_DOCUMENT_FIELDS if f not in approved_fields]
+        if denied_fields:
+            txn = self._record_transaction(s, correlation_id=correlation_id, source="dept_a", target="dept_b", master_id=master_id, consent_id=consent.consent_id, status="failed", error_code="data_field_not_consented", error_message=f"Fields not authorized by this consent: {', '.join(denied_fields)}.", fields=[], duration_ms=0.0, requested_fields=list(REQUIRED_DOCUMENT_FIELDS), approved_fields=approved_fields, denied_fields=denied_fields)
+            self._add_event(s, unified.application_id, step="field_level_consent_check_failed", source_system="civiclens", status="failed", correlation_id=correlation_id, detail={"denied_fields": denied_fields})
+            AuditService(uow.audit, self._clock).record("interop.document_exchange_failed", actor_id=ctx.user_id, resource_type="interop_transaction", resource_id=txn.transaction_id, metadata={"reason": "data_field_not_consented", "denied_fields": denied_fields, "application_no": application_no})
+            return {"status": "failed", "reason": "data_field_not_consented", "denied_fields": denied_fields, "transaction_id": txn.transaction_id, "correlation_id": correlation_id}
+
         # Gateway -> Connector Runtime -> GovernmentConnector - never a direct mock-system call.
         fetch_result = connector_runtime.call(s, "dept_a", "fetch_document", resident.resident_id, document_type)
         duration_ms = fetch_result.meta.get("duration_ms", 0.0)
 
         if not fetch_result.ok or fetch_result.data is None:
-            txn = self._record_transaction(s, correlation_id=correlation_id, source="dept_a", target="dept_b", master_id=master_id, consent_id=consent.consent_id, status="failed", error_code="document_not_found", error_message=f"No {document_type} on file for this resident.", fields=[], duration_ms=duration_ms)
+            txn = self._record_transaction(s, correlation_id=correlation_id, source="dept_a", target="dept_b", master_id=master_id, consent_id=consent.consent_id, status="failed", error_code="document_not_found", error_message=f"No {document_type} on file for this resident.", fields=[], duration_ms=duration_ms, requested_fields=list(REQUIRED_DOCUMENT_FIELDS), approved_fields=approved_fields, denied_fields=[])
             self._add_event(s, unified.application_id, step="document_fetch_failed", source_system="dept_a", status="failed", correlation_id=correlation_id, detail={"reason": "document_not_found"})
             AuditService(uow.audit, self._clock).record("interop.document_exchange_failed", actor_id=ctx.user_id, resource_type="interop_transaction", resource_id=txn.transaction_id, metadata={"reason": "document_not_found", "application_no": application_no})
             return {"status": "failed", "reason": "document_not_found", "transaction_id": txn.transaction_id, "correlation_id": correlation_id}
@@ -185,7 +203,7 @@ class InteropGatewayService:
         canonical_doc = dept_a_document_to_canonical(fetch_result.data)
         quality_score, quality_issues = _document_quality(canonical_doc)
         if quality_score < 0.7:
-            txn = self._record_transaction(s, correlation_id=correlation_id, source="dept_a", target="dept_b", master_id=master_id, consent_id=consent.consent_id, status="failed", error_code="data_quality_failed", error_message="; ".join(quality_issues), fields=[], duration_ms=duration_ms)
+            txn = self._record_transaction(s, correlation_id=correlation_id, source="dept_a", target="dept_b", master_id=master_id, consent_id=consent.consent_id, status="failed", error_code="data_quality_failed", error_message="; ".join(quality_issues), fields=[], duration_ms=duration_ms, requested_fields=list(REQUIRED_DOCUMENT_FIELDS), approved_fields=approved_fields, denied_fields=[])
             self._add_event(s, unified.application_id, step="document_quality_check_failed", source_system="dept_a", status="failed", correlation_id=correlation_id, detail={"score": quality_score, "issues": quality_issues})
             AuditService(uow.audit, self._clock).record("interop.document_exchange_failed", actor_id=ctx.user_id, resource_type="interop_transaction", resource_id=txn.transaction_id, metadata={"reason": "data_quality_failed", "issues": quality_issues, "application_no": application_no})
             return {"status": "failed", "reason": "data_quality_failed", "issues": quality_issues, "transaction_id": txn.transaction_id, "correlation_id": correlation_id}
@@ -203,7 +221,7 @@ class InteropGatewayService:
         unified.updated_at = self._clock()
         s.add(unified)
 
-        txn = self._record_transaction(s, correlation_id=correlation_id, source="dept_a", target="dept_b", master_id=master_id, consent_id=consent.consent_id, status="success", error_code=None, error_message=None, fields=["full_name", "document_type", "reference_no", "issued_on", "status"], duration_ms=duration_ms)
+        txn = self._record_transaction(s, correlation_id=correlation_id, source="dept_a", target="dept_b", master_id=master_id, consent_id=consent.consent_id, status="success", error_code=None, error_message=None, fields=list(dept_b_fields.keys()), duration_ms=duration_ms, requested_fields=list(REQUIRED_DOCUMENT_FIELDS), approved_fields=approved_fields, denied_fields=[])
         AuditService(uow.audit, self._clock).record("interop.document_exchange_completed", actor_id=ctx.user_id, resource_type="unified_application", resource_id=unified.application_id, metadata={"application_no": application_no, "master_id": master_id, "document_reference": canonical_doc.reference, "quality_score": quality_score, "transaction_id": txn.transaction_id})
 
         return {"status": "success", "transaction_id": txn.transaction_id, "application_id": unified.application_id, "document_reference": canonical_doc.reference, "quality_score": quality_score, "correlation_id": correlation_id}
@@ -226,8 +244,13 @@ class InteropGatewayService:
     def _add_event(self, session, application_id: str, *, step: str, source_system: str, status: str, correlation_id: str, detail: dict) -> None:
         session.add(UnifiedApplicationEvent(id=str(uuid.uuid4()), application_id=application_id, step=step, source_system=source_system, status=status, correlation_id=correlation_id, detail=detail, occurred_at=self._clock()))
 
-    def _record_transaction(self, session, *, correlation_id: str, source: str, target: str, master_id: str, consent_id: str, status: str, error_code: str | None, error_message: str | None, fields: list[str], duration_ms: float) -> InteropTransaction:
-        txn = InteropTransaction(transaction_id=str(uuid.uuid4()), correlation_id=correlation_id, operation="document_exchange", source_system=source, target_system=target, master_id=master_id, consent_id=consent_id, status=status, error_code=error_code, error_message=error_message, fields_exchanged=fields, duration_ms=duration_ms, created_at=self._clock())
+    def _record_transaction(self, session, *, correlation_id: str, source: str, target: str, master_id: str, consent_id: str, status: str, error_code: str | None, error_message: str | None, fields: list[str], duration_ms: float, requested_fields: list[str] | None = None, approved_fields: list[str] | None = None, denied_fields: list[str] | None = None) -> InteropTransaction:
+        txn = InteropTransaction(
+            transaction_id=str(uuid.uuid4()), correlation_id=correlation_id, operation="document_exchange", source_system=source, target_system=target,
+            master_id=master_id, consent_id=consent_id, status=status, error_code=error_code, error_message=error_message, fields_exchanged=fields,
+            requested_fields=requested_fields or [], approved_fields=approved_fields or [], denied_fields=denied_fields or [],
+            duration_ms=duration_ms, created_at=self._clock(),
+        )
         session.add(txn)
         session.flush()
         return txn
@@ -240,52 +263,60 @@ class InteropGatewayService:
         ).scalars().first()  # fmt: skip
 
     # -----------------------------------------------------------------------------------------
-    # Consent lifecycle - a citizen (or, in this demo, whoever is operating the console) must act
-    # on each request explicitly; nothing here auto-approves.
+    # Consent lifecycle - citizen-controlled (Section 8): the citizen a grant is attributed to
+    # (InteropConsentGrant.citizen_user_id) may act on it themselves, exactly as an
+    # INTEROP_MANAGE-holding integration admin can on their behalf through the admin console.
+    # Nothing here auto-approves, and an admin does not silently override a citizen's decision -
+    # every decision is attributed to whoever actually made it (ctx.user_id) in the audit trail.
     # -----------------------------------------------------------------------------------------
 
+    def _require_consent_actor(self, ctx: AuthContext, grant: InteropConsentGrant) -> None:
+        if ctx.has(Permission.INTEROP_MANAGE) or ctx.user_id == grant.citizen_user_id:
+            return
+        raise PermissionDenied("Only the citizen this consent belongs to, or an integration admin, may act on it.")
+
     def grant_consent(self, ctx: AuthContext, *, consent_id: str) -> dict:
-        require(ctx, Permission.INTEROP_MANAGE)
         with self._uow() as uow:
             s = uow.session
             grant = s.get(InteropConsentGrant, consent_id)
             if grant is None:
                 raise NotFound("Consent request not found.")
+            self._require_consent_actor(ctx, grant)
             if grant.status != "pending":
                 raise ValidationFailed(f"This consent request is already {grant.status}, not pending.")
             grant.status, grant.decided_at, grant.expires_at = "granted", self._clock(), self._clock() + CONSENT_VALIDITY
             s.add(grant)
-            AuditService(uow.audit, self._clock).record("interop.consent_granted", actor_id=ctx.user_id, resource_type="interop_consent", resource_id=consent_id, metadata={"master_id": grant.master_id, "purpose": grant.purpose})
+            AuditService(uow.audit, self._clock).record("interop.consent_granted", actor_id=ctx.user_id, resource_type="interop_consent", resource_id=consent_id, metadata={"master_id": grant.master_id, "purpose": grant.purpose, "self_service": ctx.user_id == grant.citizen_user_id})
             uow.commit()
             return {"status": "granted", "consent_id": consent_id, "expires_at": grant.expires_at.isoformat()}
 
     def deny_consent(self, ctx: AuthContext, *, consent_id: str) -> dict:
-        require(ctx, Permission.INTEROP_MANAGE)
         with self._uow() as uow:
             s = uow.session
             grant = s.get(InteropConsentGrant, consent_id)
             if grant is None:
                 raise NotFound("Consent request not found.")
+            self._require_consent_actor(ctx, grant)
             if grant.status != "pending":
                 raise ValidationFailed(f"This consent request is already {grant.status}, not pending.")
             grant.status, grant.decided_at = "denied", self._clock()
             s.add(grant)
-            AuditService(uow.audit, self._clock).record("interop.consent_denied", actor_id=ctx.user_id, resource_type="interop_consent", resource_id=consent_id, metadata={"master_id": grant.master_id})
+            AuditService(uow.audit, self._clock).record("interop.consent_denied", actor_id=ctx.user_id, resource_type="interop_consent", resource_id=consent_id, metadata={"master_id": grant.master_id, "self_service": ctx.user_id == grant.citizen_user_id})
             uow.commit()
             return {"status": "denied", "consent_id": consent_id}
 
     def revoke_consent(self, ctx: AuthContext, *, consent_id: str, reason: str) -> dict:
-        require(ctx, Permission.INTEROP_MANAGE)
         with self._uow() as uow:
             s = uow.session
             grant = s.get(InteropConsentGrant, consent_id)
             if grant is None:
                 raise NotFound("Consent request not found.")
+            self._require_consent_actor(ctx, grant)
             if grant.status != "granted":
                 raise ValidationFailed("Only a granted consent can be revoked.")
             grant.status, grant.revoked_at, grant.revocation_reason = "revoked", self._clock(), (reason or "").strip() or None
             s.add(grant)
-            AuditService(uow.audit, self._clock).record("interop.consent_revoked", actor_id=ctx.user_id, resource_type="interop_consent", resource_id=consent_id, metadata={"master_id": grant.master_id, "reason": grant.revocation_reason})
+            AuditService(uow.audit, self._clock).record("interop.consent_revoked", actor_id=ctx.user_id, resource_type="interop_consent", resource_id=consent_id, metadata={"master_id": grant.master_id, "reason": grant.revocation_reason, "self_service": ctx.user_id == grant.citizen_user_id})
             uow.commit()
             return {"status": "revoked", "consent_id": consent_id}
 
@@ -294,6 +325,18 @@ class InteropGatewayService:
         with self._uow() as uow:
             s = uow.session
             q = select(InteropConsentGrant).order_by(InteropConsentGrant.created_at.desc())
+            if status:
+                q = q.where(InteropConsentGrant.status == status)
+            return [_row(r) for r in s.execute(q).scalars().all()]
+
+    def list_my_consents(self, ctx: AuthContext, *, status: str | None = None) -> list[dict]:
+        """The citizen-facing view (Section 8): every consent request attributed to the caller's
+        own account, regardless of INTEROP_READ - a citizen never needs an integration-admin
+        permission to see who is asking to share their own data."""
+        require(ctx, Permission.PROFILE_MANAGE)
+        with self._uow() as uow:
+            s = uow.session
+            q = select(InteropConsentGrant).where(InteropConsentGrant.citizen_user_id == ctx.user_id).order_by(InteropConsentGrant.created_at.desc())
             if status:
                 q = q.where(InteropConsentGrant.status == status)
             return [_row(r) for r in s.execute(q).scalars().all()]

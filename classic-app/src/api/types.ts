@@ -114,7 +114,7 @@ export type ExchangeStatus = 'consent_required' | 'identity_ambiguous' | 'identi
 export interface ExchangeResult {
   status: ExchangeStatus; consent_id?: string; master_id?: string; side?: string; confidence?: number; explanation?: string;
   detail?: string; transaction_id?: string; application_id?: string; document_reference?: string; quality_score?: number;
-  correlation_id?: string; reason?: string; issues?: string[];
+  correlation_id?: string; reason?: string; issues?: string[]; denied_fields?: string[];
 }
 export interface InteropConsent {
   consent_id: string; master_id: string; citizen_user_id: string; requesting_system: string; providing_system: string;
@@ -136,7 +136,8 @@ export interface TimelineResult { application: UnifiedApplicationView; events: U
 export interface InteropTransactionView {
   transaction_id: string; correlation_id: string; operation: string; source_system: string; target_system: string;
   master_id: string | null; consent_id: string | null; status: string; error_code: string | null; error_message: string | null;
-  fields_exchanged: string[]; duration_ms: number | null; created_at: string;
+  fields_exchanged: string[]; requested_fields: string[]; approved_fields: string[]; denied_fields: string[];
+  duration_ms: number | null; created_at: string;
 }
 
 // ---- monitoring / integrations (admin) --------------------------------------------------------

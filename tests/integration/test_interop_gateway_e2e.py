@@ -279,6 +279,85 @@ class DocumentExchangeEndToEndTests(unittest.TestCase):
                 s.execute(delete(MockDeptBBeneficiary).where(MockDeptBBeneficiary.beneficiary_code == beneficiary_code))
                 uow.commit()
 
+    def test_field_level_consent_refuses_an_exchange_missing_an_authorized_field(self) -> None:
+        """InteropConsentGrant.fields is enforced, not decorative: narrowing it after the request
+        was created (simulating a citizen who authorized fewer fields than this operation needs)
+        must refuse the exchange before Department B is touched, and record exactly which fields
+        were denied on the InteropTransaction row."""
+        first = self.gateway.request_document_exchange(self.admin, application_no=self.application_no)
+        self.assertEqual(first["status"], "consent_required")
+        consent_id = first["consent_id"]
+        self._created_master_ids.add(first["master_id"])
+
+        with self.uow_factory() as uow:
+            grant = uow.session.get(InteropConsentGrant, consent_id)
+            grant.fields = ["reference", "status"]  # "issued_on" deliberately missing
+            uow.session.add(grant)
+            uow.commit()
+
+        self.gateway.grant_consent(self.admin, consent_id=consent_id)
+        result = self.gateway.request_document_exchange(self.admin, application_no=self.application_no)
+        self.assertEqual(result["status"], "failed")
+        self.assertEqual(result["reason"], "data_field_not_consented")
+        self.assertEqual(result["denied_fields"], ["issued_on"])
+
+        with self.uow_factory() as uow:
+            app_row = mock_systems.dept_b_get_application(uow.session, self.application_no)
+            self.assertEqual(app_row.document_status, "missing")  # never written
+
+            txn = uow.session.get(InteropTransaction, result["transaction_id"])
+            self.assertEqual(txn.status, "failed")
+            self.assertEqual(txn.error_code, "data_field_not_consented")
+            self.assertEqual(txn.denied_fields, ["issued_on"])
+            self.assertEqual(sorted(txn.approved_fields), ["reference", "status"])
+            self.assertEqual(sorted(txn.requested_fields), ["issued_on", "reference", "status"])
+
+    def test_citizen_can_grant_their_own_consent_but_not_someone_elses(self) -> None:
+        """Section 8: citizen-controlled consent. The citizen a grant is attributed to may act on
+        it themselves without INTEROP_MANAGE; a different citizen may not, even though both are
+        plain CITIZEN-role accounts with no special interop permission at all."""
+        now = datetime.now(UTC)
+        citizen_a_id, citizen_b_id = str(uuid.uuid4()), str(uuid.uuid4())
+        with self.uow_factory() as uow:
+            s = uow.session
+            s.add(UserModel(id=citizen_a_id, email=f"citizen-a-{self._suffix}@example.invalid", password_hash="x", full_name="Citizen A", role="citizen", is_active=True, created_at=now))
+            s.add(UserModel(id=citizen_b_id, email=f"citizen-b-{self._suffix}@example.invalid", password_hash="x", full_name="Citizen B", role="citizen", is_active=True, created_at=now))
+            master = MasterEntity(master_id=str(uuid.uuid4()), display_name="Self-Service Test Citizen", created_at=now)
+            s.add(master)
+            s.flush()
+            self._created_master_ids.add(master.master_id)
+            grant_1 = InteropConsentGrant(consent_id=str(uuid.uuid4()), master_id=master.master_id, citizen_user_id=citizen_a_id, requesting_system="dept_b", providing_system="dept_a", purpose="Test", data_category="residence_certificate", fields=["reference"], status="pending", created_at=now)
+            grant_2 = InteropConsentGrant(consent_id=str(uuid.uuid4()), master_id=master.master_id, citizen_user_id=citizen_a_id, requesting_system="dept_b", providing_system="dept_a", purpose="Test", data_category="residence_certificate", fields=["reference"], status="pending", created_at=now)
+            s.add(grant_1)
+            s.add(grant_2)
+            uow.commit()
+            grant_1_id, grant_2_id = grant_1.consent_id, grant_2.consent_id
+
+        try:
+            citizen_a = AuthContext(citizen_a_id, Role.CITIZEN)
+            citizen_b = AuthContext(citizen_b_id, Role.CITIZEN)
+
+            with self.assertRaises(PermissionDenied):
+                self.gateway.grant_consent(citizen_b, consent_id=grant_1_id)
+
+            granted = self.gateway.grant_consent(citizen_a, consent_id=grant_1_id)
+            self.assertEqual(granted["status"], "granted")
+
+            with self.assertRaises(PermissionDenied):
+                self.gateway.deny_consent(citizen_b, consent_id=grant_2_id)
+            denied = self.gateway.deny_consent(citizen_a, consent_id=grant_2_id)
+            self.assertEqual(denied["status"], "denied")
+
+            mine = self.gateway.list_my_consents(citizen_a)
+            self.assertEqual({c["consent_id"] for c in mine}, {grant_1_id, grant_2_id})
+            self.assertEqual(self.gateway.list_my_consents(citizen_b), [])
+        finally:
+            with self.uow_factory() as uow:
+                s = uow.session
+                s.execute(delete(InteropConsentGrant).where(InteropConsentGrant.consent_id.in_([grant_1_id, grant_2_id])))
+                s.execute(delete(UserModel).where(UserModel.id.in_([citizen_a_id, citizen_b_id])))
+                uow.commit()
+
     def test_auditor_can_read_but_never_manage_the_gateway(self) -> None:
         """The dedicated INTEGRATION_ADMIN/AUDITOR roles (app.core.authorization) against the real
         permission checks in InteropGatewayService - not just the pure authorization-matrix unit

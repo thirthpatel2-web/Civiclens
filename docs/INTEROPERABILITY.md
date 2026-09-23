@@ -83,13 +83,88 @@ distinct from the existing broad `data_sharing_government` consent purpose
 (`data_category`, e.g. `residence_certificate`), *between which two systems*
 (`requesting_system`/`providing_system`), *why* (`purpose`, generated per-request — e.g. "Verify
 residence certificate for application APP-MH-2026-5501"), and *which fields*
-(`fields: ["full_name", "reference_no", "issued_on", "status"]`).
+(`fields: ["reference", "status", "issued_on"]` — the canonical `Document` field names, see
+"Field-level consent enforcement" below).
 
 State machine: `pending → granted | denied`, and a granted consent can later be `revoked`
 (with a reason, timestamped). A grant expires 30 days after it's granted
 (`InteropGatewayService.CONSENT_VALIDITY`). **No data is read from the providing system until a
 grant exists in `granted` state** — `request_document_exchange` checks for one first and returns
 `consent_required` (with nothing else having happened) if none exists yet.
+
+**Field-level consent enforcement**: `fields` is checked, not decorative. Before the Department A
+connector is called at all, `InteropGatewayService` compares `REQUIRED_DOCUMENT_FIELDS` (what this
+operation needs: `reference`, `status`, `issued_on`) against `consent.fields`; anything missing
+refuses the exchange with `data_field_not_consented` and the exact denied field names, recorded on
+the `InteropTransaction` row's `requested_fields`/`approved_fields`/`denied_fields` columns
+(migration `0011`). See `docs/SECURITY.md`'s "Field-level consent enforcement" section.
+
+**Citizen-controlled consent**: `grant_consent`/`deny_consent`/`revoke_consent` accept either an
+`INTEROP_MANAGE`-holding integration admin *or* the citizen the grant is attributed to
+(`citizen_user_id == ctx.user_id`) — checked in the service layer, since it's a data-dependent
+question, not a static permission. `GET /my-consents` is the citizen-facing list. See
+`docs/SECURITY.md`'s "Citizen-controlled consent" section, including its one named limitation
+(today's demo personas aren't linked to real CivicLens accounts, so `citizen_user_id` is set to
+whoever operates the demo console rather than a citizen who logged in themselves).
+
+## Canonical data model
+
+`app/interop/canonical/v1/` — external systems never talk to CivicLens's internal SQLAlchemy
+models. Every connector transforms its own system's shape into one of 16 frozen dataclasses
+(`Citizen`, `MasterIdentity`, `Organization`, `Address`, `Department`, `Office`, `Service`,
+`Application`, `Grievance`, `Document`, `Approval`, `Beneficiary`, `Consent`, `Event`, `Workflow`,
+`Notification` — `models.py`) on the way in, and back into that system's native field names on the
+way out (`transform.py`):
+
+```
+Department A format -> Connector -> External-to-Canonical Transformer -> Canonical Record
+Canonical Record -> Canonical-to-External Transformer -> Department B format
+```
+
+Only `Document` and `Application` are wired into a live data flow today — the no-reupload exchange
+transforms Department A's row into a canonical `Document` (`dept_a_document_to_canonical`), quality
+checks *that*, then derives exactly what Department B needs
+(`canonical_document_to_dept_b_fields`) rather than forwarding Department A's row wholesale. The
+other 14 dataclasses are real and typed, ready for the next connector operation that needs them,
+but a dataclass existing is not itself a claim that it's wired anywhere — see
+`docs/REQUIREMENT_TRACEABILITY.md`.
+
+`Application.status` is constrained to `CANONICAL_APPLICATION_STATES` (`DRAFT`, `SUBMITTED`,
+`IN_PROGRESS`, `WAITING_FOR_CITIZEN`, `WAITING_FOR_DEPARTMENT`, `WAITING_FOR_EXTERNAL_SYSTEM`,
+`APPROVED`, `REJECTED`, `COMPLETED`, `FAILED`, `CANCELLED`) — the shared vocabulary every
+department's own status words map into, so a citizen's cross-department timeline reads
+consistently rather than switching vocabulary mid-view. Dept B's `pending_document` maps to
+`WAITING_FOR_EXTERNAL_SYSTEM`, `processing` to `IN_PROGRESS`, and so on
+(`transform.py::_DEPT_B_STATUS_TO_CANONICAL`).
+
+Schema versioning: this is v1. A breaking change adds `app.interop.canonical.v2` alongside it
+rather than editing v1 in place — existing connectors keep transforming into v1 until migrated.
+
+## Reusable connector abstraction
+
+`app/interop/connectors/` — the gateway calls Department A/B/C **only** through
+`GovernmentConnector` (`base.py`), resolved by a runtime (`runtime.py`), never by importing a
+mock-system query function directly:
+
+```
+Interop Gateway -> Connector Runtime -> GovernmentConnector -> Dept A / Dept B / Dept C / future systems
+```
+
+Every connector — `DeptAConnector`, `DeptBConnector`, `DeptCConnector` today — implements the same
+interface: `authenticate()`, `health_check()`, `get_entity()`, `query()`, `submit()`, `update()`,
+`fetch_document()`, plus `send_event()`/`transform_request()`/`transform_response()`/
+`handle_error()` with sensible defaults a connector only overrides if it needs to. Adding a new
+government system means implementing this interface and registering it
+(`app.interop.connector_registry`) — it never requires touching gateway orchestration logic. The
+runtime checks the connector registry's `enabled` flag before dispatching and records every real
+call's timing/success against the registry's live stats (`connector_registry.record_call`) — the
+same accounting the connector health cards show, now sourced from one place regardless of which
+operation triggered the call.
+
+The three demo connectors are all read-mostly against real persisted tables: `DeptAConnector`
+refuses `submit`/`update` honestly (`CONNECTOR_UNAVAILABLE`, "read-only"); `DeptBConnector.update`
+is the actual no-reupload write; `DeptCConnector` is read-only and not part of the headline demo.
+See `tests/integration/test_connectors.py` for interface-conformance and registry-gating coverage.
 
 ## Connector registry
 
@@ -151,14 +226,17 @@ two permissions: `INTEROP_READ` on every `GET`, `INTEROP_MANAGE` on every mutati
 `SUPER_ADMIN` hold both; the dedicated `INTEGRATION_ADMIN` role holds both too but nothing outside
 the interop platform (not `admin.users`/`departments`/`*_rules`); `AUDITOR` holds only
 `INTEROP_READ` — it can watch every exchange, consent decision and identity resolution, but can
-never make one. See `app/core/authorization.py`.
+never make one. See `app/core/authorization.py`. The three consent-decision routes and
+`/my-consents` are the exception — see "Citizen-controlled consent" above.
 
 | Method | Path | Does |
 |---|---|---|
 | `POST` | `/document-exchange` | Runs (or resumes) the scenario above for one `application_no` |
 | `GET` | `/timeline/{application_no}` | The full cross-department event timeline for one application |
 | `GET` | `/transactions` | Recent `InteropTransaction` rows |
-| `GET` / `POST .../grant` / `.../deny` / `.../revoke` | `/consents` | Consent lifecycle |
+| `GET` | `/consents` | Every consent grant (admin view) |
+| `GET` | `/my-consents` | The caller's own consent grants (citizen view, `PROFILE_MANAGE`-gated) |
+| `POST .../grant` / `.../deny` / `.../revoke` | `/consents/{id}` | Consent decisions - the grant owner or an integration admin |
 | `GET` | `/identity-candidates` | The manual-review queue |
 | `POST` | `/identity-candidates/{id}/resolve` | Approve or reject an ambiguous match |
 | `GET` | `/connectors` | Connector registry, with live health/call stats |
