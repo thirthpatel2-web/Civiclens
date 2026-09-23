@@ -5,13 +5,20 @@ database model, UI screen, test, and an honest status. Nothing here is marked **
 is implemented, wired into the running application, covered by a test, and demonstrable per
 `docs/DEMO_GUIDE.md`.
 
-This matrix covers Milestone 1 (the no-reupload demo and its supporting platform) and the
-completion spec's Phase 1 (canonical model, connector abstraction) and Phase 2 (field-level
-consent, citizen-controlled consent, data minimization). It will keep expanding as later phases
-(federated identity, event bus, workflow engine, generic data-quality engine, exception taxonomy,
-monitoring, service catalog) land — rows for capabilities not yet started are simply not listed
-here yet rather than pre-emptively marked DEFERRED, to keep this matrix an accurate snapshot of
-what exists rather than a checklist of everything asked for.
+This matrix covers Milestone 1 (the no-reupload demo and its supporting platform) through the
+completion spec's Phase 1-9: canonical model & connector abstraction, field-level & citizen-
+controlled consent, federated identity (mock IdP), event-driven pub/sub, the configurable workflow
+engine, the generic data quality engine & central exception management (taxonomy, retry, dead-
+letter), connector SLA/alerting & distributed transaction tracing, the service catalog & field
+mapping catalog, and the UI surfacing all of it. Rows for capabilities not yet started are simply
+not listed here yet rather than pre-emptively marked DEFERRED, to keep this matrix an accurate
+snapshot of what exists rather than a checklist of everything asked for.
+
+As of Phase 9: 31 rows **DONE**, 5 rows real-but-narrower (**PARTIAL**, or **DONE** with a named
+**PARTIAL**/**DEFERRED** qualifier on one specific sub-part), 1 row genuinely not started
+(**DEFERRED** — legacy/modern connector transport types beyond the session-based demo connectors).
+Every non-DONE row's Notes column names exactly what's missing and why, per this project's rule
+against silent gaps.
 
 Legend: **DONE** · **PARTIAL** (real, narrower than the spec's full ask — explained in Notes) ·
 **DEFERRED** (not built; named so it isn't silently missing).
@@ -46,8 +53,8 @@ Legend: **DONE** · **PARTIAL** (real, narrower than the spec's full ask — exp
 | Cross-system Audit Trail | **DONE** | Every consent/exchange/candidate-resolution action calls `AuditService.record(...)`, reusing the existing generic audit service | `audit_logs` (existing table) | audit rows not separately exposed via the gateway API (existing `/admin/audit` surface applies) | — | covered indirectly (audit calls execute without error in `test_interop_gateway_e2e.py`) | `correlation_id` on every audit row matches the transaction/event rows for the same exchange |
 | Expanded RBAC (CITIZEN/OFFICER/ADMIN/**INTEGRATION_ADMIN**/**AUDITOR**/SUPER_ADMIN) | **DONE** | `app/core/authorization.py` (`Role.INTEGRATION_ADMIN`/`Role.AUDITOR`, `Permission.INTEROP_MANAGE`/`INTEROP_READ`, `is_privileged_role()`) | `users.role` (plain string column, no migration needed) | gateway router splits `INTEROP_READ` (every GET) from `INTEROP_MANAGE` (every mutation); `/auth/admin/login` accepts both new roles | classic-app: `homeFor()` routes both roles straight to the Interop Gateway screen on login (not the officer complaint dashboard, which neither role can read); `(officer)/more.tsx`'s nav matches each role's real permission set | `test_authorization.py` permission matrix + `test_auditor_can_read_but_never_manage_the_gateway` (live DB) + live HTTP walkthrough (register → promote → `/auth/login` and `/auth/admin/login` with a real TOTP code → every gateway endpoint) | AUDITOR is read-only by construction (never holds `INTEROP_MANAGE`); INTEGRATION_ADMIN cannot touch `admin.users`/`departments`/`*_rules`/`config`. Both roles work end-to-end over the REST API and classic-app today; the legacy NiceGUI web admin login door (`app/ui/pages/public.py`) wasn't opened to them since no screens exist there for either role yet |
 | ~40 new UI screens across 4 roles | **PARTIAL** | One consolidated admin console (`classic-app/app/interop-gateway.tsx`) covers connector health + live SLA status, the exchange demo, consent lifecycle, identity review, transactions, the connector alert log (with acknowledge), the central exception log (with retry/resolve/mark-dead), and the service catalog + field mapping catalog (expandable per service) | — | `GET/POST /interop-gateway/alerts*`, `/exceptions*`, `/service-catalog`, `/field-mappings` | Interop Gateway screen | `classic-app`'s own test suite (31 tests, unaffected) + `tsc --noEmit` + a full `expo export --platform web` production bundle, all clean; no interactive browser session was run in this environment (headless), named honestly rather than claimed | Deliberately one dense, real, fully-wired screen rather than many thin/placeholder ones - every Phase 6-8 backend capability that previously had zero UI now has a real, data-backed section here |
-| Documentation (README/ARCHITECTURE/**INTEROPERABILITY**/API/**DEMO_GUIDE**/**SECURITY**/**DATA_MODEL**/CONNECTOR_GUIDE/WORKFLOW_GUIDE) | **PARTIAL** | `docs/INTEROPERABILITY.md`, `docs/DEMO_GUIDE.md`, `docs/DATA_MODEL.md`, `docs/SECURITY.md` written; `ARCHITECTURE.md` extended | — | — | — | — | `CONNECTOR_GUIDE.md`/`WORKFLOW_GUIDE.md` for this subsystem not yet written |
-| Architecture diagrams (10) | **DEFERRED** | ASCII diagrams inline in `ARCHITECTURE.md`/`INTEROPERABILITY.md` only | — | — | — | — | No standalone diagram files |
+| Documentation (README/ARCHITECTURE/**INTEROPERABILITY**/API/**DEMO_GUIDE**/**SECURITY**/**DATA_MODEL**/**CONNECTOR_GUIDE**/**WORKFLOW_GUIDE**) | **DONE** | All nine written and kept current every phase: `docs/INTEROPERABILITY.md`, `docs/DEMO_GUIDE.md`, `docs/DATA_MODEL.md`, `docs/SECURITY.md`, `docs/CONNECTOR_GUIDE.md`, `docs/WORKFLOW_GUIDE.md`, `ARCHITECTURE.md`, `README.md`, `docs/API_CONTRACT.md` | — | — | — | — | `CONNECTOR_GUIDE.md`/`WORKFLOW_GUIDE.md` written in Phase 10, covering how to add a connector/workflow and the real government-system honesty rule (never a fabricated `healthy` for an unconfigured adapter) |
+| Architecture diagrams (10) | **DONE** | `docs/ARCHITECTURE_DIAGRAMS.md` - 10 Mermaid diagrams (system context, canonical transform, identity resolution, consent lifecycle, federated auth sequence, event bus, workflow engine state machine, data quality + exception dead-letter state machine, SLA/alerting flow, tracing ERD) | — | — | — | — | Mermaid, not exported image files - renders inline on GitHub/most Markdown viewers without a separate asset to keep in sync with the code |
 | The required end-to-end test | **DONE** | `tests/integration/test_interop_gateway_e2e.py` | — | exercises the real API surface via the service layer | — | itself | Runs against live PostgreSQL (the one deliberate exception to this suite's in-memory-doubles convention); found and fixed a real autoflush bug during development |
 | "Do not fabricate analytics" / honest degraded states | **DONE** | Every gateway response is a real outcome (`consent_required`, `identity_ambiguous`, `identity_conflict`, `source_record_not_found`, `failed` with a reason, `already_completed`, `success`) — no code path fabricates a success | — | — | each status has distinct, honest UI copy | `test_interop_gateway_e2e.py` asserts on real statuses, not mocked ones | |
 

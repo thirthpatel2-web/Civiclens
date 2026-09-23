@@ -573,4 +573,6 @@ Named here rather than left silently missing, per this project's rule against cl
 - Editing the service catalog / field mapping catalog from the UI — `GET /service-catalog`/
   `GET /field-mappings` are shown (expandable per service) on the Interop Gateway screen, but
   read-only; a fourth+ mock system
-- `docs/CONNECTOR_GUIDE.md`, `docs/WORKFLOW_GUIDE.md`
+- Standalone architecture diagram image files — `docs/ARCHITECTURE_DIAGRAMS.md` has the 10 named
+  diagrams as Mermaid (renders inline on GitHub/most Markdown viewers), not exported as separate
+  image files
