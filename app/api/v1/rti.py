@@ -15,6 +15,7 @@ from app.services.rti_service import (
     RtiDraft,
     build_rti_questions,
     default_records_for_category,
+    enhance_questions_with_llm,
 )
 
 router = APIRouter(prefix="/rti", tags=["rti"])
@@ -32,8 +33,13 @@ def categories(ctx: AuthContext = OWNER) -> dict:
 
 
 @router.post("/questions/preview")
-def preview_questions(body: RtiQuestionsPreviewBody, ctx: AuthContext = OWNER) -> dict:
-    """Composes precise statutory RTI questions from a category + record checklist, without saving anything."""
+def preview_questions(body: RtiQuestionsPreviewBody, ctx: AuthContext = OWNER, c: AppContainer = Depends(get_container)) -> dict:
+    """Composes precise statutory RTI questions from a category + record checklist, without saving anything.
+
+    The deterministic baseline always runs first and is always included; if a chat model is
+    configured, up to 3 questions specific to what the citizen actually described are appended -
+    best-effort, never required, never blocking.
+    """
     records = tuple(body.records_requested) or default_records_for_category(body.category)
     qs = build_rti_questions(
         subject=body.subject,
@@ -43,6 +49,7 @@ def preview_questions(body: RtiQuestionsPreviewBody, ctx: AuthContext = OWNER) -
         time_period=body.time_period,
         custom_questions=tuple(body.custom_questions),
     )
+    qs = enhance_questions_with_llm(body.subject, body.location, qs, c.llm)
     return {"questions": list(qs), "records_used": list(records)}
 
 

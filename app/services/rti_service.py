@@ -114,6 +114,45 @@ def build_rti_questions(
     return tuple(qs)
 
 
+class _ChatProvider(Protocol):
+    def chat(self, messages: list[dict[str, str]], *, temperature: float = 0.0) -> str: ...
+
+
+def enhance_questions_with_llm(subject: str, location: str | None, baseline: tuple[str, ...], llm: _ChatProvider | None) -> tuple[str, ...]:
+    """Best-effort: ask the model for 1-3 questions specific to this exact situation, on top of the
+    deterministic statutory baseline. Never replaces the baseline, never blocks on failure - an LLM
+    outage or a bad response just means the citizen gets the same solid template as before, not an
+    error. The model is asked to request information/records only, never to assert facts about the
+    matter it wasn't given - it has no factual basis to add beyond what the citizen already wrote.
+    """
+    if llm is None or not subject.strip():
+        return baseline
+    import json
+    import re
+
+    where = f' The location given is: "{location}".' if location else ""
+    prompt = (
+        f'A citizen is filing an RTI application about this situation, in their own words: "{subject.strip()[:2000]}"{where}\n\n'
+        f"These statutory questions are already included:\n" + "\n".join(f"- {q}" for q in baseline) + "\n\n"
+        "Suggest up to 3 ADDITIONAL RTI questions - each requesting a specific document, record or "
+        "piece of official information that would help this exact situation, and that is not already "
+        "covered above. Do not restate the existing questions. Do not assert or assume any fact "
+        "(date, name, amount, cause) that was not stated by the citizen - only request records. "
+        'Reply with ONLY a JSON array of strings, e.g. ["question one", "question two"]. If nothing '
+        "useful can be added beyond the list above, reply with an empty JSON array []."
+    )  # fmt: skip
+    try:
+        raw = llm.chat([{"role": "user", "content": prompt}], temperature=0.2)
+        fenced = re.sub(r"^```(?:json)?\s*|\s*```$", "", raw.strip(), flags=re.MULTILINE)
+        extra = json.loads(fenced)
+        if not isinstance(extra, list):
+            return baseline
+        cleaned = tuple(q.strip() for q in extra if isinstance(q, str) and q.strip())[:3]
+    except Exception:  # noqa: BLE001 - any failure (timeout, bad JSON, provider error) degrades to the deterministic baseline
+        return baseline
+    return baseline + cleaned
+
+
 class RtiStatus(StrEnum):
     DRAFT = "draft"
     GENERATED = "generated"

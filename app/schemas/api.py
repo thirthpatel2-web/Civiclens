@@ -106,7 +106,10 @@ class RtiFileBody(Strict):
 
 
 class RtiQuestionsPreviewBody(Strict):
-    subject: str = Field(max_length=200)
+    # Unlike RtiBody.subject (a short document subject line), this carries the citizen's free-text
+    # problem description for the AI to reason about - capped like LegalBody.problem, not like a
+    # one-line subject. A tighter cap here silently 422'd any realistically detailed complaint.
+    subject: str = Field(max_length=8000)
     category: str | None = None
     location: str | None = Field(default=None, max_length=200)
     records_requested: list[str] = Field(default_factory=list, max_length=20)

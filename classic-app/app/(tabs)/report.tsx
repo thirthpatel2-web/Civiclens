@@ -141,6 +141,7 @@ export default function FileRequest() {
   const [applicantAddress, setApplicantAddress] = useState('');
   const [preview, setPreview] = useState<string[]>([]);
   const [previewing, setPreviewing] = useState(false);
+  const [previewError, setPreviewError] = useState<string | null>(null);
   const [rtiItems, setRtiItems] = useState<RtiApplication[]>([]);
   const [rtiBusy, setRtiBusy] = useState(false);
   const [rtiError, setRtiError] = useState<string | null>(null);
@@ -151,8 +152,8 @@ export default function FileRequest() {
   const activeRtiCategory = categories.find((c) => c.code === rtiCategory);
 
   const doPreview = React.useCallback(async () => {
-    if (description.trim().length < 5) { setPreview([]); return; }
-    setPreviewing(true);
+    if (description.trim().length < 5) { setPreview([]); setPreviewError(null); return; }
+    setPreviewing(true); setPreviewError(null);
     try {
       const recordsRequested = activeRtiCategory ? activeRtiCategory.default_records.filter((r) => checked[r]) : [];
       const r = await endpoints.previewRtiQuestions({
@@ -161,7 +162,8 @@ export default function FileRequest() {
         custom_questions: customQs.split('\n').map((s) => s.trim()).filter(Boolean),
       });
       setPreview(r.questions);
-    } catch { /* best-effort */ } finally { setPreviewing(false); }
+    } catch (e: any) { setPreview([]); setPreviewError(e?.message ?? 'Could not draft questions - the boilerplate statutory letter still works, or try a shorter description.'); }
+    finally { setPreviewing(false); }
   }, [description, rtiCategory, activeRtiCategory, checked, ward, tenderRef, timePeriod, customQs]);
 
   useEffect(() => { if (activeTab !== 'rti') return; const id = setTimeout(doPreview, 600); return () => clearTimeout(id); }, [activeTab, doPreview]);
@@ -305,7 +307,7 @@ export default function FileRequest() {
             </Pressable>
           </Card>
 
-          {previewing ? <Body soft>🤖 Building your statutory questions…</Body> : preview.length > 0 ? (
+          {previewing ? <Body soft>🤖 Building your statutory questions…</Body> : previewError ? <ErrorBanner message={previewError} /> : preview.length > 0 ? (
             <Card>
               <Body soft>Statutory questions this RTI will ask ({preview.length})</Body>
               {preview.map((q, i) => <Body key={i}>{i + 1}. {q}</Body>)}
