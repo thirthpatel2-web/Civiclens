@@ -146,9 +146,12 @@ Orchestrated by `InteropGatewayService.request_document_exchange`
 
 ## API
 
-All endpoints below live at `/api/v1/interop-gateway/*`, gated on `Permission.ADMIN_INTEGRATIONS`
-(`app/api/v1/interop_gateway.py`). This milestone doesn't yet have a dedicated
-`INTEGRATION_ADMIN` role (see "Deferred" below) — it reuses the existing admin permission.
+All endpoints below live at `/api/v1/interop-gateway/*` (`app/api/v1/interop_gateway.py`), gated on
+two permissions: `INTEROP_READ` on every `GET`, `INTEROP_MANAGE` on every mutating call. `ADMIN` and
+`SUPER_ADMIN` hold both; the dedicated `INTEGRATION_ADMIN` role holds both too but nothing outside
+the interop platform (not `admin.users`/`departments`/`*_rules`); `AUDITOR` holds only
+`INTEROP_READ` — it can watch every exchange, consent decision and identity resolution, but can
+never make one. See `app/core/authorization.py`.
 
 | Method | Path | Does |
 |---|---|---|
@@ -192,7 +195,8 @@ covers:
   → the connector registry reflects the real call.
 - The manual-review path: a deliberately weak name/mobile match is queued, not auto-linked, and
   an officer's reject creates a distinct identity rather than leaving the identifier dangling.
-- A citizen without `ADMIN_INTEGRATIONS` cannot grant consent.
+- A citizen without `INTEROP_MANAGE` cannot grant consent; an `AUDITOR` (real, live database) can
+  read every surface but is refused by every mutating call, including the connector health check.
 
 Every row the test creates is deleted in `tearDown`, scoped narrowly by the master entity ids and
 fixture ids the test itself created — repeated runs stay deterministic and the shared dev database
@@ -204,7 +208,9 @@ reachable. Run it with `pytest tests/integration/test_interop_gateway_e2e.py -v`
 Named here rather than left silently missing, per this project's rule against claiming
 "implemented" for a placeholder:
 
-- Dedicated `INTEGRATION_ADMIN` / `AUDITOR` RBAC roles (currently reuses `ADMIN_INTEGRATIONS`)
+- Login-routing UI for `INTEGRATION_ADMIN`/`AUDITOR` (they authenticate and hold the right
+  permissions over the REST API today; no dedicated dashboard/menu exists yet in classic-app or
+  the legacy NiceGUI web admin for either role specifically)
 - A connector health *dashboard* (the data exists via `GET /connectors`; no charts/SLA view yet)
 - Routing real interop events through the WebSocket event bus (`app/realtime/events.py`) — it's
   tightly coupled to the complaint/notification domain; this milestone uses the dedicated
