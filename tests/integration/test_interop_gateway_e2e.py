@@ -236,6 +236,49 @@ class DocumentExchangeEndToEndTests(unittest.TestCase):
                     s.execute(delete(MasterEntity).where(MasterEntity.master_id == master_id))
                 uow.commit()
 
+    def test_data_quality_failure_blocks_the_write_and_is_recorded_honestly(self) -> None:
+        """A document that hasn't actually been verified by Department A must never be written
+        into Department B's application, even with consent granted - the quality gate is real,
+        not decorative."""
+        suffix = f"{self._suffix}-q"
+        resident_id, beneficiary_code, application_no = f"TEST-A-{suffix}", f"TEST-B-{suffix}", f"TEST-APP-{suffix}"
+        now = datetime.now(UTC)
+        with self.uow_factory() as uow:
+            s = uow.session
+            s.add(MockDeptAResident(resident_id=resident_id, full_name="Rahul Mehta", mobile="9700011122", address="1 Test Rd", city="Pune", state="Maharashtra", created_at=now))
+            s.flush()
+            # status "pending", not "verified" - the one check this fixture deliberately fails.
+            s.add(MockDeptADocument(document_id=str(uuid.uuid4()), resident_id=resident_id, document_type="residence_certificate", status="pending", reference_no=f"TESTREF-{suffix}", issued_on=now, created_at=now))
+            s.add(MockDeptBBeneficiary(beneficiary_code=beneficiary_code, full_name="Rahul Mehta", mobile_number="9700011122", created_at=now))
+            s.flush()
+            s.add(MockDeptBApplication(application_no=application_no, beneficiary_code=beneficiary_code, service_type="Small Business Registration", status="pending_document", required_document_type="residence_certificate", document_status="missing", created_at=now, updated_at=now))
+            uow.commit()
+        try:
+            first = self.gateway.request_document_exchange(self.admin, application_no=application_no)
+            self.assertEqual(first["status"], "consent_required")
+            self._created_master_ids.add(first["master_id"])
+            self.gateway.grant_consent(self.admin, consent_id=first["consent_id"])
+
+            result = self.gateway.request_document_exchange(self.admin, application_no=application_no)
+            self.assertEqual(result["status"], "failed")
+            self.assertEqual(result["reason"], "data_quality_failed")
+            self.assertTrue(any("verified" in issue for issue in result["issues"]))
+
+            with self.uow_factory() as uow:
+                app_row = mock_systems.dept_b_get_application(uow.session, application_no)
+                self.assertEqual(app_row.document_status, "missing")  # never written
+
+                txns = self.gateway.list_transactions(self.admin, limit=200)
+                self.assertTrue(any(t["status"] == "failed" and t["error_code"] == "data_quality_failed" for t in txns))
+        finally:
+            with self.uow_factory() as uow:
+                s = uow.session
+                s.execute(delete(MockDeptADocument).where(MockDeptADocument.resident_id == resident_id))
+                s.execute(delete(MockDeptAResident).where(MockDeptAResident.resident_id == resident_id))
+                s.execute(delete(MockDeptBApplication).where(MockDeptBApplication.application_no == application_no))
+                s.execute(delete(MockDeptBBeneficiary).where(MockDeptBBeneficiary.beneficiary_code == beneficiary_code))
+                uow.commit()
+
     def test_auditor_can_read_but_never_manage_the_gateway(self) -> None:
         """The dedicated INTEGRATION_ADMIN/AUDITOR roles (app.core.authorization) against the real
         permission checks in InteropGatewayService - not just the pure authorization-matrix unit
