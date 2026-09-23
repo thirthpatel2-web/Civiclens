@@ -237,6 +237,52 @@ by `tests/integration/test_interop_event_subscriber_e2e.py`, and confirmed live 
 running server: a genuine HTTP exchange's `ExchangeCompleted` event was read back directly from
 Redis with `redis-cli`-equivalent tooling outside the app process entirely.
 
+## Configurable workflows
+
+`app/interop/workflow/` - the no-reupload scenario's step sequence is stored data
+(`WorkflowDefinition.steps`, migration `0013`), executed by `WorkflowEngine`, not a single
+hard-coded Python scenario. The engine is generic: it knows nothing about identity resolution or
+document exchange, only how to run an ordered list of named steps against a registry of step
+functions.
+
+Real, tested support for:
+- **ordered steps**, run in the definition's stored order
+- **conditional branches**: a step's `condition_key` skips it (without invoking the step function
+  at all) when that context key is falsy; `on_failure: "branch:<step_id>"` jumps execution to a
+  named step on failure instead of stopping
+- **retry policy**: `retry_max_attempts` re-invokes a failed step, recording every attempt
+  (`WorkflowStepExecution` - a real, inspectable history, not just a final status)
+- **timeout**: `timeout_seconds`, detected once the step function returns (this engine has no
+  preemptive interrupt - named honestly as detection, not true preemption)
+- **manual approval**: `requires_approval` pauses the execution (`status: "waiting_approval"`)
+  until `resume()` is called with that approval recorded
+- **failure routing**: `on_failure` is `"fail"` (stop), `"skip"` (continue anyway), or
+  `"branch:<step_id>"`
+
+The spec's own example, `residence_certificate_verification`
+(`app/interop/workflow/definitions.py`), is registered on every app start
+(`register_default_workflows`, idempotent) with exactly its nine named steps: `resolve_identity`,
+`request_consent` (`requires_approval=True` - a real manual gate, not a placeholder),
+`fetch_document` (retried, timed), `validate_document`, `transform_data`, `deliver_document`
+(retried), `publish_event`, `update_tracker`, `notify` (the last three `on_failure="skip"` - a
+broken notification or event bus must never undo a completed exchange). Every step function is
+built from primitives this codebase already has and had already tested independently - the
+identity resolver, the connector runtime, the canonical transform, the exact same document-quality
+check `InteropGatewayService` uses - so this module adds new *orchestration*, not new business
+logic.
+
+**Scope note, stated plainly**: `InteropGatewayService.request_document_exchange` remains the
+tested, unchanged production entry point for the no-reupload demo. Running the same scenario
+through the workflow engine is a genuine, independently-verified *additional* execution path
+proving the engine can drive the real flow end to end (including its own manual-approval pause,
+observed against real seeded data) - not a replacement of the primary path this milestone. Fully
+migrating the primary entry point onto the engine is a named follow-up, not claimed as done; see
+`docs/REQUIREMENT_TRACEABILITY.md`.
+
+Read surfaces: `GET /interop-gateway/workflows`, `GET /interop-gateway/workflow-executions`,
+`GET /interop-gateway/workflow-executions/{id}` (definition + full step history). No admin UI
+screen for these yet (Section 13's "Workflow Admin UI" - deferred, named honestly).
+
 ## Connector registry
 
 `app/interop/connector_registry.py` + `ConnectorRegistration` (`interop_connector_registry`).

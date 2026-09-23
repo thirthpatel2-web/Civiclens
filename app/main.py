@@ -30,11 +30,13 @@ def _seed_interop_demo_data(container: AppContainer) -> None:
     try:
         from app.interop import connector_registry, mock_systems
         from app.interop.federation import idp
+        from app.interop.workflow.definitions import register_default_workflows
 
         with container.uow_factory() as uow:
             mock_systems.seed_if_empty(uow.session)
             connector_registry.seed_if_empty(uow.session)
             idp.seed_if_empty(uow.session)
+            register_default_workflows(uow.session)
             uow.commit()
     except Exception:
         logger.warning("interop demo data seeding failed")

@@ -256,7 +256,7 @@ class RedisLimitTests(unittest.TestCase):
 
 class SchemaCheckTests(unittest.TestCase):
     def test_expected_head_is_the_last_revision_of_the_real_chain(self):
-        self.assertEqual(expected_head(), "0012")
+        self.assertEqual(expected_head(), "0013")
 
     def test_branched_or_broken_chains_are_reported(self):
         with tempfile.TemporaryDirectory() as d:
@@ -279,9 +279,9 @@ class SchemaCheckTests(unittest.TestCase):
                     def first(s2): return self.row
                 return R()
 
-        self.assertEqual(check(Session(Row(("0012",))))["status"], "ok")
+        self.assertEqual(check(Session(Row(("0013",))))["status"], "ok")
         behind = check(Session(Row(("0004",))))
-        self.assertEqual((behind["status"], behind["current"], behind["expected"]), ("behind", "0004", "0012"))
+        self.assertEqual((behind["status"], behind["current"], behind["expected"]), ("behind", "0004", "0013"))
         self.assertEqual(check(Session(fail=True))["status"], "unknown")
 
 

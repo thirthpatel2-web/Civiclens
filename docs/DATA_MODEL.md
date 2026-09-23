@@ -213,6 +213,36 @@ what happened is already `InteropTransaction` + `UnifiedApplicationEvent` (both 
 above) + the audit log; the event bus's job is notifying *other* consumers in near-real-time, not
 being a second system of record. See `docs/INTEROPERABILITY.md`'s "Event-driven pub/sub" section.
 
+### Configurable workflows — migration `0013`
+
+| `interop_workflow_definitions` | Type | Notes |
+|---|---|---|
+| `workflow_id` (PK) | `String(80)` | e.g. `residence_certificate_verification` |
+| `name`, `version` | `String` | |
+| `steps` | `jsonb` list | Ordered step dicts - `step_id`, `on_failure`, `retry_max_attempts`, `timeout_seconds`, `requires_approval`, `condition_key` (see `app/interop/workflow/engine.py::StepSpec`) |
+| `active` | `bool` | |
+| `created_at` | `timestamptz` | |
+
+| `interop_workflow_executions` | Type | Notes |
+|---|---|---|
+| `execution_id` (PK) | `uuid` | |
+| `workflow_id` (FK) | → `interop_workflow_definitions` | |
+| `correlation_id` | `String(60)` | |
+| `status` | `String(20)` | `running` \| `completed` \| `failed` \| `waiting_approval` |
+| `current_step_index` | `int` | Where a paused or failed execution stopped - `resume()` continues from here |
+| `context` | `jsonb` dict | Accumulated step outputs, merged as each step completes - only ever plain JSON-safe values, never a raw ORM row |
+| `started_at`, `finished_at` | `timestamptz`, latter nullable | |
+
+| `interop_workflow_step_executions` | Type | Notes |
+|---|---|---|
+| `id` (PK) | `uuid` | |
+| `execution_id` (FK, CASCADE) | → `interop_workflow_executions` | |
+| `step_id`, `step_index` | `String` / `int` | |
+| `status` | `String(20)` | `completed` \| `failed` \| `skipped` (no `pending`/`running` row is ever persisted - only a step that actually ran gets a row) |
+| `attempt` | `int` | One row per attempt - a retried step leaves a full history, not just its last try |
+| `error_message` | `String(400)`, nullable | |
+| `started_at`, `finished_at` | `timestamptz`, nullable | |
+
 ## Why no `CHECK` constraints on the string enum-ish columns
 
 `status`, `health_state`, `system`, `identifier_type` and similar columns are plain

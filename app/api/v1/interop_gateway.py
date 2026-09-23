@@ -102,3 +102,19 @@ def connector_health(connector_id: str, ctx: AuthContext = MANAGE, c: AppContain
 @router.put("/connectors/{connector_id}/enabled")
 def set_connector_enabled(connector_id: str, body: SetConnectorEnabledBody, ctx: AuthContext = MANAGE, c: AppContainer = Depends(get_container)) -> dict:
     return to_jsonable(c.interop_gateway.set_connector_enabled(ctx, connector_id=connector_id, enabled=body.enabled))
+
+
+# ---- configurable workflows (read surfaces - see app/interop/workflow/)
+@router.get("/workflows")
+def list_workflow_definitions(ctx: AuthContext = READ, c: AppContainer = Depends(get_container)) -> dict:
+    return {"items": to_jsonable(c.interop_gateway.list_workflow_definitions(ctx))}
+
+
+@router.get("/workflow-executions")
+def list_workflow_executions(workflow_id: str | None = None, status: str | None = None, limit: int = 50, ctx: AuthContext = READ, c: AppContainer = Depends(get_container)) -> dict:
+    return {"items": to_jsonable(c.interop_gateway.list_workflow_executions(ctx, workflow_id=workflow_id, status=status, limit=limit))}
+
+
+@router.get("/workflow-executions/{execution_id}")
+def get_workflow_execution(execution_id: str, ctx: AuthContext = READ, c: AppContainer = Depends(get_container)) -> dict:
+    return to_jsonable(c.interop_gateway.get_workflow_execution(ctx, execution_id=execution_id))

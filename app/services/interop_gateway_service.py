@@ -48,6 +48,9 @@ from app.db.models.interop_platform import (
     MasterEntity,
     UnifiedApplication,
     UnifiedApplicationEvent,
+    WorkflowDefinition,
+    WorkflowExecution,
+    WorkflowStepExecution,
 )
 from app.interop import connector_registry, mock_systems
 from app.interop.canonical.v1.models import Document as CanonicalDocument
@@ -466,3 +469,34 @@ class InteropGatewayService:
             AuditService(uow.audit, self._clock).record("interop.connector_toggled", actor_id=ctx.user_id, resource_type="connector", resource_id=connector_id, metadata={"enabled": enabled})
             uow.commit()
             return {"connector_id": connector_id, "enabled": enabled}
+
+    # -----------------------------------------------------------------------------------------
+    # Configurable workflows (Section 12/13) - read surfaces over WorkflowEngine's stored
+    # definitions and execution history. Listing/inspecting only; running a workflow is
+    # app.interop.workflow.definitions' own entry point today, not yet wired to a POST route here
+    # (see docs/REQUIREMENT_TRACEABILITY.md).
+    # -----------------------------------------------------------------------------------------
+
+    def list_workflow_definitions(self, ctx: AuthContext) -> list[dict]:
+        require(ctx, Permission.INTEROP_READ)
+        with self._uow() as uow:
+            return [_row(r) for r in uow.session.execute(select(WorkflowDefinition)).scalars().all()]
+
+    def list_workflow_executions(self, ctx: AuthContext, *, workflow_id: str | None = None, status: str | None = None, limit: int = 50) -> list[dict]:
+        require(ctx, Permission.INTEROP_READ)
+        with self._uow() as uow:
+            q = select(WorkflowExecution).order_by(WorkflowExecution.started_at.desc()).limit(limit)
+            if workflow_id:
+                q = q.where(WorkflowExecution.workflow_id == workflow_id)
+            if status:
+                q = q.where(WorkflowExecution.status == status)
+            return [_row(r) for r in uow.session.execute(q).scalars().all()]
+
+    def get_workflow_execution(self, ctx: AuthContext, *, execution_id: str) -> dict:
+        require(ctx, Permission.INTEROP_READ)
+        with self._uow() as uow:
+            execution = uow.session.get(WorkflowExecution, execution_id)
+            if execution is None:
+                raise NotFound("Workflow execution not found.")
+            steps = uow.session.execute(select(WorkflowStepExecution).where(WorkflowStepExecution.execution_id == execution_id).order_by(WorkflowStepExecution.step_index, WorkflowStepExecution.started_at)).scalars().all()
+            return {"execution": _row(execution), "steps": [_row(s) for s in steps]}

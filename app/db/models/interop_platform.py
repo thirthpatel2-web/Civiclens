@@ -276,3 +276,47 @@ class FederationToken(Base):
         UniqueConstraint("token_hash", name="uq_interop_federation_tokens_token_hash"),
         Index("ix_interop_federation_tokens_client_id", "client_id"),
     )
+
+
+# ---------------------------------------------------------------------------------------------
+# Configurable interop workflows (Section 12) - a stored, ordered step sequence the workflow
+# engine (app/interop/workflow/engine.py) executes, instead of a single hard-coded scenario in
+# Python control flow. See docs/INTEROPERABILITY.md's "Configurable workflows" section.
+# ---------------------------------------------------------------------------------------------
+
+
+class WorkflowDefinition(Base):
+    __tablename__ = "interop_workflow_definitions"
+    workflow_id: Mapped[str] = mapped_column(String(80), primary_key=True)  # e.g. "residence_certificate_verification"
+    name: Mapped[str] = mapped_column(String(150), nullable=False)
+    version: Mapped[str] = mapped_column(String(20), nullable=False, default="1")
+    steps: Mapped[list] = jsonb(list)  # ordered list of step dicts - see engine.py's StepSpec for the exact shape
+    active: Mapped[bool] = mapped_column(nullable=False, default=True)
+    created_at: Mapped[datetime] = created_at()
+
+
+class WorkflowExecution(Base):
+    __tablename__ = "interop_workflow_executions"
+    execution_id: Mapped[str] = uuid_pk()
+    workflow_id: Mapped[str] = mapped_column(ForeignKey("interop_workflow_definitions.workflow_id"), nullable=False)
+    correlation_id: Mapped[str] = mapped_column(String(60), nullable=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="running")  # running | completed | failed | waiting_approval
+    current_step_index: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    context: Mapped[dict] = jsonb(dict)  # accumulated step outputs, merged as each step completes
+    started_at: Mapped[datetime] = created_at()
+    finished_at: Mapped[datetime | None] = tstz()
+    __table_args__ = (Index("ix_interop_workflow_executions_workflow_id", "workflow_id"), Index("ix_interop_workflow_executions_correlation_id", "correlation_id"))
+
+
+class WorkflowStepExecution(Base):
+    __tablename__ = "interop_workflow_step_executions"
+    id: Mapped[str] = uuid_pk()
+    execution_id: Mapped[str] = mapped_column(ForeignKey("interop_workflow_executions.execution_id", ondelete="CASCADE"), nullable=False)
+    step_id: Mapped[str] = mapped_column(String(80), nullable=False)
+    step_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False)  # pending | running | completed | failed | skipped
+    attempt: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    error_message: Mapped[str | None] = mapped_column(String(400), nullable=True)
+    started_at: Mapped[datetime | None] = tstz()
+    finished_at: Mapped[datetime | None] = tstz()
+    __table_args__ = (Index("ix_interop_workflow_step_executions_execution_id", "execution_id"),)
