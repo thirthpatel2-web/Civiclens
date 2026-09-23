@@ -1,7 +1,7 @@
 // Types mirroring the FastAPI responses (backend: app/api/v1/*, app/schemas/api.py). Keep in sync with docs/API_CONTRACT.md.
 import type { LanguageCode } from '../i18n/languages.ts';
 
-export interface SessionUser { id: string; role: 'citizen' | 'officer' | 'admin' | 'super_admin'; department_code: string | null; email: string | null; full_name: string | null; mfa_enabled: boolean; language: string; onboarding_complete: boolean }
+export interface SessionUser { id: string; role: 'citizen' | 'officer' | 'admin' | 'super_admin' | 'integration_admin' | 'auditor'; department_code: string | null; email: string | null; full_name: string | null; mfa_enabled: boolean; language: string; onboarding_complete: boolean }
 export interface LoginResponse { user: SessionUser; mfa_verified: boolean; csrf_token: string; session_token: string; token_type: 'Bearer' }
 
 export interface Complaint {

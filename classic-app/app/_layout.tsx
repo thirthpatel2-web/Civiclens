@@ -13,7 +13,10 @@ import { TopBar } from '../src/components/TopBar.tsx';
 import { PrivacyConsentGate } from '../src/components/PrivacyConsentGate.tsx';
 import { ThemeProvider, useTheme } from '../src/theme/ThemeContext.tsx';
 
-const homeFor = (role: string) => (role === 'citizen' ? '/(tabs)/home' : '/(officer)/dashboard');
+// INTEGRATION_ADMIN/AUDITOR hold no complaint-queue permissions (app.core.authorization) - the
+// officer dashboard would just show them an empty/error state, so they land on the one screen
+// their role actually grants: the interop gateway console.
+const homeFor = (role: string) => (role === 'citizen' ? '/(tabs)/home' : role === 'integration_admin' || role === 'auditor' ? '/interop-gateway' : '/(officer)/dashboard');
 
 function Gate() {
   const { user, loading } = useAuth();
@@ -32,7 +35,7 @@ function Gate() {
     // A citizen who somehow lands on the officer tabs (or vice versa) gets redirected home for
     // their real role - the API already enforces this server-side; this just keeps the UI honest.
     else if (user && user.role === 'citizen' && inOfficerArea) router.replace('/(tabs)/home');
-    else if (user && user.role !== 'citizen' && inCitizenArea) router.replace('/(officer)/dashboard');
+    else if (user && user.role !== 'citizen' && inCitizenArea) router.replace(homeFor(user.role));
   }, [user, loading, segments, router]);
   useEffect(() => { if (user?.role === 'citizen') registerBackgroundSync().catch(() => undefined); }, [user]);
   if (loading) return <Loading label="CivicLens" />;

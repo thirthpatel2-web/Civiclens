@@ -1,8 +1,9 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 import { AppButton, Body, Card, Chip, EmptyState, ErrorBanner, Field, H1, InfoBanner, Loading, Screen } from '../src/components/ui.tsx';
 import { endpoints } from '../src/api/instance.ts';
 import type { ConnectorView, ExchangeResult, IdentityMatchCandidateView, InteropConsent, InteropTransactionView, TimelineResult } from '../src/api/types.ts';
+import { useAuth } from '../src/auth/AuthContext.tsx';
 import { radius, withAlpha } from '../src/theme.ts';
 import { useTheme } from '../src/theme/ThemeContext.tsx';
 
@@ -36,6 +37,7 @@ const STATUS_COPY: Record<string, { label: string; tone: 'ok' | 'warn' | 'bad' |
 
 export default function InteropGateway() {
   const { colors } = useTheme();
+  const { user, signOut } = useAuth();
   const [connectors, setConnectors] = useState<ConnectorView[] | null>(null);
   const [consents, setConsents] = useState<InteropConsent[] | null>(null);
   const [candidates, setCandidates] = useState<IdentityMatchCandidateView[] | null>(null);
@@ -80,6 +82,10 @@ export default function InteropGateway() {
     <Screen>
       <H1>🔄 Interop Gateway</H1>
       <Body soft>The no-reupload cross-department demo: a citizen’s document, already on file with one department, satisfies another department’s requirement automatically - with explicit consent, confidence-scored identity resolution, and a full audit trail.</Body>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Body soft>Signed in as {user?.full_name ?? user?.email} · {user?.role?.replace(/_/g, ' ')}</Body>
+        <Pressable accessibilityRole="button" onPress={signOut}><Text style={{ color: colors.bad, fontWeight: '700', fontSize: 13 }}>Sign out</Text></Pressable>
+      </View>
       {error ? <ErrorBanner message={error} onRetry={load} /> : null}
 
       <Text style={{ fontWeight: '700', color: colors.text, marginTop: 4 }}>Connector registry</Text>
