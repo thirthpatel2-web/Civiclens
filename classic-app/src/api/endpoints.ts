@@ -134,6 +134,15 @@ export function createEndpoints(api: ApiClient) {
     interopConnectors: () => api.get<{ items: T.ConnectorView[] }>('/interop-gateway/connectors'),
     interopConnectorHealthCheck: (connector_id: string) => api.post<Record<string, unknown>>(`/interop-gateway/connectors/${connector_id}/health-check`, {}),
     setConnectorEnabled: (connector_id: string, enabled: boolean) => api.put(`/interop-gateway/connectors/${connector_id}/enabled`, { enabled }),
+    interopGatewayExceptions: (resolution_state?: string | null) => api.get<{ items: T.InteropExceptionView[] }>('/interop-gateway/exceptions', resolution_state ? { resolution_state } : undefined),
+    retryInteropException: (exception_id: string) => api.post<T.InteropExceptionView>(`/interop-gateway/exceptions/${exception_id}/retry`, {}),
+    resolveInteropException: (exception_id: string) => api.post<T.InteropExceptionView>(`/interop-gateway/exceptions/${exception_id}/resolve`, {}),
+    markInteropExceptionDead: (exception_id: string, reason?: string) => api.post<T.InteropExceptionView>(`/interop-gateway/exceptions/${exception_id}/mark-dead`, { reason: reason ?? null }),
+    interopAlerts: (acknowledged?: boolean) => api.get<{ items: T.ConnectorAlertView[] }>('/interop-gateway/alerts', acknowledged === undefined ? undefined : { acknowledged }),
+    acknowledgeInteropAlert: (alert_id: string) => api.post<T.ConnectorAlertView>(`/interop-gateway/alerts/${alert_id}/acknowledge`, {}),
+    interopTrace: (correlation_id: string) => api.get<T.TraceResult>(`/interop-gateway/trace/${correlation_id}`),
+    interopServiceCatalog: () => api.get<{ items: T.ServiceCatalogEntryView[] }>('/interop-gateway/service-catalog'),
+    interopFieldMappings: (service_id?: string) => api.get<{ items: T.FieldMappingView[] }>('/interop-gateway/field-mappings', service_id ? { service_id } : undefined),
 
     // ---- monitoring / integrations (admin) --------------------------------------------------------
     integrationStatus: () => api.get<{ items: T.IntegrationHealth[] }>('/integrations'),

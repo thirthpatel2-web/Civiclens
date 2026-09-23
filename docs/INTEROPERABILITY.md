@@ -521,6 +521,11 @@ never make one. See `app/core/authorization.py`. The three consent-decision rout
    timeline.
 5. The **Identity match review queue** and **Recent transactions** sections show the manual-review
    path and the machine-to-machine record respectively, and refresh after every action.
+6. Each connector card now shows a live **SLA badge** alongside health state. The
+   **Connector alerts**, **Exception log**, and **Service catalog & field mappings** sections
+   (collapsed by default — tap to expand) show Section 19-23's monitoring and catalog data:
+   acknowledge an alert, retry/resolve/dead-letter an exception, or expand a service to see the
+   exact field mappings it performs, verified against the real transform code.
 
 The same flow run over plain HTTP (exactly what the screen calls) is in `docs/DEMO_GUIDE.md`'s
 curl walkthrough, and as an automated, repeatable test in the next section.
@@ -553,21 +558,19 @@ Named here rather than left silently missing, per this project's rule against cl
 - A `INTEGRATION_ADMIN`/`AUDITOR` login door in the legacy NiceGUI web admin (`app/ui/pages/public.py`)
   — classic-app routes both roles to a working home (the Interop Gateway screen) on login, but no
   screens exist for either role in the older NiceGUI admin app specifically
-- A connector health *dashboard* — the data is real and now includes SLA status/thresholds
-  (`GET /connectors`) and a real alert log (`GET /alerts`); no charts or a visual SLA view exist yet
+- A connector health *dashboard* with charts — `GET /connectors`'s live SLA status/thresholds and
+  the alert log are both now shown on the Interop Gateway screen (badges + an "Alerts" section),
+  but as a status view, not a charted trend over time
 - Loading `QualityRuleSet` rows from the database into the gateway's quality check — the table,
   the engine that would execute them, and the API surface to author them are all real; the gateway
   still evaluates a fixed Python list of `QualityRule` objects, not a stored, versioned rule set
-- An admin UI screen for the central exception queue (`GET/POST /interop-gateway/exceptions*` work
-  over plain HTTP; no classic-app screen calls them yet)
-- An admin UI screen for the alert log or the transaction trace view (`GET /alerts`,
-  `POST /alerts/{id}/acknowledge`, `GET /trace/{correlation_id}` all work over plain HTTP; no
-  classic-app screen calls any of them yet)
+- A UI for the distributed transaction trace view — `GET /trace/{correlation_id}` works over plain
+  HTTP (see `docs/DEMO_GUIDE.md`); no classic-app screen calls it yet (the exception log, alert log,
+  and service/field-mapping catalog below DO now have real screen sections, added this phase)
 - Routing real interop events through the WebSocket event bus (`app/realtime/events.py`) — it's
   tightly coupled to the complaint/notification domain; this milestone uses the dedicated
   `InteropTransaction`/`UnifiedApplicationEvent` tables as the interop-specific record instead
-- Admin UI to view or edit the service catalog / field mapping catalog (`GET /service-catalog`,
-  `GET /field-mappings` are real and seeded from the actual transform functions - see "Service
-  catalog & field mapping catalog" above; no classic-app screen calls them yet) / a fourth+ mock
-  system
+- Editing the service catalog / field mapping catalog from the UI — `GET /service-catalog`/
+  `GET /field-mappings` are shown (expandable per service) on the Interop Gateway screen, but
+  read-only; a fourth+ mock system
 - `docs/CONNECTOR_GUIDE.md`, `docs/WORKFLOW_GUIDE.md`

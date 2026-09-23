@@ -129,6 +129,28 @@ export interface ConnectorView {
   connector_id: string; name: string; department: string; version: string; supported_operations: string[]; enabled: boolean;
   health_state: 'healthy' | 'degraded' | 'unavailable' | 'not_configured' | 'unknown'; last_health_check: string | null;
   last_success_at: string | null; last_failure_at: string | null; total_calls: number; total_failures: number; avg_response_ms: number | null;
+  sla_max_avg_response_ms: number | null; sla_min_success_rate: number | null; sla_status: 'met' | 'breached' | 'unknown';
+}
+export interface InteropExceptionView {
+  exception_id: string; error_code: string; message: string; source_system: string | null; target_system: string | null;
+  correlation_id: string | null; retryable: boolean; retry_count: number; max_retries: number; next_action: string | null;
+  resolution_state: 'open' | 'retrying' | 'resolved' | 'dead'; created_at: string; resolved_at: string | null;
+}
+export interface ConnectorAlertView {
+  alert_id: string; connector_id: string; alert_type: 'SLA_BREACHED' | 'CONNECTOR_UNAVAILABLE'; severity: 'warning' | 'critical';
+  message: string; created_at: string; acknowledged: boolean; acknowledged_at: string | null; acknowledged_by: string | null;
+}
+export interface ServiceCatalogEntryView {
+  service_id: string; name: string; description: string; source_system: string; target_system: string; data_category: string;
+  workflow_id: string | null; active: boolean; created_at: string;
+}
+export interface FieldMappingView {
+  mapping_id: string; service_id: string | null; direction: 'external_to_canonical' | 'canonical_to_external'; system_id: string;
+  entity: string; source_field: string; target_field: string; transform_note: string | null; created_at: string;
+}
+export interface TraceResult {
+  correlation_id: string; transactions: InteropTransactionView[]; exceptions: InteropExceptionView[];
+  events: UnifiedApplicationEventView[]; audit_entries: Record<string, unknown>[];
 }
 export interface UnifiedApplicationEventView { id: string; application_id: string; step: string; source_system: string; status: string; correlation_id: string | null; detail: Record<string, unknown>; occurred_at: string }
 export interface UnifiedApplicationView { application_id: string; reference: string; master_id: string; service_type: string; primary_system: string; external_reference: string | null; status: string; created_at: string; updated_at: string }

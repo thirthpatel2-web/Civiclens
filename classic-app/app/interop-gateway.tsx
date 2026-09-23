@@ -1,8 +1,11 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
-import { AppButton, Body, Card, Chip, EmptyState, ErrorBanner, Field, H1, InfoBanner, Loading, Screen } from '../src/components/ui.tsx';
+import { AppButton, Body, Card, Chip, Disclosure, EmptyState, ErrorBanner, Field, H1, InfoBanner, Loading, Screen } from '../src/components/ui.tsx';
 import { endpoints } from '../src/api/instance.ts';
-import type { ConnectorView, ExchangeResult, IdentityMatchCandidateView, InteropConsent, InteropTransactionView, TimelineResult } from '../src/api/types.ts';
+import type {
+  ConnectorAlertView, ConnectorView, ExchangeResult, FieldMappingView, IdentityMatchCandidateView, InteropConsent,
+  InteropExceptionView, InteropTransactionView, ServiceCatalogEntryView, TimelineResult,
+} from '../src/api/types.ts';
 import { useAuth } from '../src/auth/AuthContext.tsx';
 import { radius, withAlpha } from '../src/theme.ts';
 import { useTheme } from '../src/theme/ThemeContext.tsx';
@@ -14,6 +17,8 @@ const DEMO_APPLICATIONS = [
 ];
 
 const HEALTH_TONE: Record<string, 'ok' | 'warn' | 'bad' | 'muted'> = { healthy: 'ok', degraded: 'warn', unavailable: 'bad', not_configured: 'muted', unknown: 'muted' };
+const SLA_TONE: Record<string, 'ok' | 'warn' | 'bad' | 'muted'> = { met: 'ok', breached: 'bad', unknown: 'muted' };
+const RESOLUTION_TONE: Record<string, 'ok' | 'warn' | 'bad' | 'muted'> = { open: 'warn', retrying: 'warn', resolved: 'ok', dead: 'bad' };
 
 function Badge({ label, tone }: { label: string; tone: 'ok' | 'warn' | 'bad' | 'muted' | 'info' }) {
   const { colors } = useTheme();
@@ -42,6 +47,10 @@ export default function InteropGateway() {
   const [consents, setConsents] = useState<InteropConsent[] | null>(null);
   const [candidates, setCandidates] = useState<IdentityMatchCandidateView[] | null>(null);
   const [transactions, setTransactions] = useState<InteropTransactionView[] | null>(null);
+  const [exceptions, setExceptions] = useState<InteropExceptionView[] | null>(null);
+  const [alerts, setAlerts] = useState<ConnectorAlertView[] | null>(null);
+  const [services, setServices] = useState<ServiceCatalogEntryView[] | null>(null);
+  const [fieldMappings, setFieldMappings] = useState<Record<string, FieldMappingView[]>>({});
 
   const [applicationNo, setApplicationNo] = useState(DEMO_APPLICATIONS[0].value);
   const [result, setResult] = useState<ExchangeResult | null>(null);
@@ -52,13 +61,24 @@ export default function InteropGateway() {
   const load = useCallback(async () => {
     setError(null);
     try {
-      const [c, k, cand, t] = await Promise.all([
+      const [c, k, cand, t, exc, al, svc] = await Promise.all([
         endpoints.interopConnectors(), endpoints.interopConsents('pending'), endpoints.interopIdentityCandidates('pending'), endpoints.interopTransactions(20),
+        endpoints.interopGatewayExceptions(), endpoints.interopAlerts(false), endpoints.interopServiceCatalog(),
       ]);
       setConnectors(c.items); setConsents(k.items); setCandidates(cand.items); setTransactions(t.items);
-    } catch (e: any) { setError(e?.message ?? 'Could not load the interop console. You may need admin access.'); setConnectors([]); setConsents([]); setCandidates([]); setTransactions([]); }
+      setExceptions(exc.items); setAlerts(al.items); setServices(svc.items);
+    } catch (e: any) {
+      setError(e?.message ?? 'Could not load the interop console. You may need admin access.');
+      setConnectors([]); setConsents([]); setCandidates([]); setTransactions([]); setExceptions([]); setAlerts([]); setServices([]);
+    }
   }, []);
   useEffect(() => { load(); }, [load]);
+
+  const loadFieldMappings = useCallback(async (serviceId: string) => {
+    if (fieldMappings[serviceId]) return;
+    try { const r = await endpoints.interopFieldMappings(serviceId); setFieldMappings((prev) => ({ ...prev, [serviceId]: r.items })); }
+    catch { /* the Disclosure just shows nothing below - not worth a separate error banner for a read-only catalog view */ }
+  }, [fieldMappings]);
 
   const runExchange = useCallback(async () => {
     setBusy('exchange'); setError(null); setTimeline(null);
@@ -95,7 +115,10 @@ export default function InteropGateway() {
             <View key={c.connector_id} style={{ flex: 1, minWidth: 220, backgroundColor: colors.card, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, padding: 12, gap: 4 }}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                 <Text style={{ fontWeight: '700', color: colors.text }}>{c.name}</Text>
-                <Badge label={c.health_state} tone={HEALTH_TONE[c.health_state] ?? 'muted'} />
+                <View style={{ flexDirection: 'row', gap: 4 }}>
+                  <Badge label={c.health_state} tone={HEALTH_TONE[c.health_state] ?? 'muted'} />
+                  <Badge label={`SLA ${c.sla_status}`} tone={SLA_TONE[c.sla_status] ?? 'muted'} />
+                </View>
               </View>
               <Body soft>{c.department}</Body>
               <Text style={{ fontSize: 11, color: colors.textMuted }}>{c.total_calls} call(s){c.total_failures ? ` · ${c.total_failures} failed` : ''}{c.avg_response_ms != null ? ` · ~${Math.round(c.avg_response_ms)}ms` : ''}</Text>
@@ -177,6 +200,68 @@ export default function InteropGateway() {
           <Text style={{ fontSize: 10, color: colors.textMuted }}>{new Date(t.created_at).toLocaleString()}{t.duration_ms != null ? ` · ${Math.round(t.duration_ms)}ms` : ''}</Text>
         </Card>
       ))}
+
+      <Disclosure label={`Connector alerts${alerts && alerts.length ? ` (${alerts.length} unacknowledged)` : ''}`}>
+        <Body soft>Raised only on a genuine state change - an SLA that just breached, or a connector that just became unavailable - never once per failed call.</Body>
+        {alerts === null ? <Loading /> : alerts.length === 0 ? <EmptyState message="No unacknowledged alerts." /> : alerts.map((a) => (
+          <Card key={a.alert_id}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+              <Badge label={a.alert_type.replace(/_/g, ' ')} tone={a.severity === 'critical' ? 'bad' : 'warn'} />
+              <Text style={{ fontSize: 10, color: colors.textMuted }}>{new Date(a.created_at).toLocaleString()}</Text>
+            </View>
+            <Body soft>{a.message}</Body>
+            <AppButton label="Acknowledge" kind="secondary" busy={busy === a.alert_id} onPress={() => act(a.alert_id, () => endpoints.acknowledgeInteropAlert(a.alert_id))} />
+          </Card>
+        ))}
+      </Disclosure>
+
+      <Disclosure label={`Exception log${exceptions && exceptions.length ? ` (${exceptions.length})` : ''}`}>
+        <Body soft>Every failed exchange lands here with a canonical error code, retry bookkeeping, and dead-letter state - not just the plain-language reason shown above.</Body>
+        {exceptions === null ? <Loading /> : exceptions.length === 0 ? <EmptyState message="No exceptions logged." /> : exceptions.map((x) => (
+          <Card key={x.exception_id}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+              <Text style={{ fontWeight: '700', fontSize: 12, color: colors.text }}>{x.error_code}</Text>
+              <Badge label={x.resolution_state} tone={RESOLUTION_TONE[x.resolution_state] ?? 'muted'} />
+            </View>
+            <Body soft>{x.message}</Body>
+            <Text style={{ fontSize: 10, color: colors.textMuted }}>{x.source_system ?? '?'} → {x.target_system ?? '?'}{x.retryable ? ` · retry ${x.retry_count}/${x.max_retries}` : ' · not retryable'}</Text>
+            {x.resolution_state !== 'resolved' && x.resolution_state !== 'dead' ? (
+              <View style={{ flexDirection: 'row', gap: 6, marginTop: 4 }}>
+                {x.retryable ? <AppButton label="Retry" kind="secondary" busy={busy === `retry-${x.exception_id}`} onPress={() => act(`retry-${x.exception_id}`, () => endpoints.retryInteropException(x.exception_id))} /> : null}
+                <AppButton label="Resolve" kind="secondary" busy={busy === `resolve-${x.exception_id}`} onPress={() => act(`resolve-${x.exception_id}`, () => endpoints.resolveInteropException(x.exception_id))} />
+                <AppButton label="Mark dead" kind="danger" busy={busy === `dead-${x.exception_id}`} onPress={() => act(`dead-${x.exception_id}`, () => endpoints.markInteropExceptionDead(x.exception_id))} />
+              </View>
+            ) : null}
+          </Card>
+        ))}
+      </Disclosure>
+
+      <Disclosure label="Service catalog & field mappings">
+        <Body soft>The cross-department services this platform exposes, and exactly which fields each one reads and writes - generated from, and verified against, the real transform code.</Body>
+        {services === null ? <Loading /> : services.length === 0 ? <EmptyState message="No services in the catalog." /> : services.map((s) => (
+          <Card key={s.service_id}>
+            <Text style={{ fontWeight: '700', fontSize: 13, color: colors.text }}>{s.name}</Text>
+            <Body soft>{s.description}</Body>
+            <Text style={{ fontSize: 11, color: colors.textMuted }}>{s.source_system} → {s.target_system} · {s.data_category}</Text>
+            <Disclosure label="Field mappings" defaultOpen={false}>
+              {(() => {
+                const mappings = fieldMappings[s.service_id];
+                if (!mappings) { loadFieldMappings(s.service_id); return <Loading />; }
+                return mappings.length === 0 ? <EmptyState message="No mappings recorded." /> : mappings.map((m) => {
+                  const from = m.direction === 'external_to_canonical' ? `${m.system_id}.${m.source_field}` : `canonical.${m.source_field}`;
+                  const to = m.direction === 'external_to_canonical' ? `canonical.${m.target_field}` : `${m.system_id}.${m.target_field}`;
+                  return (
+                    <View key={m.mapping_id} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 3, borderBottomWidth: 1, borderBottomColor: colors.border }}>
+                      <Text style={{ fontSize: 11, color: colors.text }}>{from} → {to}</Text>
+                      <Text style={{ fontSize: 10, color: colors.textMuted }}>{m.transform_note}</Text>
+                    </View>
+                  );
+                });
+              })()}
+            </Disclosure>
+          </Card>
+        ))}
+      </Disclosure>
     </Screen>
   );
 }
