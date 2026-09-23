@@ -373,6 +373,10 @@ class SetConnectorEnabledBody(Strict):
     enabled: bool
 
 
+class MarkExceptionDeadBody(Strict):
+    reason: str | None = Field(default=None, max_length=300)
+
+
 class FederationTokenBody(Strict):
     """OAuth2 client_credentials grant (RFC 6749 s4.4) against the mock Government IdP - see
     app/interop/federation/idp.py. grant_type is accepted (and validated) for shape-compatibility

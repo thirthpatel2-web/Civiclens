@@ -57,12 +57,16 @@ from app.interop.canonical.v1.models import Document as CanonicalDocument
 from app.interop.canonical.v1.transform import canonical_document_to_dept_b_fields, dept_a_document_to_canonical
 from app.interop.connectors import runtime as connector_runtime
 from app.interop.events.bus import InMemoryInteropEventBus, InteropEventBus
+from app.interop.exceptions import center as exception_center
+from app.interop.exceptions.taxonomy import classify as classify_exception
 from app.interop.events.types import InteropEvent
 from app.interop.identity_resolution import IdentityResolutionService
+from app.interop.quality.engine import DataQualityEngine, QualityRule
 from app.services.audit_service import AuditService
 from app.services.uow import UowFactory
 
 CONSENT_VALIDITY = timedelta(days=30)
+_quality_engine = DataQualityEngine()  # stateless - one instance evaluates any record against any rule set
 
 # Canonical field names (app.interop.canonical.v1.models.Document) this exchange needs to read
 # from Department A - the field-level consent vocabulary a citizen actually authorizes against.
@@ -80,20 +84,23 @@ def _row(obj) -> dict | None:
     return {c.key: getattr(obj, c.key) for c in inspect(obj).mapper.column_attrs}
 
 
+_DOCUMENT_QUALITY_RULES = [
+    QualityRule("status", "in_set", {"allowed": ["verified"]}, message="source document status is not verified"),
+    QualityRule("reference", "min_length", {"min": 6}, message="reference number is missing or too short to be a real reference"),
+    QualityRule("issued_on", "required", message="issue date is missing"),
+]
+
+
 def _document_quality(document: CanonicalDocument) -> tuple[float, list[str]]:
-    """A check specific to what THIS exchange needs verified - not a generic rubric borrowed from
-    a different data shape. Every failure reason is something a reviewer could independently check
-    against the same canonical document. Runs on the canonical shape (app.interop.canonical.v1),
-    not the source system's native row, so the same check applies unchanged once a second document
-    type or a real connector's Document starts flowing through here."""
-    checks = [
-        (document.status == "verified", f"source document status is {document.status!r}, not verified"),
-        (bool(document.reference and len(document.reference.strip()) >= 6), "reference number is missing or too short to be a real reference"),
-        (document.issued_on is not None, "issue date is missing"),
-    ]
-    issues = [msg for ok, msg in checks if not ok]
-    score = sum(1 for ok, _ in checks if ok) / len(checks)
-    return round(score, 2), issues
+    """The document exchange's rules, run through the reusable DataQualityEngine
+    (app.interop.quality.engine) - not a bespoke rubric hard-coded to this one call site. Every
+    failure reason is something a reviewer could independently check against the same canonical
+    document. Runs on the canonical shape (app.interop.canonical.v1), not the source system's
+    native row, so the same rules apply unchanged once a second document type or a real
+    connector's Document starts flowing through here."""
+    record = {"status": document.status, "reference": document.reference, "issued_on": document.issued_on}
+    result = _quality_engine.evaluate(record, _DOCUMENT_QUALITY_RULES)
+    return result.score, result.errors
 
 
 class InteropGatewayService:
@@ -140,6 +147,7 @@ class InteropGatewayService:
                 # above is invisible to the SELECT the Department A resolution below runs against
                 # the same still-open transaction, and it would wrongly create a second master.
                 if b_result.candidate_id:
+                    exception_center.log_exception(s, error_code=classify_exception("identity_ambiguous"), message=f"Department B identity match ambiguous (confidence {b_result.confidence}); needs manual review.", source_system="dept_b", target_system="civiclens", correlation_id=correlation_id, clock=self._clock)
                     uow.commit()
                     self._publish(InteropEvent(event_type="IdentityReviewRequired", source_system="dept_b", entity_id=b_result.candidate_id, correlation_id=correlation_id, payload={"side": "dept_b", "confidence": b_result.confidence}))
                     return {"status": "identity_ambiguous", "side": "dept_b", "candidate_id": b_result.candidate_id, "confidence": b_result.confidence, "explanation": b_result.matched_on}
@@ -147,15 +155,18 @@ class InteropGatewayService:
 
                 resident = self._find_matching_dept_a_resident(s, beneficiary=beneficiary)
                 if resident is None:
+                    exception_center.log_exception(s, error_code=classify_exception("source_record_not_found"), message=f"No matching resident found in {mock_systems.DEPT_A_NAME}.", source_system="dept_a", target_system="civiclens", correlation_id=correlation_id, clock=self._clock)
                     uow.commit()
                     return {"status": "source_record_not_found", "detail": f"No matching resident found in {mock_systems.DEPT_A_NAME}."}
 
                 a_result = resolver.resolve_person(s, system="dept_a", identifier_type="resident_id", identifier_value=resident.resident_id, name=resident.full_name, mobile=resident.mobile)
                 if a_result.candidate_id:
+                    exception_center.log_exception(s, error_code=classify_exception("identity_ambiguous"), message=f"Department A identity match ambiguous (confidence {a_result.confidence}); needs manual review.", source_system="dept_a", target_system="civiclens", correlation_id=correlation_id, clock=self._clock)
                     uow.commit()
                     self._publish(InteropEvent(event_type="IdentityReviewRequired", source_system="dept_a", entity_id=a_result.candidate_id, correlation_id=correlation_id, payload={"side": "dept_a", "confidence": a_result.confidence}))
                     return {"status": "identity_ambiguous", "side": "dept_a", "candidate_id": a_result.candidate_id, "confidence": a_result.confidence, "explanation": a_result.matched_on}
                 if a_result.master_id != master_id:
+                    exception_center.log_exception(s, error_code=classify_exception("identity_conflict"), message="Department A and Department B resolved to two different master identities. Needs manual review.", source_system="civiclens", target_system="civiclens", correlation_id=correlation_id, clock=self._clock)
                     uow.commit()
                     return {"status": "identity_conflict", "detail": "Department A and Department B resolved to two different master identities. Needs manual review."}
                 self._publish(InteropEvent(event_type="IdentityResolved", source_system="civiclens", entity_id=master_id, correlation_id=correlation_id, payload={"dept_a_resident_id": resident.resident_id, "dept_b_beneficiary_code": beneficiary.beneficiary_code}))
@@ -209,6 +220,7 @@ class InteropGatewayService:
         if denied_fields:
             txn = self._record_transaction(s, correlation_id=correlation_id, source="dept_a", target="dept_b", master_id=master_id, consent_id=consent.consent_id, status="failed", error_code="data_field_not_consented", error_message=f"Fields not authorized by this consent: {', '.join(denied_fields)}.", fields=[], duration_ms=0.0, requested_fields=list(REQUIRED_DOCUMENT_FIELDS), approved_fields=approved_fields, denied_fields=denied_fields)
             self._add_event(s, unified.application_id, step="field_level_consent_check_failed", source_system="civiclens", status="failed", correlation_id=correlation_id, detail={"denied_fields": denied_fields})
+            exception_center.log_exception(s, error_code=classify_exception("data_field_not_consented"), message=f"Fields not authorized by this consent: {', '.join(denied_fields)}.", source_system="dept_a", target_system="dept_b", correlation_id=correlation_id, clock=self._clock)
             AuditService(uow.audit, self._clock).record("interop.document_exchange_failed", actor_id=ctx.user_id, resource_type="interop_transaction", resource_id=txn.transaction_id, metadata={"reason": "data_field_not_consented", "denied_fields": denied_fields, "application_no": application_no})
             events.append(InteropEvent(event_type="ExchangeFailed", source_system="dept_a", destination="dept_b", entity_id=txn.transaction_id, correlation_id=correlation_id, payload={"reason": "data_field_not_consented", "denied_fields": denied_fields}))
             return {"status": "failed", "reason": "data_field_not_consented", "denied_fields": denied_fields, "transaction_id": txn.transaction_id, "correlation_id": correlation_id}, events
@@ -221,6 +233,7 @@ class InteropGatewayService:
         if not fetch_result.ok or fetch_result.data is None:
             txn = self._record_transaction(s, correlation_id=correlation_id, source="dept_a", target="dept_b", master_id=master_id, consent_id=consent.consent_id, status="failed", error_code="document_not_found", error_message=f"No {document_type} on file for this resident.", fields=[], duration_ms=duration_ms, requested_fields=list(REQUIRED_DOCUMENT_FIELDS), approved_fields=approved_fields, denied_fields=[])
             self._add_event(s, unified.application_id, step="document_fetch_failed", source_system="dept_a", status="failed", correlation_id=correlation_id, detail={"reason": "document_not_found"})
+            exception_center.log_exception(s, error_code=classify_exception("document_not_found"), message=f"No {document_type} on file for this resident.", source_system="dept_a", target_system="dept_b", correlation_id=correlation_id, clock=self._clock)
             AuditService(uow.audit, self._clock).record("interop.document_exchange_failed", actor_id=ctx.user_id, resource_type="interop_transaction", resource_id=txn.transaction_id, metadata={"reason": "document_not_found", "application_no": application_no})
             events.append(InteropEvent(event_type="ExchangeFailed", source_system="dept_a", destination="dept_b", entity_id=txn.transaction_id, correlation_id=correlation_id, payload={"reason": "document_not_found"}))
             return {"status": "failed", "reason": "document_not_found", "transaction_id": txn.transaction_id, "correlation_id": correlation_id}, events
@@ -232,6 +245,7 @@ class InteropGatewayService:
         if quality_score < 0.7:
             txn = self._record_transaction(s, correlation_id=correlation_id, source="dept_a", target="dept_b", master_id=master_id, consent_id=consent.consent_id, status="failed", error_code="data_quality_failed", error_message="; ".join(quality_issues), fields=[], duration_ms=duration_ms, requested_fields=list(REQUIRED_DOCUMENT_FIELDS), approved_fields=approved_fields, denied_fields=[])
             self._add_event(s, unified.application_id, step="document_quality_check_failed", source_system="dept_a", status="failed", correlation_id=correlation_id, detail={"score": quality_score, "issues": quality_issues})
+            exception_center.log_exception(s, error_code=classify_exception("data_quality_failed"), message="; ".join(quality_issues), source_system="dept_a", target_system="dept_b", correlation_id=correlation_id, clock=self._clock)
             AuditService(uow.audit, self._clock).record("interop.document_exchange_failed", actor_id=ctx.user_id, resource_type="interop_transaction", resource_id=txn.transaction_id, metadata={"reason": "data_quality_failed", "issues": quality_issues, "application_no": application_no})
             events.append(InteropEvent(event_type="ExchangeFailed", source_system="dept_a", destination="dept_b", entity_id=txn.transaction_id, correlation_id=correlation_id, payload={"reason": "data_quality_failed", "issues": quality_issues}))
             return {"status": "failed", "reason": "data_quality_failed", "issues": quality_issues, "transaction_id": txn.transaction_id, "correlation_id": correlation_id}, events
@@ -500,3 +514,48 @@ class InteropGatewayService:
                 raise NotFound("Workflow execution not found.")
             steps = uow.session.execute(select(WorkflowStepExecution).where(WorkflowStepExecution.execution_id == execution_id).order_by(WorkflowStepExecution.step_index, WorkflowStepExecution.started_at)).scalars().all()
             return {"execution": _row(execution), "steps": [_row(s) for s in steps]}
+
+    # -----------------------------------------------------------------------------------------
+    # Central exception management (Section 16-18) - the taxonomy, retry and dead-letter state
+    # that every gateway failure branch above now logs into automatically. Reading and acting on
+    # these records is an integration-admin operation, same gating as connector health/workflows.
+    # -----------------------------------------------------------------------------------------
+
+    def list_exceptions(self, ctx: AuthContext, *, resolution_state: str | None = None, error_code: str | None = None, correlation_id: str | None = None, limit: int = 100) -> list[dict]:
+        require(ctx, Permission.INTEROP_READ)
+        with self._uow() as uow:
+            records = exception_center.list_exceptions(uow.session, resolution_state=resolution_state, error_code=error_code, correlation_id=correlation_id, limit=limit)
+            return [_row(r) for r in records]
+
+    def retry_exception(self, ctx: AuthContext, *, exception_id: str) -> dict:
+        require(ctx, Permission.INTEROP_MANAGE)
+        with self._uow() as uow:
+            record = exception_center.retry(uow.session, exception_id, clock=self._clock)
+            if record is None:
+                raise NotFound("No retryable exception with that id (unknown, non-retryable, or already dead).")
+            AuditService(uow.audit, self._clock).record("interop.exception_retried", actor_id=ctx.user_id, resource_type="interop_exception", resource_id=exception_id, metadata={"resolution_state": record.resolution_state, "retry_count": record.retry_count})
+            row = _row(record)
+            uow.commit()
+            return row
+
+    def resolve_exception(self, ctx: AuthContext, *, exception_id: str) -> dict:
+        require(ctx, Permission.INTEROP_MANAGE)
+        with self._uow() as uow:
+            record = exception_center.mark_resolved(uow.session, exception_id, clock=self._clock)
+            if record is None:
+                raise NotFound("No exception with that id.")
+            AuditService(uow.audit, self._clock).record("interop.exception_resolved", actor_id=ctx.user_id, resource_type="interop_exception", resource_id=exception_id, metadata={})
+            row = _row(record)
+            uow.commit()
+            return row
+
+    def mark_exception_dead(self, ctx: AuthContext, *, exception_id: str, reason: str | None = None) -> dict:
+        require(ctx, Permission.INTEROP_MANAGE)
+        with self._uow() as uow:
+            record = exception_center.mark_dead(uow.session, exception_id, reason=reason, clock=self._clock)
+            if record is None:
+                raise NotFound("No exception with that id.")
+            AuditService(uow.audit, self._clock).record("interop.exception_marked_dead", actor_id=ctx.user_id, resource_type="interop_exception", resource_id=exception_id, metadata={"reason": reason})
+            row = _row(record)
+            uow.commit()
+            return row

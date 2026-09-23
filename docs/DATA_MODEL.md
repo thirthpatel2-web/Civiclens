@@ -243,6 +243,41 @@ being a second system of record. See `docs/INTEROPERABILITY.md`'s "Event-driven 
 | `error_message` | `String(400)`, nullable | |
 | `started_at`, `finished_at` | `timestamptz`, nullable | |
 
+### Data quality rule sets & central exception management — migration `0014`
+
+| `interop_quality_rule_sets` | Type | Notes |
+|---|---|---|
+| `ruleset_id` (PK) | `String(80)` | e.g. `residence_certificate_v1` |
+| `name`, `version` | `String` | |
+| `rules` | `jsonb` list | List of `QualityRule` dicts (`app/interop/quality/engine.py::QualityRule.to_dict()`) - field, rule type, params, message |
+| `active` | `bool` | |
+| `created_at` | `timestamptz` | |
+
+Real and migrated; nothing reads from it yet — `InteropGatewayService._document_quality` still
+evaluates a fixed Python list of `QualityRule` objects, not a row loaded from this table. Named as
+partial in `docs/REQUIREMENT_TRACEABILITY.md`.
+
+| `interop_exceptions` | Type | Notes |
+|---|---|---|
+| `exception_id` (PK) | `uuid` | |
+| `error_code` | `String(40)` | One of `app.interop.exceptions.taxonomy.EXCEPTION_TYPES` (20 canonical codes) |
+| `message` | `String(500)` | |
+| `source_system`, `target_system` | `String(40)`, nullable | |
+| `correlation_id` | `String(60)`, nullable, indexed | Shared with the `InteropTransaction`/audit rows the same failure produced |
+| `retryable` | `bool` | Defaults from `taxonomy.is_retryable(error_code)` unless overridden |
+| `retry_count`, `max_retries` | `int` | |
+| `next_action` | `String(200)`, nullable | Human-readable guidance; cleared on resolve |
+| `resolution_state` | `String(20)`, indexed | `open` \| `retrying` \| `resolved` \| `dead` |
+| `created_at` | `timestamptz` | |
+| `resolved_at` | `timestamptz`, nullable | |
+
+Distinct from the pre-existing `IntegrationExceptionRecord`/`ExceptionService`
+(`app/services/interop_service.py`) — that is a simpler "log a malformed inbound payload for a
+human to review" queue with no taxonomy, no `correlation_id`, and no retry tracking. Both are real
+tables serving different purposes; neither replaces the other. See `docs/INTEROPERABILITY.md`'s
+"Central exception management" section for how `log_exception()` is wired into
+`InteropGatewayService`'s real failure branches.
+
 ## Why no `CHECK` constraints on the string enum-ish columns
 
 `status`, `health_state`, `system`, `identifier_type` and similar columns are plain

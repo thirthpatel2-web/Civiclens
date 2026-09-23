@@ -24,11 +24,12 @@ from sqlalchemy import delete, select
 
 from app.core.authorization import AuthContext, Role
 from app.core.config import Settings
-from app.core.exceptions import PermissionDenied
+from app.core.exceptions import NotFound, PermissionDenied
 from app.db.models.identity import UserModel
 from app.db.models.interop_platform import (
     IdentityMatchCandidate,
     InteropConsentGrant,
+    InteropException,
     InteropTransaction,
     MasterEntity,
     MasterIdentifier,
@@ -100,6 +101,9 @@ class DocumentExchangeEndToEndTests(unittest.TestCase):
                 s.execute(delete(UnifiedApplicationEvent).where(UnifiedApplicationEvent.application_id == unified.application_id))
                 s.execute(delete(UnifiedApplication).where(UnifiedApplication.application_id == unified.application_id))
             if self._created_master_ids:
+                correlation_ids = [row[0] for row in s.execute(select(InteropTransaction.correlation_id).where(InteropTransaction.master_id.in_(self._created_master_ids))).all() if row[0]]
+                if correlation_ids:
+                    s.execute(delete(InteropException).where(InteropException.correlation_id.in_(correlation_ids)))
                 s.execute(delete(InteropTransaction).where(InteropTransaction.master_id.in_(self._created_master_ids)))
                 s.execute(delete(InteropConsentGrant).where(InteropConsentGrant.master_id.in_(self._created_master_ids)))
                 s.execute(delete(IdentityMatchCandidate).where(IdentityMatchCandidate.master_id.in_(self._created_master_ids)))
@@ -272,9 +276,18 @@ class DocumentExchangeEndToEndTests(unittest.TestCase):
 
                 txns = self.gateway.list_transactions(self.admin, limit=200)
                 self.assertTrue(any(t["status"] == "failed" and t["error_code"] == "data_quality_failed" for t in txns))
+
+                # Section 16: the same failure also lands in the central exception table, not just
+                # the transaction row - this is what makes the exception center genuinely wired in,
+                # not just an independently-testable module nothing ever calls.
+                exceptions = list(s.execute(select(InteropException).where(InteropException.correlation_id == result["correlation_id"])).scalars())
+                self.assertEqual(len(exceptions), 1)
+                self.assertEqual(exceptions[0].error_code, "DATA_QUALITY_FAILURE")
+                self.assertFalse(exceptions[0].retryable)
         finally:
             with self.uow_factory() as uow:
                 s = uow.session
+                s.execute(delete(InteropException).where(InteropException.correlation_id == result["correlation_id"]))
                 s.execute(delete(MockDeptADocument).where(MockDeptADocument.resident_id == resident_id))
                 s.execute(delete(MockDeptAResident).where(MockDeptAResident.resident_id == resident_id))
                 s.execute(delete(MockDeptBApplication).where(MockDeptBApplication.application_no == application_no))
@@ -380,6 +393,18 @@ class DocumentExchangeEndToEndTests(unittest.TestCase):
             self.gateway.connector_health(auditor, connector_id="dept_a")
         with self.assertRaises(PermissionDenied):
             self.gateway.set_connector_enabled(auditor, connector_id="dept_a", enabled=True)
+
+        # Central exception management (Section 16-18): an AUDITOR can see the exception log, but
+        # only INTEGRATION_ADMIN can retry, resolve or dead-letter one.
+        self.gateway.list_exceptions(auditor)
+        with self.assertRaises(PermissionDenied):
+            self.gateway.retry_exception(auditor, exception_id=str(uuid.uuid4()))
+        with self.assertRaises(PermissionDenied):
+            self.gateway.resolve_exception(auditor, exception_id=str(uuid.uuid4()))
+        with self.assertRaises(PermissionDenied):
+            self.gateway.mark_exception_dead(auditor, exception_id=str(uuid.uuid4()))
+        with self.assertRaises(NotFound):
+            self.gateway.retry_exception(integration_admin, exception_id=str(uuid.uuid4()))
 
 
 if __name__ == "__main__":

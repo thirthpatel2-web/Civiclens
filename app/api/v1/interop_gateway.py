@@ -25,6 +25,7 @@ from app.container import AppContainer
 from app.core.authorization import AuthContext, Permission
 from app.core.dependencies import get_container, get_ctx, guard
 from app.schemas.api import (
+    MarkExceptionDeadBody,
     RequestDocumentExchangeBody,
     ResolveIdentityCandidateBody,
     RevokeConsentBody,
@@ -118,3 +119,24 @@ def list_workflow_executions(workflow_id: str | None = None, status: str | None 
 @router.get("/workflow-executions/{execution_id}")
 def get_workflow_execution(execution_id: str, ctx: AuthContext = READ, c: AppContainer = Depends(get_container)) -> dict:
     return to_jsonable(c.interop_gateway.get_workflow_execution(ctx, execution_id=execution_id))
+
+
+# ---- central exception management (Section 16-18 - see app/interop/exceptions/)
+@router.get("/exceptions")
+def list_exceptions(resolution_state: str | None = None, error_code: str | None = None, correlation_id: str | None = None, limit: int = 100, ctx: AuthContext = READ, c: AppContainer = Depends(get_container)) -> dict:
+    return {"items": to_jsonable(c.interop_gateway.list_exceptions(ctx, resolution_state=resolution_state, error_code=error_code, correlation_id=correlation_id, limit=limit))}
+
+
+@router.post("/exceptions/{exception_id}/retry")
+def retry_exception(exception_id: str, ctx: AuthContext = MANAGE, c: AppContainer = Depends(get_container)) -> dict:
+    return to_jsonable(c.interop_gateway.retry_exception(ctx, exception_id=exception_id))
+
+
+@router.post("/exceptions/{exception_id}/resolve")
+def resolve_exception(exception_id: str, ctx: AuthContext = MANAGE, c: AppContainer = Depends(get_container)) -> dict:
+    return to_jsonable(c.interop_gateway.resolve_exception(ctx, exception_id=exception_id))
+
+
+@router.post("/exceptions/{exception_id}/mark-dead")
+def mark_exception_dead(exception_id: str, body: MarkExceptionDeadBody, ctx: AuthContext = MANAGE, c: AppContainer = Depends(get_container)) -> dict:
+    return to_jsonable(c.interop_gateway.mark_exception_dead(ctx, exception_id=exception_id, reason=body.reason))

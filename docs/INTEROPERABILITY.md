@@ -294,6 +294,77 @@ the business logic that calls them: `enabled`/`disabled` without touching the ga
 actual invocation — not a simulated heartbeat), and a manual `POST
 /interop-gateway/connectors/{id}/health-check` that genuinely queries the connector's own tables.
 
+## Generic data quality engine
+
+`app/interop/quality/engine.py` — a reusable, rule-driven `DataQualityEngine` rather than the
+hard-coded `if` checks the gateway used through Phase 5. A `QualityRule` names a field, a rule type
+(`required`, `min_length`, `max_length`, `regex`, `in_set`, `not_in_future`, `stale_after_days`,
+`cross_field_equals`), its parameters, a `severity` (`error` counts toward `REJECTED`, `warning`
+toward `VALID_WITH_WARNINGS`), and a human message; `DataQualityEngine.evaluate(record, rules)`
+runs every rule against a plain `dict` and returns a `QualityResult` (`score` 0.0-1.0 = fraction of
+rules passed, `errors`, `warnings`, `status`). An unrecognized rule type fails open (never silently
+blocks a real exchange over a configuration mistake) rather than fails closed — a deliberately
+different failure mode than the data itself being bad. Its reusability across arbitrary record
+shapes (not just documents) is exercised directly in tests — e.g. `regex` against a mobile-number
+field, `cross_field_equals` catching two conflicting values — not just the document use case below.
+
+`InteropGatewayService._document_quality` (the one call site the primary no-reupload flow uses) is
+now a thin wrapper: it builds a `record` dict from the canonical `Document` and evaluates it against
+`_DOCUMENT_QUALITY_RULES` — the exact same three checks (status verified, reference number present
+and long enough, issue date present) the old hard-coded version enforced, expressed as `QualityRule`
+objects instead of `if` statements. This was verified as a genuine behavior-preserving swap: the
+full existing test suite (687 tests at the time) stayed green with zero changes, because it's a pure
+scoring function with no control-flow change — see `tests/unit/test_data_quality_engine.py` (16
+tests) for the engine in isolation.
+
+`QualityRuleSet` (`interop_quality_rule_sets`, migration `0014`) exists as the versioned,
+admin-definable storage the spec asks for (one row per named/versioned rule set, `rules` as jsonb,
+`active`) — the table is real and migrated, but nothing loads a rule set from it yet; the gateway
+still uses the hard-coded `_DOCUMENT_QUALITY_RULES` list. **Named honestly as partial**: the engine
+that *executes* arbitrary rules is real and in production use; the admin UI/API to *author* a rule
+set and have the gateway load it from the database instead of Python is a follow-up, not claimed done.
+
+## Central exception management
+
+`app/interop/exceptions/` (Sections 16-18): one consistent taxonomy of 20 canonical error codes
+(`taxonomy.py` — `AUTHENTICATION_FAILURE`, `CONSENT_REQUIRED`, `IDENTITY_AMBIGUOUS`,
+`DATA_QUALITY_FAILURE`, `CONNECTOR_UNAVAILABLE`, ... see the module for the full list), a
+`classify()` mapping from the gateway's existing lowercase reason strings onto that taxonomy
+(additive — the lowercase strings themselves are unchanged in every API response, since real
+callers already depend on them), and which codes are inherently retryable versus needing a human
+(`RETRYABLE_TYPES` — a connector timeout is safe to retry automatically; a data quality rejection
+or an identity conflict is not, and retrying it would just fail again).
+
+`app/interop/exceptions/center.py`'s `InteropException` table (migration `0014`) is what actually
+gets written: `log_exception()` is called from inside `InteropGatewayService`'s real failure
+branches — `identity_ambiguous` (both sides), `source_record_not_found`, `identity_conflict`,
+`data_field_not_consented`, `document_not_found`, `data_quality_failed` — in the same open
+transaction as the `InteropTransaction`/audit rows that failure already produces, sharing the same
+`correlation_id`, so a broken exception log can never itself fail (or half-commit) the operation
+it's describing. This is genuinely wired in, not just an independently-testable module nothing
+calls: `tests/integration/test_interop_gateway_e2e.py::test_data_quality_failure_blocks_the_write_and_is_recorded_honestly`
+asserts a real `InteropException` row exists with the right canonical code after a real gateway
+failure, not just that `center.py`'s functions work in isolation.
+
+Retry (Section 17) is **manual**: an operator (or a caller) explicitly calls
+`retry()`/`POST .../exceptions/{id}/retry`, which increments `retry_count` and moves
+`resolution_state` `open → retrying`, or `→ dead` once `max_retries` is reached — automatic
+exponential-backoff retry is the job queue's existing, separate job (`app/workers/queue`), which
+this section doesn't duplicate. Dead-letter (Section 18) is `resolution_state = "dead"`, reached
+either automatically (retries exhausted) or by an operator giving up directly
+(`mark_dead()`/`POST .../exceptions/{id}/mark-dead`). Outcome-level idempotency for the primary
+flow itself was already covered before this phase by `request_document_exchange`'s
+`already_completed` short-circuit (step 1 of the scenario below) — calling it again after a success
+never re-writes Department B's record.
+
+Read/act surface: `GET /interop-gateway/exceptions` (filterable by `resolution_state`, `error_code`,
+`correlation_id`), `POST .../exceptions/{id}/retry`, `POST .../exceptions/{id}/resolve`,
+`POST .../exceptions/{id}/mark-dead` — same `INTEROP_READ`/`INTEROP_MANAGE` gating as the rest of
+this router; acting on an unknown or malformed id is a safe 404, never a 500 (`center.py`'s
+`_safe_get` validates the id is UUID-shaped before ever touching the database). No admin UI screen
+for this queue yet — named as deferred below, matching the same honesty rule as the workflow admin
+UI.
+
 ## The no-reupload scenario, step by step
 
 This is the demo the spec calls the single most important proof that CivicLens answers SIH26129:
@@ -319,12 +390,14 @@ Orchestrated by `InteropGatewayService.request_document_exchange`
    `request_document_exchange` again proceeds:
    - Calls the Department A connector (`mock_systems.dept_a_find_document`), timing the call and
      recording it against the connector registry.
-   - Runs a document-specific quality check (not the generic grievance-shaped `score_quality` in
+   - Runs a document-specific quality check through the generic `DataQualityEngine` (§ Generic data
+     quality engine above; not the unrelated grievance-shaped `score_quality` in
      `common_data_model.py` — reusing that rubric here would score irrelevant fields like
-     "location" against a resident document and produce a misleading number; see
-     `_document_quality` in the gateway service): source status is `verified`, a real-looking
-     reference number, an issue date present. Below 70% quality, the exchange fails honestly
-     with `data_quality_failed` and the specific issues, rather than writing bad data forward.
+     "location" against a resident document and produce a misleading number): source status is
+     `verified`, a real-looking reference number, an issue date present. Below 70% quality, the
+     exchange fails honestly with `data_quality_failed` and the specific issues (and is logged to
+     the central exception table as `DATA_QUALITY_FAILURE` — § Central exception management),
+     rather than writing bad data forward.
    - Writes Department A's reference into Department B's application
      (`mock_systems.dept_b_receive_document`) — **the actual no-reupload moment**: `document_status
      → verified`, `document_reference` set to Department A's reference, `status → processing`.
@@ -359,6 +432,13 @@ never make one. See `app/core/authorization.py`. The three consent-decision rout
 | `GET` | `/connectors` | Connector registry, with live health/call stats |
 | `POST` | `/connectors/{id}/health-check` | Run a real health check now |
 | `PUT` | `/connectors/{id}/enabled` | Enable/disable a connector |
+| `GET` | `/workflows` | Configurable workflow definitions |
+| `GET` | `/workflow-executions` | Recent workflow executions |
+| `GET` | `/workflow-executions/{id}` | One execution's definition + full step history |
+| `GET` | `/exceptions` | Central exception log (filterable) |
+| `POST` | `/exceptions/{id}/retry` | Manual retry attempt |
+| `POST` | `/exceptions/{id}/resolve` | Mark resolved |
+| `POST` | `/exceptions/{id}/mark-dead` | Operator dead-letters it directly |
 
 ## Running the demo yourself
 
@@ -407,6 +487,11 @@ Named here rather than left silently missing, per this project's rule against cl
   — classic-app routes both roles to a working home (the Interop Gateway screen) on login, but no
   screens exist for either role in the older NiceGUI admin app specifically
 - A connector health *dashboard* (the data exists via `GET /connectors`; no charts/SLA view yet)
+- Loading `QualityRuleSet` rows from the database into the gateway's quality check — the table,
+  the engine that would execute them, and the API surface to author them are all real; the gateway
+  still evaluates a fixed Python list of `QualityRule` objects, not a stored, versioned rule set
+- An admin UI screen for the central exception queue (`GET/POST /interop-gateway/exceptions*` work
+  over plain HTTP; no classic-app screen calls them yet)
 - Routing real interop events through the WebSocket event bus (`app/realtime/events.py`) — it's
   tightly coupled to the complaint/notification domain; this milestone uses the dedicated
   `InteropTransaction`/`UnifiedApplicationEvent` tables as the interop-specific record instead

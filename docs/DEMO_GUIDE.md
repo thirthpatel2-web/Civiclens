@@ -260,3 +260,42 @@ stream history, not just your latest exchange; on a dev database that's accumula
 throwaway test citizens, that can hit a foreign-key error for a citizen who no longer exists - the
 test file passes `start_id` to scope a drain to only the events one specific run just published,
 which is the pattern a real background consumer would use too.)
+
+## Data quality + central exception management
+
+Both seeded demo applications' documents are already `verified`, so neither triggers a quality
+failure through the UI as-is - `tests/integration/test_interop_gateway_e2e.py::test_data_quality_failure_blocks_the_write_and_is_recorded_honestly`
+is the live, repeatable demonstration of this path: it seeds a resident whose document `status` is
+`"pending"` instead of `"verified"`, runs the real exchange through `InteropGatewayService`, and
+asserts both that Department B's record is never written and that a real `InteropException` row
+was created with `error_code == "DATA_QUALITY_FAILURE"`. Run it directly to see it end to end:
+
+```bash
+DATABASE_URL=postgresql+psycopg://postgres:PASSWORD@localhost:5432/civiclens \
+  .venv/Scripts/python.exe -m pytest tests/integration/test_interop_gateway_e2e.py::DocumentExchangeEndToEndTests::test_data_quality_failure_blocks_the_write_and_is_recorded_honestly -v
+```
+
+The same failure, reproduced over plain HTTP, returns:
+
+```json
+{"status": "failed", "reason": "data_quality_failed", "issues": ["source document status is not verified"], "transaction_id": "...", "correlation_id": "<uuid>"}
+```
+
+and is queryable through the exception center with the canonical taxonomy code
+(`DATA_QUALITY_FAILURE`, not the gateway's lowercase reason string) and the same `correlation_id`:
+
+```bash
+curl -s -b cookies.txt "http://localhost:8080/api/v1/interop-gateway/exceptions?correlation_id=<uuid>" | python -m json.tool
+```
+
+```json
+{"items": [{"exception_id": "<uuid>", "error_code": "DATA_QUALITY_FAILURE", "message": "source document status is not verified", "source_system": "dept_a", "target_system": "dept_b", "correlation_id": "<uuid>", "retryable": false, "retry_count": 0, "max_retries": 3, "next_action": "manual review required", "resolution_state": "open", "created_at": "...", "resolved_at": null}]}
+```
+
+`DATA_QUALITY_FAILURE` is not retryable (retrying against the exact same bad source data would
+just fail again) - `POST .../exceptions/{id}/retry` refuses it and returns `null`. A
+`CONNECTOR_UNAVAILABLE`/`CONNECTOR_TIMEOUT` exception, by contrast, is retryable: each
+`POST .../exceptions/{id}/retry` moves it `open → retrying`, and once `retry_count` reaches
+`max_retries` it moves to `dead` (the dead-letter state) automatically - or an operator can
+dead-letter one directly with `POST .../exceptions/{id}/mark-dead`. Acting on an unknown or
+malformed exception id is a safe 404, never a 500.

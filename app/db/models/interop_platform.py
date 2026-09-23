@@ -320,3 +320,50 @@ class WorkflowStepExecution(Base):
     started_at: Mapped[datetime | None] = tstz()
     finished_at: Mapped[datetime | None] = tstz()
     __table_args__ = (Index("ix_interop_workflow_step_executions_execution_id", "execution_id"),)
+
+
+# ---------------------------------------------------------------------------------------------
+# Data quality rule configuration (Section 15) - a named, versioned rule set an authorized admin
+# could edit (no UI to edit them yet - see docs/REQUIREMENT_TRACEABILITY.md); the storage and
+# evaluation (app/interop/quality/engine.py) are real regardless.
+# ---------------------------------------------------------------------------------------------
+
+
+class QualityRuleSet(Base):
+    __tablename__ = "interop_quality_rule_sets"
+    ruleset_id: Mapped[str] = mapped_column(String(80), primary_key=True)  # e.g. "residence_certificate_v1"
+    name: Mapped[str] = mapped_column(String(150), nullable=False)
+    version: Mapped[str] = mapped_column(String(20), nullable=False, default="1")
+    rules: Mapped[list] = jsonb(list)  # list of QualityRule dicts (engine.py's QualityRule.to_dict())
+    active: Mapped[bool] = mapped_column(nullable=False, default=True)
+    created_at: Mapped[datetime] = created_at()
+
+
+# ---------------------------------------------------------------------------------------------
+# Central exception management (Section 16-18): one consistent taxonomy across every layer of the
+# interop platform, with retry/dead-letter state - distinct from the pre-existing
+# IntegrationExceptionRecord/ExceptionService (app/services/interop_service.py), which is a
+# simpler "log a malformed inbound payload for a human to review" queue with no taxonomy, no
+# correlation_id, and no retry tracking. Both are real; neither replaces the other.
+# ---------------------------------------------------------------------------------------------
+
+
+class InteropException(Base):
+    __tablename__ = "interop_exceptions"
+    exception_id: Mapped[str] = uuid_pk()
+    error_code: Mapped[str] = mapped_column(String(40), nullable=False)  # one of app.interop.exceptions.taxonomy.EXCEPTION_TYPES
+    message: Mapped[str] = mapped_column(String(500), nullable=False)
+    source_system: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    target_system: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    correlation_id: Mapped[str | None] = mapped_column(String(60), nullable=True)
+    retryable: Mapped[bool] = mapped_column(nullable=False, default=False)
+    retry_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    max_retries: Mapped[int] = mapped_column(Integer, nullable=False, default=3)
+    next_action: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    resolution_state: Mapped[str] = mapped_column(String(20), nullable=False, default="open")  # open | retrying | resolved | dead
+    created_at: Mapped[datetime] = created_at()
+    resolved_at: Mapped[datetime | None] = tstz()
+    __table_args__ = (
+        Index("ix_interop_exceptions_correlation_id", "correlation_id"),
+        Index("ix_interop_exceptions_resolution_state", "resolution_state"),
+    )
