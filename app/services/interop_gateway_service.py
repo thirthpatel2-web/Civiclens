@@ -10,12 +10,16 @@ does that exchange for them, end to end, using only infrastructure this codebase
   2. require an explicit, purpose-specific consent grant before any cross-system read happens
      (request_document_exchange returns "consent_required" and stops; nothing is read from
      Department A until grant_consent has been called for that exact grant).
-  3. call the Department A connector, transform + quality-check what comes back (a check specific
-     to what a "verified document" needs, not the grievance-shaped rubric in
-     app.interop.common_data_model - reusing that would score irrelevant fields like "location"
-     against a resident document and produce a misleading number).
-  4. write the result into Department B via mock_systems.dept_b_receive_document - the actual
-     no-reupload moment.
+  3. call the Department A connector through the connector runtime (app.interop.connectors.runtime)
+     - never a mock-system function directly - transform its response into the canonical v1 schema
+     (app.interop.canonical.v1), and quality-check the canonical record (a check specific to what a
+     "verified document" needs, not the grievance-shaped rubric in app.interop.common_data_model -
+     reusing that would score irrelevant fields like "location" against a resident document and
+     produce a misleading number).
+  4. transform the canonical record into exactly the fields Department B needs
+     (canonical_document_to_dept_b_fields - data minimization: Department B never sees Department
+     A's resident_id or any other field it didn't ask for) and write them via the Department B
+     connector's update() - the actual no-reupload moment.
   5. record what happened: an InteropTransaction (the machine-to-machine record), an
      UnifiedApplicationEvent per step (the citizen/officer-facing timeline), and an AuditService
      entry (reusing the existing generic, non-complaint-specific audit trail) - all tagged with one
@@ -28,7 +32,6 @@ Nothing here fabricates a success.
 
 from __future__ import annotations
 
-import time
 import uuid
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
@@ -43,11 +46,13 @@ from app.db.models.interop_platform import (
     InteropConsentGrant,
     InteropTransaction,
     MasterEntity,
-    MockDeptADocument,
     UnifiedApplication,
     UnifiedApplicationEvent,
 )
 from app.interop import connector_registry, mock_systems
+from app.interop.canonical.v1.models import Document as CanonicalDocument
+from app.interop.canonical.v1.transform import canonical_document_to_dept_b_fields, dept_a_document_to_canonical
+from app.interop.connectors import runtime as connector_runtime
 from app.interop.identity_resolution import IdentityResolutionService
 from app.services.audit_service import AuditService
 from app.services.uow import UowFactory
@@ -63,13 +68,15 @@ def _row(obj) -> dict | None:
     return {c.key: getattr(obj, c.key) for c in inspect(obj).mapper.column_attrs}
 
 
-def _document_quality(document: MockDeptADocument) -> tuple[float, list[str]]:
+def _document_quality(document: CanonicalDocument) -> tuple[float, list[str]]:
     """A check specific to what THIS exchange needs verified - not a generic rubric borrowed from
     a different data shape. Every failure reason is something a reviewer could independently check
-    against the same document row."""
+    against the same canonical document. Runs on the canonical shape (app.interop.canonical.v1),
+    not the source system's native row, so the same check applies unchanged once a second document
+    type or a real connector's Document starts flowing through here."""
     checks = [
         (document.status == "verified", f"source document status is {document.status!r}, not verified"),
-        (bool(document.reference_no and len(document.reference_no.strip()) >= 6), "reference number is missing or too short to be a real reference"),
+        (bool(document.reference and len(document.reference.strip()) >= 6), "reference number is missing or too short to be a real reference"),
         (document.issued_on is not None, "issue date is missing"),
     ]
     issues = [msg for ok, msg in checks if not ok]
@@ -93,13 +100,15 @@ class InteropGatewayService:
             with self._uow() as uow:
                 s = uow.session
                 assert s is not None
-                app_row = mock_systems.dept_b_get_application(s, application_no)
+                app_result = connector_runtime.call(s, "dept_b", "get_entity", "application", application_no)
+                app_row = app_result.data if app_result.ok else None
                 if app_row is None:
                     raise NotFound(f"No application {application_no!r} in {mock_systems.DEPT_B_NAME}.")
                 if app_row.document_status == "verified":
                     return {"status": "already_completed", "application_no": application_no, "document_reference": app_row.document_reference}
 
-                beneficiary = mock_systems.dept_b_get_beneficiary(s, app_row.beneficiary_code)
+                ben_result = connector_runtime.call(s, "dept_b", "get_entity", "beneficiary", app_row.beneficiary_code)
+                beneficiary = ben_result.data if ben_result.ok else None
                 if beneficiary is None:
                     raise NotFound("Application references a beneficiary that no longer exists.")
 
@@ -149,9 +158,11 @@ class InteropGatewayService:
             correlation_id_var.reset(token)
 
     def _find_matching_dept_a_resident(self, session, *, beneficiary):
-        candidates = mock_systems.dept_a_search_residents(session, mobile=beneficiary.mobile_number)
+        result = connector_runtime.call(session, "dept_a", "query", "resident", mobile=beneficiary.mobile_number)
+        candidates = result.data if result.ok else []
         if not candidates:
-            candidates = mock_systems.dept_a_search_residents(session, name_contains=beneficiary.full_name)
+            result = connector_runtime.call(session, "dept_a", "query", "resident", name_contains=beneficiary.full_name)
+            candidates = result.data if result.ok else []
         return candidates[0] if candidates else None
 
     def _execute_exchange(self, uow, ctx: AuthContext, *, master_id: str, consent: InteropConsentGrant, application_no: str, document_type: str, resident, correlation_id: str) -> dict:
@@ -159,28 +170,33 @@ class InteropGatewayService:
         unified = self._get_or_create_unified_application(s, master_id=master_id, application_no=application_no)
         self._add_event(s, unified.application_id, step="identity_resolved_cross_system", source_system="civiclens", status="success", correlation_id=correlation_id, detail={"master_id": master_id, "dept_a_resident_id": resident.resident_id})
 
-        t0 = time.monotonic()
-        document = mock_systems.dept_a_find_document(s, resident.resident_id, document_type)
-        duration_ms = round((time.monotonic() - t0) * 1000, 2)
-        connector_registry.record_call(s, "dept_a", success=document is not None, duration_ms=duration_ms)
+        # Gateway -> Connector Runtime -> GovernmentConnector - never a direct mock-system call.
+        fetch_result = connector_runtime.call(s, "dept_a", "fetch_document", resident.resident_id, document_type)
+        duration_ms = fetch_result.meta.get("duration_ms", 0.0)
 
-        if document is None:
+        if not fetch_result.ok or fetch_result.data is None:
             txn = self._record_transaction(s, correlation_id=correlation_id, source="dept_a", target="dept_b", master_id=master_id, consent_id=consent.consent_id, status="failed", error_code="document_not_found", error_message=f"No {document_type} on file for this resident.", fields=[], duration_ms=duration_ms)
             self._add_event(s, unified.application_id, step="document_fetch_failed", source_system="dept_a", status="failed", correlation_id=correlation_id, detail={"reason": "document_not_found"})
             AuditService(uow.audit, self._clock).record("interop.document_exchange_failed", actor_id=ctx.user_id, resource_type="interop_transaction", resource_id=txn.transaction_id, metadata={"reason": "document_not_found", "application_no": application_no})
             return {"status": "failed", "reason": "document_not_found", "transaction_id": txn.transaction_id, "correlation_id": correlation_id}
 
-        quality_score, quality_issues = _document_quality(document)
+        # External (Dept A's own row) -> canonical - the quality check and the destination
+        # transform both operate on the canonical shape, never on Dept A's native row directly.
+        canonical_doc = dept_a_document_to_canonical(fetch_result.data)
+        quality_score, quality_issues = _document_quality(canonical_doc)
         if quality_score < 0.7:
             txn = self._record_transaction(s, correlation_id=correlation_id, source="dept_a", target="dept_b", master_id=master_id, consent_id=consent.consent_id, status="failed", error_code="data_quality_failed", error_message="; ".join(quality_issues), fields=[], duration_ms=duration_ms)
             self._add_event(s, unified.application_id, step="document_quality_check_failed", source_system="dept_a", status="failed", correlation_id=correlation_id, detail={"score": quality_score, "issues": quality_issues})
             AuditService(uow.audit, self._clock).record("interop.document_exchange_failed", actor_id=ctx.user_id, resource_type="interop_transaction", resource_id=txn.transaction_id, metadata={"reason": "data_quality_failed", "issues": quality_issues, "application_no": application_no})
             return {"status": "failed", "reason": "data_quality_failed", "issues": quality_issues, "transaction_id": txn.transaction_id, "correlation_id": correlation_id}
 
-        self._add_event(s, unified.application_id, step="document_fetched_from_dept_a", source_system="dept_a", status="success", correlation_id=correlation_id, detail={"reference_no": document.reference_no, "quality_score": quality_score})
+        self._add_event(s, unified.application_id, step="document_fetched_from_dept_a", source_system="dept_a", status="success", correlation_id=correlation_id, detail={"reference_no": canonical_doc.reference, "quality_score": quality_score})
 
-        updated_app = mock_systems.dept_b_receive_document(s, application_no, document_reference=document.reference_no)
-        connector_registry.record_call(s, "dept_b", success=updated_app is not None, duration_ms=duration_ms)
+        # Canonical -> external (Dept B's own field names): data minimization in practice - Dept B
+        # never receives the resident_id or any field outside what canonical_document_to_dept_b_fields declares.
+        dept_b_fields = canonical_document_to_dept_b_fields(canonical_doc)
+        update_result = connector_runtime.call(s, "dept_b", "update", "application", application_no, dept_b_fields)
+        updated_app = update_result.data if update_result.ok else None
         self._add_event(s, unified.application_id, step="document_applied_to_dept_b_application", source_system="dept_b", status="success" if updated_app else "failed", correlation_id=correlation_id, detail={"application_no": application_no})
 
         unified.status = "completed" if updated_app else unified.status
@@ -188,15 +204,16 @@ class InteropGatewayService:
         s.add(unified)
 
         txn = self._record_transaction(s, correlation_id=correlation_id, source="dept_a", target="dept_b", master_id=master_id, consent_id=consent.consent_id, status="success", error_code=None, error_message=None, fields=["full_name", "document_type", "reference_no", "issued_on", "status"], duration_ms=duration_ms)
-        AuditService(uow.audit, self._clock).record("interop.document_exchange_completed", actor_id=ctx.user_id, resource_type="unified_application", resource_id=unified.application_id, metadata={"application_no": application_no, "master_id": master_id, "document_reference": document.reference_no, "quality_score": quality_score, "transaction_id": txn.transaction_id})
+        AuditService(uow.audit, self._clock).record("interop.document_exchange_completed", actor_id=ctx.user_id, resource_type="unified_application", resource_id=unified.application_id, metadata={"application_no": application_no, "master_id": master_id, "document_reference": canonical_doc.reference, "quality_score": quality_score, "transaction_id": txn.transaction_id})
 
-        return {"status": "success", "transaction_id": txn.transaction_id, "application_id": unified.application_id, "document_reference": document.reference_no, "quality_score": quality_score, "correlation_id": correlation_id}
+        return {"status": "success", "transaction_id": txn.transaction_id, "application_id": unified.application_id, "document_reference": canonical_doc.reference, "quality_score": quality_score, "correlation_id": correlation_id}
 
     def _get_or_create_unified_application(self, session, *, master_id: str, application_no: str) -> UnifiedApplication:
         existing = session.execute(select(UnifiedApplication).where(UnifiedApplication.external_reference == application_no, UnifiedApplication.primary_system == "dept_b")).scalars().first()
         if existing is not None:
             return existing
-        app_row = mock_systems.dept_b_get_application(session, application_no)
+        app_result = connector_runtime.call(session, "dept_b", "get_entity", "application", application_no)
+        app_row = app_result.data if app_result.ok else None
         unified = UnifiedApplication(
             application_id=str(uuid.uuid4()), reference=f"CL-APP-{application_no}", master_id=master_id,
             service_type=app_row.service_type if app_row else "unknown", primary_system="dept_b",

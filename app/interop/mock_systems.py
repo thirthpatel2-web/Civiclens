@@ -31,6 +31,23 @@ from app.db.models.interop_platform import (
     MockDeptCGrievance,
 )
 
+__all__ = [
+    "DEPT_A_NAME",
+    "DEPT_B_NAME",
+    "DEPT_C_NAME",
+    "dept_a_find_document",
+    "dept_a_get_resident",
+    "dept_a_search_residents",
+    "dept_b_applications_for_beneficiary",
+    "dept_b_get_application",
+    "dept_b_get_beneficiary",
+    "dept_b_receive_document",
+    "dept_b_search_beneficiaries",
+    "dept_c_get_grievance",
+    "dept_c_search_grievances",
+    "seed_if_empty",
+]
+
 DEPT_A_NAME = "Maharashtra Revenue Records System (demo)"
 DEPT_B_NAME = "Seva Setu Service Application System (demo)"
 DEPT_C_NAME = "Nagrik Grievance Cell (demo)"
@@ -158,3 +175,20 @@ def dept_b_receive_document(session: Session, application_no: str, *, document_r
     app_row.updated_at = datetime.now(UTC)
     session.add(app_row)
     return app_row
+
+
+# ---------------------------------------------------------------------------------------------
+# Department C connector surface - not used by the headline no-reupload demo, but real and
+# queryable, proving "at least three independent systems" is a fact rather than a claim.
+# ---------------------------------------------------------------------------------------------
+
+
+def dept_c_get_grievance(session: Session, grievance_ref: str) -> MockDeptCGrievance | None:
+    return session.get(MockDeptCGrievance, grievance_ref)
+
+
+def dept_c_search_grievances(session: Session, *, citizen_ref: str | None = None) -> list[MockDeptCGrievance]:
+    q = select(MockDeptCGrievance)
+    if citizen_ref:
+        q = q.where(MockDeptCGrievance.citizen_ref == citizen_ref)
+    return list(session.execute(q).scalars().all())
