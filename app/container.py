@@ -55,6 +55,7 @@ from app.services.emergency_service import EmergencyHubService
 from app.services.gis_service import GisService
 from app.services.government_service import GovernmentSubmissionService
 from app.services.intent_router import IntentRouter
+from app.services.interop_gateway_service import InteropGatewayService
 from app.services.interop_service import (
     ClassificationCorrectionService,
     ExceptionService,
@@ -175,6 +176,7 @@ class AppContainer:
         self.exceptions = ExceptionService(self.uow_factory, self.clock)
         self.external_links = ExternalLinksService(self.uow_factory, self.clock)
         self.classification_corrections = ClassificationCorrectionService(self.uow_factory, self.clock)
+        self.interop_gateway = InteropGatewayService(self.uow_factory, self.clock)
         self.drafts = DraftService(self.uow_factory, self.complaints, self.clock)
         self.rti_rules = RtiRules(s.rti_response_days, s.rti_life_liberty_hours)
         self.gis = GisService(self.uow_factory, self.clock)

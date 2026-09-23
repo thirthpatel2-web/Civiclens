@@ -356,6 +356,23 @@ class UpdateExternalLinkStatusBody(Strict):
     status_note: str = Field(max_length=300)
 
 
+class RequestDocumentExchangeBody(Strict):
+    application_no: str = Field(max_length=40)
+    document_type: str = Field(default="residence_certificate", max_length=60)
+
+
+class RevokeConsentBody(Strict):
+    reason: str = Field(default="", max_length=300)
+
+
+class ResolveIdentityCandidateBody(Strict):
+    approve: bool
+
+
+class SetConnectorEnabledBody(Strict):
+    enabled: bool
+
+
 class DuplicateDecisionBody(Strict):
     other_complaint_id: str
     decision: str

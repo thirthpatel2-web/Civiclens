@@ -24,6 +24,20 @@ from app.realtime.websocket_manager import LocalEventBus
 logger = logging.getLogger("civiclens.main")
 
 
+def _seed_interop_demo_data(container: AppContainer) -> None:
+    """Idempotent: only inserts rows the first time (checked per-table). Safe to run every boot -
+    this is demo/mock government data, not anything a real citizen submitted."""
+    try:
+        from app.interop import connector_registry, mock_systems
+
+        with container.uow_factory() as uow:
+            mock_systems.seed_if_empty(uow.session)
+            connector_registry.seed_if_empty(uow.session)
+            uow.commit()
+    except Exception:
+        logger.warning("interop demo data seeding failed")
+
+
 def _load_precedents(container: AppContainer) -> int:
     """Populate the verified precedent index from PostgreSQL (rows come from scripts/ingest_legal_metadata.py --db)."""
     try:
@@ -72,6 +86,7 @@ def create_app(container: AppContainer | None = None, *, with_ui: bool = True) -
         sweep_task = asyncio.create_task(sweeper())
         if hasattr(c.bus, "listen"):  # Redis pub/sub bridge: every web process pushes to its own sockets
             threading.Thread(target=c.bus.listen, args=(lambda ev: asyncio.run_coroutine_threadsafe(c.ws.deliver(ev), loop), stop), daemon=True).start()
+        await run_in_threadpool(_seed_interop_demo_data, c)
         n = await run_in_threadpool(_load_precedents, c) if container is None else 0
         if c.index_sync is not None:
             await run_in_threadpool(c.index_sync.refresh)
