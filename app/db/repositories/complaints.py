@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Any
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -110,7 +111,10 @@ class SqlComplaintRepository:
         # Spelled out rather than `*r[3:17]`: a slice of a SQLAlchemy Row types as Sequence[Any],
         # whose length mypy cannot verify statically, so unpacking it mid-call (with two more
         # positional args after it) made every one of ComplaintRow's 19 fields look ambiguous.
-        return [ComplaintRow(r[0], r[1], ComplaintStatus(r[2]), r[3], r[4], r[5], r[6], r[7], r[8], r[9], r[10], r[11], r[12], r[13], r[14], r[15], r[16], r[17], bool(r[18])) for r in self.s.execute(q)]  # fmt: skip
+        # Rows are typed Any: SQLAlchemy 2.1 types a 19-column Row as a variadic tuple mypy can't index
+        # past position 9, although every index below exists at runtime.
+        result: list[Any] = list(self.s.execute(q))
+        return [ComplaintRow(r[0], r[1], ComplaintStatus(r[2]), r[3], r[4], r[5], r[6], r[7], r[8], r[9], r[10], r[11], r[12], r[13], r[14], r[15], r[16], r[17], bool(r[18])) for r in result]  # fmt: skip
 
     # ---- events / evidence / feedback
     def add_event(self, e: ComplaintEvent) -> None:
