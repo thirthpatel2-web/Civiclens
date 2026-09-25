@@ -13,7 +13,7 @@ from pathlib import Path
 from app.container import AppContainer
 from app.core.authorization import Role
 from app.core.config import Settings
-from app.core.exceptions import AuthenticationFailed, MfaRequired, NotFound, PermissionDenied
+from app.core.exceptions import AuthenticationFailed, NotFound, PermissionDenied
 from app.core.security import SecretBox
 from app.legal.precedents import load_records
 from app.rag.ollama import OllamaChatProvider  # noqa: F401  (documented provider type)
@@ -95,21 +95,15 @@ class FullFlowTests(unittest.TestCase):
         s = Sys()
         c = s.c
 
-        # ---------------- admin bootstrap (once, token-guarded) and two-factor
+        # ---------------- admin bootstrap (once, token-guarded); two-factor is opt-in, never a gate
         with self.assertRaises(PermissionDenied):
             s._uow(lambda u: c.auth_for(u).bootstrap_first_admin("root@gov.example", PW, "Root Admin", provided_token="wrong", expected_token="setup-token-123"), commit_on_error=True)
         root = s._uow(lambda u: c.auth_for(u).bootstrap_first_admin("root@gov.example", PW, "Root Admin", provided_token="setup-token-123", expected_token="setup-token-123"))
         self.assertIs(root.role, Role.SUPER_ADMIN)
         first = s.login("root@gov.example")
-        self.assertFalse(first.context.mfa_verified)
-        with self.assertRaises(PermissionDenied):
-            c.admin.list_users(first.context)  # privileged role without a second factor is refused
-        s.enrol_mfa(first.context, "root@gov.example", first.session_token)
-        s._uow(lambda u: c.auth_for(u).logout(first.session_token))
-        with self.assertRaises(MfaRequired):
-            s.login("root@gov.example")
-        admin = s.login("root@gov.example", otp=s.otp("root@gov.example")).context
-        self.assertTrue(admin.mfa_verified)
+        self.assertTrue(first.context.mfa_verified)
+        c.admin.list_users(first.context)  # a privileged role works immediately, no second factor required
+        admin = first.context
 
         # ---------------- admin configures staff, SLA policy and reference data
         off_roads = c.admin.create_staff(admin, "roads.officer@gov.example", PW, "Ravi Roads", Role.OFFICER, "roads")
@@ -133,9 +127,7 @@ class FullFlowTests(unittest.TestCase):
         s._uow(lambda u: c.auth_for(u).logout(sess.session_token))
         with self.assertRaises(AuthenticationFailed):
             s.auth(sess.session_token)  # logout really invalidated the server-side session
-        with self.assertRaises(MfaRequired):
-            s.login("asha@example.com")
-        cit = s.login("asha@example.com", otp=s.otp("asha@example.com")).context
+        cit = s.login("asha@example.com").context  # enrolled MFA still never blocks login
         self.assertEqual(c.dashboards.citizen(cit)["has_data"], False)
 
         # ---------------- complaint with evidence + location; classification/routing/duplicate/reference/SLA

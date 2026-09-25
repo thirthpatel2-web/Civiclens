@@ -8,7 +8,13 @@ from __future__ import annotations
 import unittest
 from datetime import date, timedelta
 
-from app.interop.quality.engine import REJECTED, VALID, VALID_WITH_WARNINGS, DataQualityEngine, QualityRule
+from app.interop.quality.engine import (
+    REJECTED,
+    VALID,
+    VALID_WITH_WARNINGS,
+    DataQualityEngine,
+    QualityRule,
+)
 
 
 class DataQualityEngineTests(unittest.TestCase):

@@ -17,7 +17,8 @@ error, which is a different failure mode than the data itself being bad).
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
+from dataclasses import field as dc_field
 from datetime import date, datetime, timedelta
 from typing import Any
 
@@ -34,7 +35,7 @@ RULE_TYPES = frozenset(
 class QualityRule:
     field: str
     rule_type: str
-    params: dict[str, Any] = field(default_factory=dict)
+    params: dict[str, Any] = dc_field(default_factory=dict)
     severity: str = "error"  # "error" -> counts toward REJECTED; "warning" -> counts toward VALID_WITH_WARNINGS
     message: str | None = None  # overrides the rule's default message when it fails
 
@@ -115,5 +116,5 @@ class DataQualityEngine:
             return (date.today() - parsed) <= timedelta(days=max_age), f"{rule.field} is older than {max_age} days"  # noqa: DTZ011
         if rule.rule_type == "cross_field_equals":
             other = rule.params.get("other_field")
-            return record.get(rule.field) == record.get(other), f"{rule.field} does not match {other}"
+            return record.get(rule.field) == (record.get(other) if other is not None else None), f"{rule.field} does not match {other}"
         return True, ""  # unrecognized rule type: a configuration problem, not a data problem - never blocks a real exchange

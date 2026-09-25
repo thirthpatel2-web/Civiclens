@@ -1,6 +1,6 @@
 # API contract (mobile ⇄ FastAPI)
 
-Base: `{API_BASE_URL}/api/v1`. JSON unless multipart. Types: `mobile/src/api/types.ts` (mirror of the backend responses; keep in sync).
+Base: `{API_BASE_URL}/api/v1`. JSON unless multipart. Types: `classic-app/src/api/types.ts` (mirror of the backend responses; keep in sync).
 
 **Auth.** Web uses an HttpOnly cookie + `X-CSRF-Token`. Mobile uses `Authorization: Bearer <session_token>` from `POST /auth/mobile/login` (no cookie, no CSRF needed because a browser never attaches
 a Bearer header automatically). Sessions are server-side, revocable, expiring (mobile: 14 days idle / 60 days absolute). Role and department always come from the database row. Admin/privileged

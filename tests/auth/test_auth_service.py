@@ -5,7 +5,6 @@ from app.core.authorization import Role
 from app.core.exceptions import (
     AuthenticationFailed,
     Conflict,
-    MfaRequired,
     PermissionDenied,
     RateLimited,
     ValidationFailed,
@@ -143,16 +142,15 @@ class LoginWith2faTests(unittest.TestCase):
         self.user = self.h.auth.register("a@example.com", PW, "Asha Rao")
         self.secret = self.h.enable_mfa(self.user)
 
-    def test_password_alone_is_not_enough(self):
-        with self.assertRaises(MfaRequired):
-            self.h.auth.login("a@example.com", PW)
-        self.assertEqual(len(self.h.sessions.rows), 0)
+    def test_password_alone_is_enough_even_with_mfa_enabled(self):
+        """Two-factor is opt-in and never blocks sign-in - an account that enrolled MFA still logs
+        in with just email + password, exactly like one that never enrolled."""
+        res = self.h.auth.login("a@example.com", PW)
+        self.assertTrue(res.context.mfa_verified)
+        self.assertEqual(len(self.h.sessions.rows), 1)
 
-    def test_wrong_otp_rejected_right_otp_accepted(self):
-        with self.assertRaises(AuthenticationFailed):
-            self.h.auth.login("a@example.com", PW, otp="000000")
-        self.h.clock.advance(seconds=30)
-        res = self.h.auth.login("a@example.com", PW, otp=ReferenceTotp.code_at(self.secret, self.h.clock.epoch()))
+    def test_a_wrong_otp_is_simply_ignored_not_checked(self):
+        res = self.h.auth.login("a@example.com", PW, otp="000000")
         self.assertTrue(res.context.mfa_verified)
 
     def test_otp_alone_without_password_rejected(self):

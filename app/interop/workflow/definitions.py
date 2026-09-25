@@ -103,7 +103,9 @@ def build_residence_certificate_step_registry(session: Session, *, clock=None) -
         ).scalars().first()  # fmt: skip
         if existing is not None:
             return {"consent_id": existing.consent_id}
-        from app.services.interop_gateway_service import REQUIRED_DOCUMENT_FIELDS  # local import: avoid a module-load-order cycle
+        from app.services.interop_gateway_service import (
+            REQUIRED_DOCUMENT_FIELDS,  # local import: avoid a module-load-order cycle
+        )
 
         now = clock()
         grant = InteropConsentGrant(
@@ -128,7 +130,9 @@ def build_residence_certificate_step_registry(session: Session, *, clock=None) -
         }
 
     def validate_document(ctx: dict[str, Any]) -> dict[str, Any]:
-        from app.services.interop_gateway_service import _document_quality  # reuse, don't reimplement, the exact same rubric
+        from app.services.interop_gateway_service import (
+            _document_quality,  # reuse, don't reimplement, the exact same rubric
+        )
 
         canonical_doc = _canonical_document_from_context(ctx)
         score, issues = _document_quality(canonical_doc)

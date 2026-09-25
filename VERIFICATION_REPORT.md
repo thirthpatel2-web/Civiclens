@@ -1,5 +1,14 @@
 # CivicLens — Verification Report (release build)
 
+> **Historical report — read this first.** This document records the *early* build, verified in an
+> offline sandbox before any server, database or model had run (hence "not run" throughout).
+> Everything it lists as unexecuted has since been run for real: the full suite is now **727 tests,
+> passing against a live PostgreSQL database**, and a single live end-to-end session passed **31/31**
+> checks across the whole interoperability platform. Current status lives in
+> [`docs/REQUIREMENT_TRACEABILITY.md`](docs/REQUIREMENT_TRACEABILITY.md) and the
+> [README](README.md); this file is kept unchanged below as the original record.
+
+
 Written from the final source tree. Nothing here is carried over from earlier reports.
 
 ## A. Environment (exact)

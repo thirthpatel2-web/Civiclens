@@ -36,7 +36,9 @@ export default function ComplaintScreen() {
         {c.translated_text ? (<View><Body soft>Translation (machine-generated, for officials; your original above is kept)</Body><Body>{c.translated_text}</Body></View>) : null}
       </Card>
       <Card>
-        <Body>{t('lbl.department')}: {c.department_code ?? '—'}   {t('lbl.priority')}: {c.priority}</Body>
+        <Text style={{ fontWeight: '700', color: colors.text }}>🤖 AI classification</Text>
+        <Body>Category: {c.category} · Severity: {c.severity} · Priority: {c.priority}</Body>
+        <Body soft>{t('lbl.department')}: {c.department_code ?? 'Not yet routed — under manual review'}</Body>
         {c.sla_due_at ? <Body soft>{t('lbl.due')}: {new Date(c.sla_due_at).toLocaleString()}</Body> : null}
         {c.escalation_level ? <InfoBanner tone="warn" message={`Escalated to level ${c.escalation_level}`} /> : null}
         {c.duplicates.length ? <InfoBanner message={`Similar complaints exist: ${c.duplicates.map((x) => x.reference).join(', ')}`} /> : null}

@@ -29,9 +29,12 @@ Both new roles are **privileged**: `is_privileged_role()` puts them alongside AD
 which means — enforced by the same single function everywhere, not three separately-maintained
 checks —
 
-- a session must have completed two-factor authentication this session (`require_mfa_for_privileged`,
-  checked on every `INTEROP_READ`/`INTEROP_MANAGE` route via `guard(..., mfa_for_privileged=True)`,
-  the default);
+- the `require_mfa_for_privileged` guard still runs on every `INTEROP_READ`/`INTEROP_MANAGE` route
+  (`guard(..., mfa_for_privileged=True)`, the default). **However, two-factor authentication is
+  currently optional at login for every role** (`AuthService.login` marks every session
+  `mfa_verified`, a deliberate product decision for the demo), so this guard does not force a second
+  factor today. The TOTP enrolment/verification machinery (`app/services/mfa_service.py`) is intact;
+  making 2FA mandatory again for privileged roles means restoring the OTP check in `login()`;
 - only a super-admin can assign either role to an account (`can_assign_role`);
 - only a super-admin can reset an INTEGRATION_ADMIN's or AUDITOR's password or deactivate their
   account (`admin_service.py::issue_password_reset`, `auth_service.py::set_active`).
@@ -143,3 +146,8 @@ themselves" would need that identity linkage - the existing Golden Record featur
 - `INTEGRATION_ADMIN` and `AUDITOR` currently authenticate through the same `/auth/login` /
   `/auth/admin/login` endpoints as every other role; no separate, more restricted login surface
   (e.g. IP allowlisting) exists for these two data-sensitive roles specifically.
+- Two-factor authentication is optional, not enforced, for privileged roles (see "Authorization"
+  above). A production deployment should make it mandatory for ADMIN, SUPER_ADMIN,
+  INTEGRATION_ADMIN and AUDITOR.
+- The audit log is complete (every consent decision and exchange is recorded) but not
+  cryptographically tamper-evident — rows are not hash-chained.

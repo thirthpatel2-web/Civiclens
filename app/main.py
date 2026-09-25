@@ -49,7 +49,7 @@ def _load_precedents(container: AppContainer) -> int:
         from app.db.repositories.content import SqlLegalRepository
 
         with container.uow_factory() as uow:
-            records = SqlLegalRepository(uow.session).load_all()  # type: ignore[attr-defined]
+            records = SqlLegalRepository(uow.session).load_all()
         for r in records:
             container.precedents.add(r)
         return len(records)

@@ -134,12 +134,12 @@ class GroqWhisperProvider:
             fields.append(("language", language))
         parts: list[bytes] = []
         for k, v in fields:
-            parts.append(f"--{boundary}\r\nContent-Disposition: form-data; name=\"{k}\"\r\n\r\n{v}\r\n".encode("utf-8"))
+            parts.append(f"--{boundary}\r\nContent-Disposition: form-data; name=\"{k}\"\r\n\r\n{v}\r\n".encode())
         parts.append(
-            f'--{boundary}\r\nContent-Disposition: form-data; name="file"; filename="audio.{ext}"\r\nContent-Type: {mime}\r\n\r\n'.encode("utf-8")
+            f'--{boundary}\r\nContent-Disposition: form-data; name="file"; filename="audio.{ext}"\r\nContent-Type: {mime}\r\n\r\n'.encode()
             + audio + b"\r\n"
         )  # fmt: skip
-        parts.append(f"--{boundary}--\r\n".encode("utf-8"))
+        parts.append(f"--{boundary}--\r\n".encode())
         body = b"".join(parts)
         req = urllib.request.Request(  # noqa: S310 - fixed https base URL
             f"{self._base_url}/audio/transcriptions", data=body, method="POST",

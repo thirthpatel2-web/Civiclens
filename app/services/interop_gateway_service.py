@@ -32,9 +32,11 @@ Nothing here fabricates a success.
 
 from __future__ import annotations
 
+import logging
 import uuid
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
+from typing import Any, overload
 
 from sqlalchemy import inspect, select
 
@@ -55,15 +57,18 @@ from app.db.models.interop_platform import (
 )
 from app.db.models.ops import AuditLogModel
 from app.interop import catalog, connector_registry, mock_systems
-from app.interop.monitoring import alerts as connector_alerts
 from app.interop.canonical.v1.models import Document as CanonicalDocument
-from app.interop.canonical.v1.transform import canonical_document_to_dept_b_fields, dept_a_document_to_canonical
+from app.interop.canonical.v1.transform import (
+    canonical_document_to_dept_b_fields,
+    dept_a_document_to_canonical,
+)
 from app.interop.connectors import runtime as connector_runtime
 from app.interop.events.bus import InMemoryInteropEventBus, InteropEventBus
+from app.interop.events.types import InteropEvent
 from app.interop.exceptions import center as exception_center
 from app.interop.exceptions.taxonomy import classify as classify_exception
-from app.interop.events.types import InteropEvent
 from app.interop.identity_resolution import IdentityResolutionService
+from app.interop.monitoring import alerts as connector_alerts
 from app.interop.quality.engine import DataQualityEngine, QualityRule
 from app.services.audit_service import AuditService
 from app.services.uow import UowFactory
@@ -79,7 +84,11 @@ _quality_engine = DataQualityEngine()  # stateless - one instance evaluates any 
 REQUIRED_DOCUMENT_FIELDS = ("reference", "status", "issued_on")
 
 
-def _row(obj) -> dict | None:
+@overload
+def _row(obj: None) -> None: ...
+@overload
+def _row(obj: Any) -> dict: ...
+def _row(obj: Any) -> dict | None:
     """Plain column-name->value dict for an ORM row - safe to hand to the API layer's to_jsonable,
     unlike the row itself (which carries SQLAlchemy's internal _sa_instance_state)."""
     if obj is None:
@@ -118,7 +127,7 @@ class InteropGatewayService:
         try:
             self.bus.publish(event)
         except Exception:  # noqa: BLE001
-            pass
+            logging.getLogger("civiclens.interop").warning("interop event publish failed for %s", event.event_type)
 
     # -----------------------------------------------------------------------------------------
     # The demo scenario

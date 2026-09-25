@@ -242,15 +242,15 @@ body {{
 .q-page, .q-page-container, .q-layout {{ background: transparent; }}
 /* Default browser link styling (pure blue + permanent underline) is one of the strongest "unstyled
    page" tells. Quasar's stylesheet is injected after this one, so plain ``a`` rules lose the
-   cascade - hence the raised specificity and !important. ``.q-btn``/``.q-item`` are excluded because
+   cascade - hence the raised specificity and !important. ``.q-btn``/``.q-item``/``.cl-nav-item`` (sidebar) are excluded because
    Quasar renders some buttons and nav rows as anchors and they must keep their own styling. */
-body a:not(.q-btn):not(.q-item):not(.q-tab) {{
+body a:not(.q-btn):not(.q-item):not(.q-tab):not(.cl-nav-item) {{
   color: var(--cl-primary) !important; text-decoration: none !important; transition: color .15s ease;
 }}
-body a:not(.q-btn):not(.q-item):not(.q-tab):hover, body a:not(.q-btn):not(.q-item):not(.q-tab):focus-visible {{
+body a:not(.q-btn):not(.q-item):not(.q-tab):not(.cl-nav-item):hover, body a:not(.q-btn):not(.q-item):not(.q-tab):not(.cl-nav-item):focus-visible {{
   text-decoration: underline !important; text-underline-offset: 3px;
 }}
-body.body--dark a:not(.q-btn):not(.q-item):not(.q-tab) {{ color: var(--cl-primary-strong) !important; }}
+body.body--dark a:not(.q-btn):not(.q-item):not(.q-tab):not(.cl-nav-item) {{ color: var(--cl-primary-strong) !important; }}
 /* Editorial serif for titles and headline numbers only; all UI/body text stays in Manrope, which
    is far more legible at small sizes. ``cl-title`` is applied by page_header/section_title. */
 .cl-title, .cl-hero-title, .cl-hero-stat-n, .cl-stat-value {{ font-family: var(--cl-font-display); font-weight: 600; letter-spacing: -.015em; }}
@@ -279,7 +279,7 @@ body.body--dark a:not(.q-btn):not(.q-item):not(.q-tab) {{ color: var(--cl-primar
 .cl-nav-group {{ font-size: .68rem; font-weight: 600; letter-spacing: .09em; text-transform: uppercase; color: var(--cl-sidebar-fg-muted); padding: 18px 16px 6px; }}
 .cl-nav-item {{
   width: 100%; display: flex; align-items: center; gap: 12px; padding: 9px 14px; margin: 1px 8px; border-radius: var(--cl-radius-sm);
-  color: var(--cl-sidebar-fg); font-size: .875rem; font-weight: 500; text-align: left; transition: background-color .12s ease, color .12s ease;
+  color: var(--cl-sidebar-fg); font-size: .875rem; font-weight: 500; text-align: left; text-decoration: none; transition: background-color .12s ease, color .12s ease;
 }}
 .cl-nav-item:hover {{ background: var(--cl-sidebar-hover); color: #fff; }}
 .cl-nav-item.cl-active {{ background: var(--cl-sidebar-active); color: #fff; font-weight: 600; }}
@@ -361,8 +361,36 @@ CSS += """
 .cl-chat-avatar { width: 30px; height: 30px; border-radius: 999px; display: flex; align-items: center; justify-content: center; flex: none; background: var(--cl-ai-soft); color: var(--cl-ai); }
 
 /* ---- upload dropzone ------------------------------------------------------------------------ */
-.cl-dropzone { border: 1.5px dashed var(--cl-border-strong); border-radius: var(--cl-radius-lg); background: var(--cl-surface-alt); transition: border-color .12s ease, background-color .12s ease; }
-.cl-dropzone:hover { border-color: var(--cl-primary); background: var(--cl-primary-soft); }
+.cl-dropzone { border: 1.5px dashed var(--cl-border-strong); border-radius: var(--cl-radius-lg); background: var(--cl-surface-alt); transition: border-color .12s ease, background-color .12s ease, transform .2s ease; overflow: hidden; }
+.cl-dropzone:hover { border-color: var(--cl-primary); background: var(--cl-primary-soft); transform: translateY(-1px); }
+/* Quasar's uploader always renders a "0 B / 0.00%" progress subtitle even when idle - real upload
+   progress is still shown per-file (.q-uploader__file-status), so hiding the header's is cosmetic
+   only, never hides real state. */
+.cl-dropzone .q-uploader__subtitle { display: none; }
+.cl-dropzone .q-uploader__header { background: transparent; }
+.cl-dropzone .q-uploader__title { font-weight: 600; color: var(--cl-fg); }
+
+/* A secondary "attach instead" affordance next to a primary action button (e.g. Legal Analyzer's
+   Analyze button) - same uploader, but sized to sit beside a button instead of dominating the row. */
+.cl-upload-compact { width: 15rem; max-width: 100%; }
+.cl-upload-compact .q-uploader__header { min-height: 40px; padding: 6px 12px; background: transparent; border: 1.5px dashed var(--cl-border-strong); border-radius: var(--cl-radius-md); }
+.cl-upload-compact .q-uploader__title { font-size: 13px; font-weight: 500; color: var(--cl-fg-muted); }
+.cl-upload-compact .q-uploader__subtitle, .cl-upload-compact .q-uploader__list { display: none; }
+
+/* ---- markdown-rendered AI text (interpretation, deep-dive law explanations) - tight spacing so it
+   reads like normal prose inside a card, not a full markdown document with browser-default margins */
+.cl-markdown p { margin: 0 0 8px 0; }
+.cl-markdown p:last-child { margin-bottom: 0; }
+.cl-markdown ul, .cl-markdown ol { margin: 4px 0 8px 0; padding-left: 1.3em; }
+.cl-markdown li { margin-bottom: 2px; }
+.cl-markdown strong { color: var(--cl-fg); font-weight: 700; }
+
+/* ---- a hyperlink styled as a button, for an external link (never a real ui.button - Quasar can't
+   navigate an <a> the way a real link does across browsers/popup-blockers the way ui.link can) --- */
+.cl-link-btn { display: inline-flex; align-items: center; gap: 8px; padding: 9px 18px; border-radius: var(--cl-radius-md);
+  background: var(--cl-primary); color: #fff !important; font-weight: 600; font-size: 13px; text-decoration: none !important;
+  transition: transform .18s ease, box-shadow .18s ease; box-shadow: 0 8px 20px -10px var(--cl-glow-primary); }
+.cl-link-btn:hover { transform: translateY(-2px); box-shadow: 0 12px 28px -10px var(--cl-glow-primary); }
 
 /* ---- misc ------------------------------------------------------------------------------------ */
 .cl-kbd { font-family: var(--cl-font-mono); font-size: .72rem; background: var(--cl-surface-alt); border: 1px solid var(--cl-border-strong); border-radius: 4px; padding: 1px 6px; }

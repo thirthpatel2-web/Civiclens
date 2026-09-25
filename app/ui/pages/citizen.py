@@ -14,7 +14,12 @@ from app.core.transactions import run_in_uow
 from app.services.classification_service import CATEGORIES
 from app.services.complaint_service import ComplaintInput
 from app.services.complaint_status import TRACKER_FILTERS
-from app.services.rti_service import RtiDraft, build_rti_questions, default_records_for_category
+from app.services.rti_service import (
+    RtiDraft,
+    build_rti_questions,
+    default_records_for_category,
+    enhance_questions_with_llm,
+)
 from app.ui import theme
 from app.ui.base import UiUser, data_table, error_banner, info_banner, lang, page, tr
 from app.ui.components import (
@@ -336,6 +341,8 @@ def register(c: AppContainer) -> None:
         qp = ui.context.client.request.query_params if ui.context.client.request else {}
         pre_text = (qp.get("text") or "")[:1500]
         pre_voice = qp.get("voice") or None
+        q_voice_state: dict[str, Any] = {"id": pre_voice}
+        d_voice_state: dict[str, Any] = {"id": pre_voice}
 
         page_header(tr(c, "nav.report"), tr(c, "page.report_help"), icon="add_circle")
 
@@ -348,6 +355,10 @@ def register(c: AppContainer) -> None:
                     ui.label(tr(c, "report.submitted")).classes("text-lg font-semibold").style("color: var(--cl-fg);")
                 with ui.column().classes("cl-surface-alt q-pa-md gap-1 w-full"):
                     ui.label(f"{tr(c, 'lbl.reference')}: {cm.reference}").classes("cl-mono text-sm font-semibold")
+                    with ui.row().classes("gap-2 items-center q-mt-xs"):
+                        ui.icon("auto_awesome").classes("text-[16px]").style("color: var(--cl-ai);")
+                        ui.label(f"{tr(c, 'lbl.category')}: {cm.category.replace('_', ' ').title()}").classes("text-sm font-medium").style("color: var(--cl-fg);")
+                        chip(cm.severity, color=theme.PRIORITY_COLOR.get(cm.severity, "muted"))
                     ui.label(f"{tr(c, 'lbl.department')}: {cm.department_code or tr(c, 'report.awaiting_triage')}").classes("text-sm")
                     ui.label(f"{tr(c, 'lbl.priority')}: {cm.priority}").classes("text-sm")
                     if cm.sla_due_at:
@@ -361,13 +372,23 @@ def register(c: AppContainer) -> None:
                 ui.button(tr(c, "nav.grievances"), icon="arrow_forward", on_click=lambda: ui.navigate.to(f"/grievances/{cm.id}")).props("color=primary unelevated").classes("w-full")
             dlg.open()
 
-        def create(data: dict[str, Any]) -> None:
+        def rotate_crid() -> None:
+            # the client-request-id is an idempotency key - the backend treats a repeat submission
+            # under the same one as a replay of the SAME complaint, not a new one, so a fresh id is
+            # required before the form can be used to file the next complaint.
+            nonlocal crid
+            crid = uuid.uuid4().hex
+
+        def create(data: dict[str, Any], on_success: Any = None) -> None:
             try:
                 r = c.complaints.create(user.ctx, ComplaintInput(client_request_id=crid, **{k: v for k, v in data.items() if v not in (None, "")}))
             except CivicLensError as exc:
                 ui.notify(exc.message + (f" {exc.details}" if exc.details else ""), type="negative")
                 return
             receipt(r.complaint, r.warnings)
+            rotate_crid()
+            if on_success is not None:
+                on_success()
 
         # ------------------------------------------------------------------ quick mode
         # One screen, one required field. Everything the four-step form asks for is optional and
@@ -380,6 +401,23 @@ def register(c: AppContainer) -> None:
                     s = s.split(sep)[0]
                     break
             return s[:90].strip()
+
+        def evidence_icon(mime: str) -> str:
+            if mime.startswith("image/"):
+                return "image"
+            if mime == "application/pdf":
+                return "picture_as_pdf"
+            if mime.startswith("text/"):
+                return "article"
+            return "description"
+
+        def human_size(n: int) -> str:
+            size = float(n)
+            for unit in ("B", "KB", "MB"):
+                if size < 1024 or unit == "MB":
+                    return f"{size:.0f} {unit}" if unit == "B" else f"{size:.1f} {unit}"
+                size /= 1024
+            return f"{size:.1f} MB"
 
         panes = ui.column().classes("w-full max-w-3xl gap-3")
         with ui.element("div").classes("cl-segment w-full max-w-3xl q-mb-sm"):
@@ -400,26 +438,43 @@ def register(c: AppContainer) -> None:
         for k in seg_items:
             seg_items[k].on("click", lambda kk=k: show(kk))
 
+        from app.i18n.languages import LANGUAGES
+
         with panes:
             quick_pane = ui.column().classes("w-full gap-3")
             with quick_pane, ui.column().classes("cl-card w-full gap-3"):
-                q_desc = ui.textarea(tr(c, "report.q_what"), value=pre_text).props("outlined autogrow rows=4").classes("w-full")
+                with ui.element("div").classes("cl-ask w-full"):
+                    ui.icon("add_location_alt").classes("text-[20px]").style("color: var(--cl-primary, var(--cl-ai));")
+                    q_desc = ui.textarea(tr(c, "report.q_what"), value=pre_text).props("borderless autogrow rows=3").classes("flex-1")
+                    q_mic = ui.button(icon="mic").props("round unelevated")
+                q_voice_hint = ui.label("").classes("text-xs").style("color: var(--cl-fg-subtle);")
                 field_hint(tr(c, "report.q_what_hint"))
-                q_where = ui.input(tr(c, "report.q_where")).props("outlined dense").classes("w-full")
+
+                with ui.row().classes("gap-2 flex-wrap items-center q-mt-xs"):
+                    ui.label(tr(c, "legal.examples_label")).classes("text-xs").style("color: var(--cl-fg-subtle);")
+                    for key in ("report.example.pothole", "report.example.garbage", "report.example.power", "report.example.water"):
+                        text = tr(c, key)
+                        ui.chip(text, icon="edit_note", on_click=lambda t=text: setattr(q_desc, "value", t)).props("outline dense")
+
+                divider()
+
+                with ui.row().classes("gap-3 w-full flex-wrap items-end"):
+                    q_where = ui.input(tr(c, "report.q_where")).props("outlined dense").classes("flex-1").style("min-width: 220px;")
+                    q_language = ui.select({k: f"{v.native} ({k})" for k, v in LANGUAGES.items()}, value=lang(), label=tr(c, "lbl.language")).props("outlined dense").classes("w-44")
                 field_hint(tr(c, "report.q_where_hint"))
-                q_coords = ui.label("").classes("text-xs").style("color: var(--cl-fg-subtle);")
-                q_geo: dict[str, Any] = {"lat": None, "lng": None}
+                ui.label(tr(c, "report.manual_location_hint")).classes("text-xs").style("color: var(--cl-fg-subtle); font-style: italic;")
+                ui.label(tr(c, "report.q_voice_lang_hint")).classes("text-xs").style("color: var(--cl-fg-subtle); font-style: italic;")
 
-                def on_geo(e: Any) -> None:
-                    q_geo["lat"], q_geo["lng"] = round(float(e.args["lat"]), 6), round(float(e.args["lng"]), 6)
-                    q_coords.set_text(f"{tr(c, 'report.q_pinned')} {q_geo['lat']:.5f}, {q_geo['lng']:.5f}")
+                divider()
 
-                def on_geo_error(e: Any) -> None:
-                    q_coords.set_text(tr(c, "report.q_geo_failed") + " " + str(e.args.get("message", "")))
-
-                ui.on("cl_geo", on_geo)
-                ui.on("cl_geo_error", on_geo_error)
-                q_files = ui.row().classes("gap-2 flex-wrap w-full")
+                with ui.row().classes("gap-3 items-center w-full flex-wrap"):
+                    q_locate_btn = ui.button(tr(c, "report.q_use_location"), icon="my_location").props("outline dense")
+                q_pin_card = ui.row().classes("cl-badge cl-badge-info items-center gap-2")
+                q_pin_card.set_visibility(False)
+                with q_pin_card:
+                    ui.icon("place").classes("text-[15px]")
+                    q_coords = ui.label("")
+                q_geo: dict[str, Any] = {"lat": None, "lng": None, "address": None, "city": None}
 
                 def _drop_evidence(rid: str) -> None:
                     evidence_records.pop(rid, None)
@@ -430,8 +485,8 @@ def register(c: AppContainer) -> None:
                     with q_files:
                         for rid, rec in evidence_records.items():
                             with ui.row().classes("cl-badge cl-badge-info items-center gap-2"):
-                                ui.icon("description").classes("text-[14px]")
-                                ui.label(rec.name)
+                                ui.icon(evidence_icon(rec.mime)).classes("text-[14px]")
+                                ui.label(f"{rec.name} · {human_size(rec.size)}")
                                 ui.icon("close").classes("text-[14px] cursor-pointer").on("click", lambda i=rid: _drop_evidence(i))
 
                 def q_upload(e: Any) -> None:
@@ -443,13 +498,22 @@ def register(c: AppContainer) -> None:
                     evidence_records[rec.id] = rec
                     q_redraw()
 
-                with ui.row().classes("gap-2 flex-wrap items-center w-full"):
-                    ui.button(tr(c, "report.q_use_location"), icon="my_location", on_click=lambda: ui.run_javascript(
-                        "navigator.geolocation.getCurrentPosition("
-                        "p => emitEvent('cl_geo', {lat: p.coords.latitude, lng: p.coords.longitude}),"
-                        "e => emitEvent('cl_geo_error', {message: e.message}));",
-                    )).props("outline dense")
-                    ui.upload(on_upload=q_upload, auto_upload=True, multiple=True, label=tr(c, "report.q_photo")).props("flat dense accept=image/*,.pdf").classes("flex-1")
+                ui.upload(on_upload=q_upload, auto_upload=True, multiple=True, label=tr(c, "report.q_photo")).props("flat dense accept=image/*,.pdf").classes("cl-dropzone w-full")
+                q_files = ui.row().classes("gap-2 flex-wrap w-full")
+
+                def reset_quick_form() -> None:
+                    q_desc.value, q_where.value = "", ""
+                    q_language.value = lang()
+                    q_pin_card.set_visibility(False)
+                    q_coords.set_text("")
+                    q_geo["lat"] = q_geo["lng"] = q_geo["address"] = q_geo["city"] = None
+                    q_voice_state["id"] = None
+                    q_voice_hint.set_text("")
+                    # evidence is one shared pool between Quick and Detailed mode (switching tabs keeps
+                    # what you've attached) - a submitted complaint clears it for both, so redraw both.
+                    evidence_records.clear()
+                    q_redraw()
+                    redraw_evidence()
 
                 def q_submit() -> None:
                     desc = (q_desc.value or "").strip()
@@ -460,17 +524,143 @@ def register(c: AppContainer) -> None:
                     if len(title) < 5:
                         title = desc[:90]
                     create({
-                        "title": title, "description": desc, "language": lang(),
-                        "address": (q_where.value or "").strip() or None,
+                        "title": title, "description": desc, "language": q_language.value or lang(),
+                        "address": (q_where.value or "").strip() or None, "city": q_geo["city"],
                         "lat": q_geo["lat"], "lng": q_geo["lng"],
-                        "evidence_ids": list(evidence_records.keys()), "voice_id": pre_voice,
-                    })
+                        "evidence_ids": list(evidence_records.keys()), "voice_id": q_voice_state["id"],
+                    }, on_success=reset_quick_form)
 
                 ui.button(tr(c, "act.submit"), icon="send", on_click=q_submit).props("unelevated size=lg").classes("cl-btn-glow w-full")
                 ui.label(tr(c, "report.q_footnote")).classes("text-xs").style("color: var(--cl-fg-subtle); line-height:1.5;")
 
             detail_pane = ui.column().classes("w-full gap-0")
             detail_pane.set_visibility(False)
+
+        # ---- shared live-mic infrastructure: one global JS bridge (MIC_JS), any number of mic
+        # buttons on this page. Only one recording can ever be in progress at a time (one physical
+        # microphone), so a single "which mic is active" pointer is enough to route the transcript
+        # back to the right text field/language selector/hint label - registering a separate
+        # cl_audio listener per mic button would make EVERY listener fire on EVERY recording.
+        ui.add_body_html(f"<script>{MIC_JS}</script>")
+        voice_caps = c.voice.capabilities()
+        _active_mic: dict[str, Any] = {"target": None}
+
+        def wire_mic(mic_btn: Any, target_field: Any, lang_select: Any, hint_label: Any, voice_state: dict[str, Any]) -> None:
+            mic_btn.set_enabled(voice_caps["state"] == "CONFIGURED")
+            mic_btn.tooltip(tr(c, "assistant.mic_tip") if voice_caps["state"] == "CONFIGURED" else tr(c, "assistant.mic_off"))
+
+            async def toggle() -> None:
+                if _active_mic["target"] is not None:
+                    mic_btn.props("icon=mic").classes(remove="cl-mic-live")
+                    _active_mic["target"] = None
+                    ui.run_javascript("window.clStopRec()")
+                    return
+                _active_mic["target"] = {"field": target_field, "lang": lang_select, "hint": hint_label, "voice": voice_state, "btn": mic_btn}
+                mic_btn.props("icon=stop").classes(add="cl-mic-live")
+                hint_label.set_text(tr(c, "assistant.listening"))
+                await ui.run_javascript("window.clStartRec()")
+
+            mic_btn.on_click(toggle)
+
+        def on_audio(e: Any) -> None:
+            target = _active_mic["target"]
+            _active_mic["target"] = None
+            if target is None:
+                return  # a stray event with nothing active - nothing to route it to
+            target["btn"].props("icon=mic").classes(remove="cl-mic-live")
+            import base64 as _b64
+
+            try:
+                raw = _b64.b64decode(e.args["b64"])
+            except (KeyError, ValueError):
+                ui.notify(tr(c, "assistant.mic_failed"), type="negative")
+                return
+            try:
+                r = c.voice.transcribe(user.ctx, raw, e.args.get("mime") or "audio/webm", target["lang"].value or "auto")
+            except CivicLensError as exc:
+                ui.notify(exc.message, type="negative")
+                return
+            if r.status != "OK" or not r.transcript:
+                ui.notify(r.error or r.status, type="warning")
+                return
+            target["voice"]["id"] = r.id
+            target["field"].value = ((target["field"].value or "") + " " + r.transcript).strip()  # same language, native script - never translated
+            if r.language_detected and r.language_detected in target["lang"].options:
+                target["lang"].value = r.language_detected
+            target["hint"].set_text(tr(c, "assistant.heard", lang=r.language_detected or "?", how=r.detected_by))
+
+        def on_audio_error(e: Any) -> None:
+            target = _active_mic["target"]
+            _active_mic["target"] = None
+            if target is not None:
+                target["btn"].props("icon=mic").classes(remove="cl-mic-live")
+            ui.notify(tr(c, "assistant.mic_denied") + " " + str(e.args.get("message", "")), type="negative")
+
+        ui.on("cl_audio", on_audio)
+        ui.on("cl_audio_error", on_audio_error)
+
+        wire_mic(q_mic, q_desc, q_language, q_voice_hint, q_voice_state)
+
+        # ---- shared "use my location" infrastructure: same one-active-request rule as the mic -
+        # each location button just registers itself via wire_locate(); the actual browser
+        # geolocation call and the real reverse-geocode lookup happen once, centrally, and get
+        # routed back to whichever button asked.
+        _active_geo: dict[str, Any] = {"target": None}
+
+        def wire_locate(locate_btn: Any, coords_label: Any, geo_state: dict[str, Any], where_field: Any, *, pin_card: Any = None, on_coords: Any = None) -> None:
+            def start() -> None:
+                _active_geo["target"] = {"coords": coords_label, "geo": geo_state, "where": where_field, "pin": pin_card, "btn": locate_btn, "on_coords": on_coords}
+                if pin_card is not None:
+                    pin_card.set_visibility(True)
+                coords_label.set_text(tr(c, "report.q_geo_looking_up"))
+                ui.run_javascript(
+                    "navigator.geolocation.getCurrentPosition("
+                    "p => emitEvent('cl_geo', {lat: p.coords.latitude, lng: p.coords.longitude}),"
+                    "e => emitEvent('cl_geo_error', {message: e.message}));",
+                )
+
+            locate_btn.on_click(start)
+
+        async def resolve_location(lat_v: float, lng_v: float, target: dict[str, Any]) -> None:
+            """Look up and display the address for one specific point - shared by the GPS button, a
+            map click and manually-typed coordinates, so however a citizen picks a location, the
+            shown address always reflects THAT point, never a stale one from an earlier pick."""
+            target["geo"]["lat"], target["geo"]["lng"] = lat_v, lng_v
+            if target["pin"] is not None:
+                target["pin"].set_visibility(True)
+            target["coords"].set_text(tr(c, "report.q_geo_looking_up"))
+            result = await run_with_loading(target["btn"], c.geocoding.reverse, lat_v, lng_v)
+            if result is not None and (result.area or result.city or result.display_name):
+                pretty = ", ".join(p for p in (result.area, result.city, result.state, result.pincode) if p) or result.display_name
+                target["coords"].set_text(pretty or "")
+                target["geo"]["address"], target["geo"]["city"] = pretty or result.display_name, result.city
+                if target["where"] is not None:
+                    target["where"].value = pretty or result.display_name or ""
+            else:  # geocoding failed or returned nothing - the raw coordinates are still real and useful, never fabricated
+                target["coords"].set_text(f"{tr(c, 'report.q_pinned')} {lat_v:.5f}, {lng_v:.5f}")
+
+        async def dispatch_geo(e: Any) -> None:
+            target = _active_geo["target"]
+            _active_geo["target"] = None
+            if target is None:
+                return
+            lat_v, lng_v = round(float(e.args["lat"]), 6), round(float(e.args["lng"]), 6)
+            if target["on_coords"] is not None:
+                target["on_coords"](lat_v, lng_v)
+            await resolve_location(lat_v, lng_v, target)
+
+        def dispatch_geo_error(e: Any) -> None:
+            target = _active_geo["target"]
+            _active_geo["target"] = None
+            if target is not None:
+                if target["pin"] is not None:
+                    target["pin"].set_visibility(True)
+                target["coords"].set_text(tr(c, "report.q_geo_failed") + " " + str(e.args.get("message", "")))
+
+        ui.on("cl_geo", dispatch_geo)
+        ui.on("cl_geo_error", dispatch_geo_error)
+
+        wire_locate(q_locate_btn, q_coords, q_geo, q_where, pin_card=q_pin_card)
 
         # ------------------------------------------------------------------ detailed mode
         with detail_pane, ui.column().classes("w-full max-w-3xl gap-0"):
@@ -479,34 +669,89 @@ def register(c: AppContainer) -> None:
                 with ui.step("describe", title=tr(c, "report.step_describe"), icon="edit_note"):
                     title = ui.input(tr(c, "lbl.title"), value=derive_title(pre_text)).props("outlined dense").classes("w-full")
                     field_hint(tr(c, "report.title_hint"))
-                    desc = ui.textarea(tr(c, "lbl.description"), value=pre_text).props("outlined autogrow").classes("w-full")
+                    with ui.element("div").classes("cl-ask w-full"):
+                        ui.icon("edit_note").classes("text-[20px]").style("color: var(--cl-ai);")
+                        desc = ui.textarea(tr(c, "lbl.description"), value=pre_text).props("borderless autogrow rows=3").classes("flex-1")
+                        d1_mic = ui.button(icon="mic").props("round unelevated")
+                    d1_voice_hint = ui.label("").classes("text-xs").style("color: var(--cl-fg-subtle);")
                     field_hint(tr(c, "report.desc_hint"))
-                    from app.i18n.languages import LANGUAGES
+
+                    with ui.row().classes("gap-2 flex-wrap items-center q-mt-xs"):
+                        ui.label(tr(c, "legal.examples_label")).classes("text-xs").style("color: var(--cl-fg-subtle);")
+                        for key in ("report.example.pothole", "report.example.garbage", "report.example.power", "report.example.water"):
+                            example_text = tr(c, key)
+
+                            def use_example(t: str = example_text) -> None:
+                                desc.value = t
+                                if not (title.value or "").strip():
+                                    title.value = derive_title(t)
+
+                            ui.chip(example_text, icon="edit_note", on_click=use_example).props("outline dense")
 
                     language = ui.select({k: f"{v.native} ({k})" for k, v in LANGUAGES.items()}, value=lang(), label=tr(c, "lbl.language")).props("outlined dense").classes("w-56")
+                    wire_mic(d1_mic, desc, language, d1_voice_hint, d_voice_state)
                     with ui.stepper_navigation():
                         ui.button(tr(c, "act.next"), icon="arrow_forward", on_click=stepper.next).props("color=primary unelevated")
 
                 # ---- Step 2: category & location -------------------------------------------------
                 with ui.step("locate", title=tr(c, "report.step_locate"), icon="place"):
+                    section_title(tr(c, "lbl.category"))
                     with ui.row().classes("gap-3 w-full flex-wrap"):
                         cat = ui.select({"": tr(c, "assistant.unsure"), **{k: k.replace("_", " ").title() for k in CATEGORIES}}, value="", label=tr(c, "lbl.category")).props("outlined dense").classes("w-52")
                         ward = ui.input(tr(c, "lbl.ward") + " (" + tr(c, "lbl.optional") + ")").props("outlined dense").classes("w-40")
+
+                    divider()
+                    section_title(tr(c, "lbl.location"))
+                    d2_address = ui.input(tr(c, "report.q_where")).props("outlined dense").classes("w-full")
+                    field_hint(tr(c, "report.q_where_hint"))
+                    ui.label(tr(c, "report.manual_location_hint")).classes("text-xs").style("color: var(--cl-fg-subtle); font-style: italic;")
                     field_hint(tr(c, "report.map_hint"))
+                    with ui.row().classes("gap-3 items-center w-full flex-wrap"):
+                        d2_locate_btn = ui.button(tr(c, "report.q_use_location"), icon="my_location").props("outline dense")
+                    d2_pin_card = ui.row().classes("cl-badge cl-badge-info items-center gap-2")
+                    d2_pin_card.set_visibility(False)
+                    with d2_pin_card:
+                        ui.icon("place").classes("text-[15px]")
+                        d2_coords = ui.label("")
+                    d2_geo: dict[str, Any] = {"lat": None, "lng": None, "address": None, "city": None}
                     with ui.row().classes("gap-3 items-end w-full flex-wrap"):
                         lat = ui.number(tr(c, "lbl.latitude"), format="%.6f").props("outlined dense").classes("w-40")
                         lng = ui.number(tr(c, "lbl.longitude"), format="%.6f").props("outlined dense").classes("w-40")
+                    field_hint(tr(c, "report.coords_hint"))
                     center = (12.9716, 77.5946)
                     m = ui.leaflet(center=center, zoom=11).classes("w-full h-64").style("border-radius: var(--cl-radius-md); overflow: hidden;")
                     marker: dict[str, Any] = {}
 
-                    def on_click(e: Any) -> None:
-                        lat.value, lng.value = round(e.args["latlng"]["lat"], 6), round(e.args["latlng"]["lng"], 6)
+                    def place_marker(lat_v: float, lng_v: float, *, recenter: bool = False) -> None:
+                        lat.value, lng.value = lat_v, lng_v
                         if "m" in marker:
                             m.remove_layer(marker["m"])
-                        marker["m"] = m.marker(latlng=(lat.value, lng.value))
+                        marker["m"] = m.marker(latlng=(lat_v, lng_v))
+                        if recenter:
+                            m.set_center((lat_v, lng_v))
+
+                    d2_target = {"coords": d2_coords, "geo": d2_geo, "where": d2_address, "pin": d2_pin_card, "btn": d2_locate_btn}
+
+                    async def on_click(e: Any) -> None:
+                        lat_v, lng_v = round(e.args["latlng"]["lat"], 6), round(e.args["latlng"]["lng"], 6)
+                        place_marker(lat_v, lng_v)
+                        await resolve_location(lat_v, lng_v, d2_target)
+
+                    async def apply_manual_coords() -> None:
+                        if lat.value is None or lng.value is None:
+                            return
+                        lat_v, lng_v = round(float(lat.value), 6), round(float(lng.value), 6)
+                        place_marker(lat_v, lng_v, recenter=True)
+                        await resolve_location(lat_v, lng_v, d2_target)
 
                     m.on("map-click", on_click)
+                    lat.on("blur", apply_manual_coords)
+                    lng.on("blur", apply_manual_coords)
+                    # a geocoded street address always overwrites `d2_address` (never `ward` - a distinct
+                    # municipal administrative unit the reverse-geocoder cannot determine): whichever pin
+                    # was set last - GPS, a map click, or typed coordinates - is the one the address must
+                    # match, so a stale address from an earlier pick is never left showing.
+                    wire_locate(d2_locate_btn, d2_coords, d2_geo, d2_address, pin_card=d2_pin_card, on_coords=lambda la, ln: place_marker(la, ln, recenter=True))
                     with ui.stepper_navigation():
                         ui.button(tr(c, "act.back"), on_click=stepper.previous).props("flat")
                         ui.button(tr(c, "act.next"), icon="arrow_forward", on_click=stepper.next).props("color=primary unelevated")
@@ -525,8 +770,8 @@ def register(c: AppContainer) -> None:
                         with ev_list:
                             for rid, rec in evidence_records.items():
                                 with ui.row().classes("cl-badge cl-badge-info items-center gap-2"):
-                                    ui.icon("description").classes("text-[14px]")
-                                    ui.label(f"{rec.name} · {rec.analysis_status}")
+                                    ui.icon(evidence_icon(rec.mime)).classes("text-[14px]")
+                                    ui.label(f"{rec.name} · {human_size(rec.size)}")
                                     ui.icon("close").classes("text-[14px] cursor-pointer").on("click", lambda i=rid: _drop_evidence(i))
 
                     def on_upload(e: Any) -> None:
@@ -544,32 +789,14 @@ def register(c: AppContainer) -> None:
 
                     divider()
                     section_title(tr(c, "report.voice_input"), tr(c, "lbl.optional"))
-                    caps = c.voice.capabilities()
-                    voice_state: dict[str, Any] = {"id": pre_voice}
-                    if caps["state"] != "CONFIGURED":
+                    if voice_caps["state"] != "CONFIGURED":
                         info_banner(tr(c, "report.stt_off"), "orange")
                     else:
-                        options = ({"auto": tr(c, "report.auto_detect")} if caps["auto_detect"] else {}) | {x["code"]: f"{x['native']} ({x['name']})" for x in caps["languages"]}
-                        voice_lang = ui.select(options, value=next(iter(options)), label=tr(c, "report.spoken_language")).props("outlined dense").classes("w-64")
-                        transcript_note = ui.label().classes("text-xs").style("color: var(--cl-fg-subtle);")
-
-                        def on_audio(e: Any) -> None:
-                            try:
-                                r = c.voice.transcribe(user.ctx, e.content.read(), e.type, voice_lang.value)
-                            except CivicLensError as exc:
-                                ui.notify(exc.message, type="negative")
-                                return
-                            if r.status != "OK" or not r.transcript:
-                                ui.notify(r.error or r.status, type="warning")
-                                return
-                            voice_state["id"] = r.id
-                            desc.value = ((desc.value or "") + " " + r.transcript).strip()  # same language, native script - never translated
-                            if r.language_detected in c.ui_text.languages or r.language_detected:
-                                language.value = r.language_detected if r.language_detected in [k for k in language.options] else language.value
-                            transcript_note.set_text(tr(c, "report.transcript_note", lang=r.language_detected or "?", how=r.detected_by) + (" " + " ".join(r.warnings) if r.warnings else ""))
-                            ui.notify(tr(c, "report.transcript_added"), type="positive")
-
-                        ui.upload(on_upload=on_audio, auto_upload=True, label=tr(c, "report.record_audio")).props("flat accept=.wav,.webm,.ogg,.mp3,.m4a").classes("cl-dropzone w-full")
+                        with ui.row().classes("gap-3 items-center"):
+                            d3_mic = ui.button(icon="mic").props("round unelevated")
+                            ui.label(tr(c, "report.record_audio")).classes("text-sm").style("color: var(--cl-fg);")
+                        d3_voice_hint = ui.label("").classes("text-xs").style("color: var(--cl-fg-subtle);")
+                        wire_mic(d3_mic, desc, language, d3_voice_hint, d_voice_state)
                     with ui.stepper_navigation():
                         ui.button(tr(c, "act.back"), on_click=stepper.previous).props("flat")
                         ui.button(tr(c, "act.next"), icon="arrow_forward", on_click=stepper.next).props("color=primary unelevated")
@@ -587,6 +814,8 @@ def register(c: AppContainer) -> None:
                                 chip(cat.value or tr(c, "lbl.category") + ": " + tr(c, "assistant.unsure"), color="info", outline=True)
                                 if ward.value:
                                     chip(f"{tr(c, 'lbl.ward')} {ward.value}", color="muted", outline=True)
+                                if d2_address.value:
+                                    chip(d2_address.value, color="muted", outline=True)
                                 if lat.value and lng.value:
                                     chip(f"{lat.value:.4f}, {lng.value:.4f}", color="muted", outline=True)
                                 chip(tr(c, "report.n_evidence", n=len(evidence_records)), color="muted", outline=True)
@@ -596,7 +825,9 @@ def register(c: AppContainer) -> None:
                     status = ui.label().classes("text-xs").style("color: var(--cl-fg-subtle);")
 
                     def payload() -> dict[str, Any]:
-                        return {"title": title.value, "description": desc.value, "language": language.value, "category": cat.value or None, "ward": ward.value or None, "lat": lat.value, "lng": lng.value, "evidence_ids": list(evidence_records.keys()), "voice_id": voice_state["id"]}
+                        return {"title": title.value, "description": desc.value, "language": language.value, "category": cat.value or None, "ward": ward.value or None,
+                                "address": (d2_address.value or "").strip() or None, "city": d2_geo["city"], "lat": lat.value, "lng": lng.value,
+                                "evidence_ids": list(evidence_records.keys()), "voice_id": d_voice_state["id"]}  # fmt: skip
 
                     def autosave() -> None:
                         try:
@@ -607,8 +838,31 @@ def register(c: AppContainer) -> None:
 
                     ui.timer(10.0, autosave)  # server-side draft; survives page reloads and dropped connections
 
+                    def reset_detailed_form() -> None:
+                        title.value, desc.value = "", ""
+                        language.value = lang()
+                        cat.value, ward.value, d2_address.value = "", "", ""
+                        d2_pin_card.set_visibility(False)
+                        d2_coords.set_text("")
+                        d2_geo["lat"] = d2_geo["lng"] = d2_geo["address"] = d2_geo["city"] = None
+                        lat.value, lng.value = None, None
+                        if "m" in marker:
+                            m.remove_layer(marker["m"])
+                            marker.pop("m", None)
+                        m.set_center(center)
+                        d_voice_state["id"] = None
+                        d1_voice_hint.set_text("")
+                        if voice_caps["state"] == "CONFIGURED":
+                            d3_voice_hint.set_text("")
+                        # evidence is the shared pool with Quick mode - clear and redraw both.
+                        evidence_records.clear()
+                        redraw_evidence()
+                        q_redraw()
+                        stepper.set_value("describe")
+                        draw_review()
+
                     def submit() -> None:
-                        create(payload())
+                        create(payload(), on_success=reset_detailed_form)
 
                     def pending() -> None:
                         for dr in c.drafts.sync_all(user.ctx):
@@ -661,6 +915,12 @@ def register(c: AppContainer) -> None:
                     ui.label(cm.description).classes("text-sm").style("color: var(--cl-fg);")
                     divider()
                     with ui.row().classes("gap-6 flex-wrap"):
+                        with ui.column().classes("gap-0"):
+                            ui.label(tr(c, "lbl.category")).classes("text-xs").style("color: var(--cl-fg-subtle);")
+                            ui.label(cm.category.replace("_", " ").title()).classes("text-sm font-medium").style("color: var(--cl-fg);")
+                        with ui.column().classes("gap-0"):
+                            ui.label(tr(c, "lbl.severity")).classes("text-xs").style("color: var(--cl-fg-subtle);")
+                            chip(cm.severity, color=theme.PRIORITY_COLOR.get(cm.severity, "muted"))
                         with ui.column().classes("gap-0"):
                             ui.label(tr(c, "lbl.department")).classes("text-xs").style("color: var(--cl-fg-subtle);")
                             ui.label(cm.department_code or "-").classes("text-sm font-medium").style("color: var(--cl-fg);")
@@ -722,43 +982,141 @@ def register(c: AppContainer) -> None:
 
     @page(c, "/rti", "nav.rti", roles=CIT)
     def rti(c: AppContainer, user: UiUser) -> None:
+        import base64
+
+        from app.i18n.languages import LANGUAGES
+
         page_header(tr(c, "tabRTI"), tr(c, "tipText"), icon="gavel")
+        mine = run_in_uow(c, lambda uow: uow.rti.list_for_owner(user.ctx.user_id))
+        last_address = next((a.draft.applicant_address for a in mine if a.draft.applicant_address), "")
+        depts = c.gis.locator(user.ctx)["departments"]
+        dept_options = [d["name"] for d in depts if d["name"]]
+        dept_name_to_code = {d["name"]: d["code"] for d in depts if d["name"]}
+        caps = c.voice.capabilities()
+
         with ui.row().classes("gap-6 w-full flex-wrap"):
-            with ui.column().classes("cl-card gap-3").style("min-width: 320px; max-width: 480px; flex: 1;"):
-                section_title(tr(c, "rti.subject_authority"))
-                subject = ui.input(tr(c, "lbl.title")).props("outlined dense").classes("w-full")
+            with ui.column().classes("cl-card gap-3").style("min-width: 320px; max-width: 520px; flex: 1;"):
+                with ui.element("div").classes("cl-ask w-full"):
+                    ui.icon("gavel").classes("text-[20px]").style("color: var(--cl-ai);")
+                    subject = ui.textarea(tr(c, "rti.subject_label")).props("borderless autogrow rows=2").classes("flex-1")
+                    r_mic = ui.button(icon="mic").props("round unelevated")
+                    r_mic.set_enabled(caps["state"] == "CONFIGURED")
+                    r_mic.tooltip(tr(c, "assistant.mic_tip") if caps["state"] == "CONFIGURED" else tr(c, "assistant.mic_off"))
+                r_voice_hint = ui.label("").classes("text-xs").style("color: var(--cl-fg-subtle);")
                 field_hint(tr(c, "rti.subject_hint"))
-                authority = ui.input(tr(c, "selectDepartment")).props("outlined dense").classes("w-full")
-                location = ui.input(tr(c, "lbl.location") + " (" + tr(c, "lbl.optional") + ")").props("outlined dense").classes("w-full")
+
+                with ui.row().classes("gap-2 flex-wrap items-center q-mt-xs"):
+                    ui.label(tr(c, "legal.examples_label")).classes("text-xs").style("color: var(--cl-fg-subtle);")
+                    for ex_key in ("roads", "water", "electricity"):
+                        ex_text = tr(c, f"rti.example.{ex_key}")
+
+                        def use_rti_example(t: str = ex_text, k: str = ex_key) -> None:
+                            subject.value = t
+                            cat_select.value = k
+                            draw_records()
+
+                        ui.chip(ex_text, icon="edit_note", on_click=use_rti_example).props("outline dense")
+
+                r_language = ui.select({k: f"{v.native} ({k})" for k, v in LANGUAGES.items()}, value=lang(), label=tr(c, "lbl.language")).props("outlined dense").classes("w-44")
 
                 divider()
-                section_title(tr(c, "rti.records"), tr(c, "rti.records_sub"))
+                authority = ui.select(dept_options, with_input=True, new_value_mode="add-unique", label=tr(c, "selectDepartment")).props("outlined dense").classes("w-full")
+                dept_suggest_hint = ui.label("").classes("text-xs").style("color: var(--cl-ai);")
+                field_hint(tr(c, "rti.authority_hint"))
+                location = ui.input(tr(c, "lbl.location") + " (" + tr(c, "lbl.optional") + ")").props("outlined dense").classes("w-full")
+
+                def suggest_department() -> None:
+                    """Fill the department in for you from what you wrote - only when you haven't
+                    already picked one yourself, and only when the classifier is actually confident;
+                    an ambiguous or 'other' read is never turned into a guessed department name."""
+                    subj = (subject.value or "").strip()
+                    if not subj or (authority.value or "").strip():
+                        return
+                    preview = c.complaints.preview_classification(user.ctx, subj, subj, None)
+                    if not preview["ambiguous"] and preview["category"] != "other" and preview["department_name"]:
+                        authority.value = preview["department_name"]
+                        dept_suggest_hint.set_text(tr(c, "rti.dept_suggested", category=preview["category"].replace("_", " ").title()))
+
+                subject.on("blur", suggest_department)
+
+                divider()
                 cat_select = ui.select({"": tr(c, "col.general_not_sure"), **{k: k.replace("_", " ").title() for k in CATEGORIES}}, value="", label=tr(c, "lbl.category")).props("outlined dense").classes("w-full")
+                field_hint(tr(c, "rti.records_sub"))
                 record_boxes: dict[str, ui.checkbox] = {}
-                record_list = ui.column().classes("w-full gap-1")
 
-                def draw_records() -> None:
-                    record_list.clear()
-                    record_boxes.clear()
-                    with record_list:
-                        for rec in default_records_for_category(cat_select.value):
-                            record_boxes[rec] = ui.checkbox(rec, value=True).props("dense color=primary").classes("text-sm")
+                with ui.expansion(tr(c, "rti.advanced"), icon="tune").classes("w-full cl-surface-alt"):
+                    record_list = ui.column().classes("w-full gap-1")
 
-                cat_select.on_value_change(lambda e: draw_records())
-                draw_records()
-                with ui.row().classes("gap-3 w-full flex-wrap"):
-                    tender_ref = ui.input("Tender / Work Order No. (" + tr(c, "lbl.optional") + ")").props("outlined dense").classes("w-full sm:flex-1")
-                    time_period = ui.input("Time period (" + tr(c, "lbl.optional") + ", e.g. FY 2025-26)").props("outlined dense").classes("w-full sm:flex-1")
-                questions = ui.textarea("Additional specific questions (" + tr(c, "lbl.optional") + ", one per line)").props("outlined autogrow").classes("w-full")
+                    def draw_records() -> None:
+                        record_list.clear()
+                        record_boxes.clear()
+                        with record_list:
+                            for rec in default_records_for_category(cat_select.value, r_language.value or "en"):
+                                record_boxes[rec] = ui.checkbox(rec, value=True).props("dense color=primary").classes("text-sm")
+
+                    cat_select.on_value_change(lambda e: draw_records())
+                    r_language.on_value_change(lambda e: draw_records())
+                    draw_records()
+                    with ui.row().classes("gap-3 w-full flex-wrap"):
+                        tender_ref = ui.input("Tender / Work Order No. (" + tr(c, "lbl.optional") + ")").props("outlined dense").classes("w-full sm:flex-1")
+                        time_period = ui.input("Time period (" + tr(c, "lbl.optional") + ", e.g. FY 2025-26)").props("outlined dense").classes("w-full sm:flex-1")
+                    questions = ui.textarea("Additional specific questions (" + tr(c, "lbl.optional") + ", one per line)").props("outlined autogrow").classes("w-full")
+                    purpose = ui.input(tr(c, "rti.context")).props("outlined dense").classes("w-full")
+                    with ui.row().classes("gap-4"):
+                        life = ui.checkbox(tr(c, "emergency48Hr"))
+                        bpl = ui.checkbox(tr(c, "rti.bpl"))
 
                 divider()
                 section_title(tr(c, "rti.applicant"))
                 name = ui.input(tr(c, "fullName"), value=user.full_name).props("outlined dense").classes("w-full")
-                addr = ui.textarea(tr(c, "residentialAddress")).props("outlined").classes("w-full")
-                purpose = ui.input(tr(c, "rti.context")).props("outlined dense").classes("w-full")
-                with ui.row().classes("gap-4"):
-                    life = ui.checkbox(tr(c, "emergency48Hr"))
-                    bpl = ui.checkbox("Below poverty line")
+                addr = ui.textarea(tr(c, "residentialAddress"), value=last_address).props("outlined").classes("w-full")
+                field_hint(tr(c, "rti.address_hint"))
+
+                # ---- voice: same lightweight mic pattern as the Legal Analyzer screen -----------
+                ui.add_body_html(f"<script>{MIC_JS}</script>")
+                rec_state = {"recording": False}
+
+                def on_audio(e: Any) -> None:
+                    rec_state["recording"] = False
+                    r_mic.props("icon=mic").classes(remove="cl-mic-live")
+                    try:
+                        raw = base64.b64decode(e.args["b64"])
+                    except (KeyError, ValueError):
+                        ui.notify(tr(c, "assistant.mic_failed"), type="negative")
+                        return
+                    try:
+                        r = c.voice.transcribe(user.ctx, raw, e.args.get("mime") or "audio/webm", r_language.value or "auto")
+                    except CivicLensError as exc:
+                        ui.notify(exc.message, type="negative")
+                        return
+                    if r.status != "OK" or not r.transcript:
+                        ui.notify(r.error or r.status, type="warning")
+                        return
+                    subject.value = ((subject.value or "") + " " + r.transcript).strip()
+                    if r.language_detected and r.language_detected in r_language.options:
+                        r_language.value = r.language_detected
+                    r_voice_hint.set_text(tr(c, "assistant.heard", lang=r.language_detected or "?", how=r.detected_by))
+
+                def on_audio_error(e: Any) -> None:
+                    rec_state["recording"] = False
+                    r_mic.props("icon=mic").classes(remove="cl-mic-live")
+                    ui.notify(tr(c, "assistant.mic_denied") + " " + str(e.args.get("message", "")), type="negative")
+
+                ui.on("cl_audio", on_audio)
+                ui.on("cl_audio_error", on_audio_error)
+
+                async def toggle_mic() -> None:
+                    if rec_state["recording"]:
+                        rec_state["recording"] = False
+                        r_mic.props("icon=mic").classes(remove="cl-mic-live")
+                        ui.run_javascript("window.clStopRec()")
+                        return
+                    rec_state["recording"] = True
+                    r_mic.props("icon=stop").classes(add="cl-mic-live")
+                    r_voice_hint.set_text(tr(c, "assistant.listening"))
+                    await ui.run_javascript("window.clStartRec()")
+
+                r_mic.on_click(toggle_mic)
 
                 def draft() -> RtiDraft:
                     selected_records = tuple(rec for rec, box in record_boxes.items() if box.value)
@@ -766,10 +1124,15 @@ def register(c: AppContainer) -> None:
                         subject=subject.value or "", location=location.value or None, records_requested=selected_records,
                         tender_reference=tender_ref.value or None, time_period=time_period.value or None,
                         custom_questions=tuple((questions.value or "").splitlines()),
+                        language=r_language.value or "en",
                     )
-                    return RtiDraft(subject.value or "", authority.value or "", composed, name.value or "", addr.value or "", lang(), purpose.value or None, bool(life.value), bool(bpl.value))
+                    # same "deterministic baseline, then up to 3 model-specific additions" pipeline the
+                    # REST /rti/preview-questions route already uses - best-effort, never blocking or
+                    # required: an unconfigured/unavailable model just leaves the baseline untouched.
+                    composed = enhance_questions_with_llm(subject.value or "", location.value or None, composed, c.llm, r_language.value or "en")
+                    return RtiDraft(subject.value or "", authority.value or "", composed, name.value or "", addr.value or "", r_language.value or lang(), purpose.value or None, bool(life.value), bool(bpl.value))
 
-                def create() -> None:
+                def do_generate() -> None:
                     try:
                         a = run_in_uow(c, lambda uow: c.rti_for(uow).generate(user.ctx, c.rti_for(uow).create(user.ctx, draft()).id))
                     except CivicLensError as exc:
@@ -777,7 +1140,48 @@ def register(c: AppContainer) -> None:
                         return
                     show(a.id)
 
+                pending_mismatch: dict[str, Any] = {}
+                with ui.dialog() as mismatch_dlg, ui.column().classes("cl-card gap-3 w-full max-w-sm"):
+                    with ui.row().classes("items-center gap-2"):
+                        ui.icon("warning_amber").classes("text-[22px]").style("color: var(--cl-warning);")
+                        ui.label(tr(c, "rti.dept_mismatch_title")).classes("text-base font-semibold").style("color: var(--cl-fg);")
+                    mismatch_body = ui.label("").classes("text-sm").style("color: var(--cl-fg-muted);")
+                    with ui.row().classes("justify-end gap-2 w-full q-mt-sm"):
+                        def _fix_department() -> None:
+                            mismatch_dlg.close()
+                            authority.value = pending_mismatch.get("suggested_name", "")
+
+                        def _continue_anyway() -> None:
+                            mismatch_dlg.close()
+                            do_generate()
+
+                        ui.button(tr(c, "rti.dept_mismatch_fix"), on_click=_fix_department).props("unelevated color=primary")
+                        ui.button(tr(c, "rti.dept_mismatch_continue"), on_click=_continue_anyway).props("flat")
+
+                def create() -> None:
+                    subj = (subject.value or "").strip()
+                    if subj:
+                        preview = c.complaints.preview_classification(user.ctx, subj, subj, None)
+                        chosen_code = dept_name_to_code.get((authority.value or "").strip())
+                        # only ever checked when BOTH sides are known for certain: a confident, unambiguous
+                        # classification, AND a department picked from the real directory (never guessed
+                        # against free-typed text, which this can't reliably compare).
+                        if not preview["ambiguous"] and preview["category"] != "other" and preview["department_code"] and chosen_code and chosen_code != preview["department_code"]:
+                            pending_mismatch["suggested_name"] = preview["department_name"] or preview["department_code"]
+                            mismatch_body.set_text(tr(c, "rti.dept_mismatch_body", category=preview["category"].replace("_", " ").title(), suggested=pending_mismatch["suggested_name"], chosen=authority.value))
+                            mismatch_dlg.open()
+                            return
+                        if preview["department_name"] and not (authority.value or "").strip():
+                            authority.value = preview["department_name"]
+                    do_generate()
+
                 ui.button(tr(c, "generateLetterBtn"), icon="description", on_click=create).props("color=primary unelevated").classes("w-full")
+
+                with ui.row().classes("cl-card w-full items-start gap-3").style("background: var(--cl-warning-soft); border-color: transparent;") as translation_note:
+                    ui.icon("translate").style("color: var(--cl-warning);")
+                    ui.label(tr(c, "rti.template_translation_note")).classes("text-sm").style("color: var(--cl-warning);")
+                translation_note.set_visibility(r_language.value != "en")
+                r_language.on_value_change(lambda e: translation_note.set_visibility(e.value != "en"))
 
             with ui.column().classes("gap-3").style("min-width: 320px; flex: 1;"):
                 section_title(tr(c, "rti.preview"))
@@ -818,7 +1222,6 @@ def register(c: AppContainer) -> None:
                         return
                     ui.download(data, f"rti-{app_id[:8]}.pdf")
 
-                mine = run_in_uow(c, lambda uow: uow.rti.list_for_owner(user.ctx.user_id))
                 if mine:
                     section_title(tr(c, "rti.mine"))
                     data_table([("ref", tr(c, "lbl.reference")), ("subject", tr(c, "lbl.title")), ("status", tr(c, "lbl.status"))], [{"id": a.id, "ref": a.reference or "draft", "subject": a.draft.subject, "status": a.status.value} for a in mine], on_row=lambda r: show(r["id"]))
@@ -830,7 +1233,7 @@ def register(c: AppContainer) -> None:
         import base64
 
         page_header(tr(c, "nav.legal"), icon="balance")
-        info_banner(tr(c, "msg.metadata_only"), "orange")
+        info_banner(tr(c, "msg.metadata_only"), "blue")
         _qp = ui.context.client.request.query_params if ui.context.client.request else {}
         state: dict[str, Any] = {"recording": False}
         caps = c.voice.capabilities()
@@ -849,70 +1252,191 @@ def register(c: AppContainer) -> None:
                 text = tr(c, key)
                 ui.chip(text, icon="edit_note", on_click=lambda t=text: setattr(problem, "value", t)).props("outline dense")
 
-        with ui.row().classes("gap-3 items-center q-mt-sm"):
-            analyze_btn = ui.button(tr(c, "legal.analyze_btn"), icon="search", on_click=lambda: analyze(problem.value or "")).props("color=primary unelevated")
-            ui.upload(on_upload=lambda e: on_doc(e), auto_upload=True, label=tr(c, "legal.upload_doc")).props("flat accept=.pdf,.txt,.docx").classes("cl-dropzone")
+        with ui.row().classes("gap-4 items-start q-mt-sm flex-wrap"):
+            analyze_btn = ui.button(tr(c, "legal.analyze_btn"), icon="search", on_click=lambda: analyze(problem.value or "")).props("color=primary unelevated size=lg").classes("cl-btn-glow")
+            with ui.column().classes("gap-1"):
+                ui.upload(on_upload=lambda e: on_doc(e), auto_upload=True, label=tr(c, "legal.upload_doc")).props("flat dense accept=.pdf,.txt,.docx").classes("cl-upload-compact")
+                ui.label(tr(c, "legal.attach_doc_hint")).classes("text-xs").style("color: var(--cl-fg-subtle);")
         result = ui.column().classes("w-full max-w-3xl gap-3")
 
         STATUS_KEY = {"no_verified_precedent": "legal.status_no_verified_precedent", "precedents_only": "legal.status_precedents_only", "analysed": "legal.status_analysed"}
         CONF_KEY = {"none": "legal.conf_none", "low": "legal.conf_low", "medium": "legal.conf_medium"}
+        CONF_EXPLAIN = {"none": "legal.conf_explain_none", "low": "legal.conf_explain_low", "medium": "legal.conf_explain_medium"}
 
         def render(r: Any) -> None:
             result.clear()
             with result:
-                with ui.row().classes("items-center gap-2"):
-                    ui.label(tr(c, STATUS_KEY.get(r.status, r.status))).classes("text-sm font-medium").style("color: var(--cl-fg);")
+                with ui.row().classes("items-center gap-2 flex-wrap"):
+                    ui.label(tr(c, STATUS_KEY.get(r.status, r.status))).classes("text-base font-semibold").style("color: var(--cl-fg);")
                     chip(tr(c, CONF_KEY.get(r.confidence, r.confidence)), color="muted", outline=True)
+
+                # ---- a short, always-present lead so the tab never opens on just a warning banner -
+                # built entirely from the same concepts/court_guides the service already computed, so
+                # it adapts with whatever the citizen actually described, never a fixed canned line.
+                with ui.row().classes("cl-card w-full items-start gap-3").style("background: var(--cl-ai-soft); border-color: transparent;"):
+                    ui.icon("lightbulb").classes("text-[20px]").style("color: var(--cl-ai);")
+                    with ui.column().classes("gap-1"):
+                        ui.label(tr(c, "legal.next_step_title")).classes("text-sm font-semibold").style("color: var(--cl-fg);")
+                        if r.court_guides:
+                            top = r.court_guides[0]
+                            ui.label(tr(c, "legal.next_step_matched", concept=top["concept"])).classes("text-sm").style("color: var(--cl-fg);")
+                            ui.label(tr(c, "legal.next_step_action", step=top["steps"][0])).classes("text-sm font-medium").style("color: var(--cl-fg);")
+                        elif r.precedents:
+                            ui.label(tr(c, "legal.next_step_precedents_only")).classes("text-sm").style("color: var(--cl-fg);")
+                        else:
+                            ui.label(tr(c, "legal.next_step_unmatched")).classes("text-sm").style("color: var(--cl-fg);")
+
                 with ui.tabs().props("dense no-caps active-color=primary indicator-color=primary").classes("w-full") as result_tabs:
                     t_analysis = ui.tab("analysis", label=tr(c, "legal.tab_analysis"))
                     t_laws = ui.tab("laws", label=tr(c, "legal.tab_laws"))
                     t_precedents = ui.tab("precedents", label=tr(c, "legal.tab_precedents"))
+                    t_why = ui.tab("why", label=tr(c, "legal.tab_why"))
                 with ui.tab_panels(result_tabs, value=t_analysis).classes("w-full").style("background: transparent;"):
                     with ui.tab_panel(t_analysis).classes("gap-3"):
                         if r.interpretation:
                             section_title(tr(c, "legal.ai_interpretation_title"), tr(c, "legal.ai_interpretation_sub"))
                             with ui.row().classes("cl-card w-full items-start gap-2").style("background: var(--cl-ai-soft); border-color: transparent;"):
                                 ui.icon("auto_awesome").style("color: var(--cl-ai);")
-                                ui.label(r.interpretation).classes("text-sm").style("color: var(--cl-fg);")
+                                ui.markdown(r.interpretation).classes("cl-markdown text-sm").style("color: var(--cl-fg);")
                         for w in r.warnings:
                             info_banner(w, "orange")
-                        for line in r.bias_and_coverage:
-                            ui.label(line).classes("text-xs").style("color: var(--cl-fg-subtle);")
+                        # ---- a withheld/unavailable AI answer is never a dead end: the real, verified
+                        # precedents already retrieved are shown right here too, with a one-click jump
+                        # to the full list - "here's what we CAN give you", not just "sorry, we can't".
+                        if not r.interpretation and r.precedents:
+                            # An "exact citation" hit (the citizen quoted a real case number) is a
+                            # solid match; a bare "metadata text match" is just BM25 word-overlap on
+                            # party names/dates - genuinely often unrelated, so it's never framed with
+                            # the same confidence as a real match.
+                            has_exact = any(p["matchedOn"] == "exact citation" for p in r.precedents)
+                            with ui.column().classes("cl-card w-full gap-2"):
+                                with ui.row().classes("items-center gap-2"):
+                                    ui.icon("fact_check").classes("text-[18px]").style(f"color: var(--cl-{'success' if has_exact else 'warning'});")
+                                    ui.label(tr(c, "legal.fallback_precedents_title", n=len(r.precedents))).classes("text-sm font-semibold").style("color: var(--cl-fg);")
+                                for p in r.precedents[:2]:
+                                    ui.label(f'{p["title"]} ({p["neutralCitation"]})').classes("text-sm cl-clip-1").style("color: var(--cl-fg-muted);")
+                                if not has_exact:
+                                    ui.label(tr(c, "legal.fallback_precedents_caveat")).classes("text-xs italic").style("color: var(--cl-fg-subtle);")
+                                ui.button(tr(c, "legal.view_all_precedents"), icon="arrow_forward", on_click=lambda: result_tabs.set_value(t_precedents)).props("flat dense color=primary")
+                        with ui.expansion(tr(c, "legal.tech_coverage"), icon="info").classes("w-full"):
+                            for line in r.bias_and_coverage:
+                                ui.label(line).classes("text-xs q-mb-xs").style("color: var(--cl-fg-subtle);")
                         ui.label(r.disclaimer).classes("text-xs italic").style("color: var(--cl-fg-subtle);")
                     with ui.tab_panel(t_laws).classes("gap-3"):
                         if r.concepts:
-                            with ui.column().classes("cl-surface-alt q-pa-sm gap-1 w-full"):
-                                ui.label(tr(c, "legal.statutes_detected")).classes("text-xs font-medium").style("color: var(--cl-fg-muted);")
-                                ui.label("; ".join(r.concepts)).classes("text-sm").style("color: var(--cl-fg);")
+                            ui.label(tr(c, "legal.based_on_description")).classes("text-xs font-medium").style("color: var(--cl-fg-muted);")
+                            with ui.row().classes("gap-2 flex-wrap"):
+                                for name in r.concepts:
+                                    chip(name, color="info", outline=True)
                         else:
                             ui.label(tr(c, "legal.no_concepts")).classes("text-sm").style("color: var(--cl-fg-muted);")
                         for g in r.court_guides:
-                            with ui.column().classes("cl-card w-full gap-2"):
-                                ui.label(g["concept"]).classes("text-sm font-semibold").style("color: var(--cl-fg);")
-                                for label_key, value in ((tr(c, "legal.forum"), g["forum"]), (tr(c, "legal.advocate_mandatory"), g["advocateMandatory"]), (tr(c, "legal.fee_basis"), g["feeBasis"])):
-                                    with ui.row().classes("gap-2 items-start"):
-                                        ui.label(label_key + ":").classes("text-xs font-medium").style("color: var(--cl-fg-muted); min-width: 11rem;")
-                                        ui.label(value).classes("text-xs").style("color: var(--cl-fg);")
-                                ui.label(tr(c, "legal.procedure") + ":").classes("text-xs font-medium q-mt-xs").style("color: var(--cl-fg-muted);")
+                            with ui.column().classes("cl-card w-full gap-3"):
+                                ui.label(g["concept"]).classes("text-base font-semibold").style("color: var(--cl-fg);")
+                                with ui.row().classes("gap-4 flex-wrap"):
+                                    for icon_name, label_key, value in (("gavel", tr(c, "legal.forum"), g["forum"]), ("balance", tr(c, "legal.advocate_mandatory"), g["advocateMandatory"]), ("payments", tr(c, "legal.fee_basis"), g["feeBasis"])):
+                                        with ui.row().classes("items-start gap-2").style("min-width: 220px; flex: 1;"):
+                                            ui.icon(icon_name).classes("text-[16px] q-mt-xs").style("color: var(--cl-fg-subtle);")
+                                            with ui.column().classes("gap-0"):
+                                                ui.label(label_key).classes("text-xs font-medium").style("color: var(--cl-fg-muted);")
+                                                ui.label(value).classes("text-sm").style("color: var(--cl-fg);")
+                                explanation = r.concept_explanations.get(g["concept"])
+                                if explanation:
+                                    divider()
+                                    with ui.row().classes("items-center gap-2"):
+                                        ui.icon("auto_awesome").classes("text-[15px]").style("color: var(--cl-ai);")
+                                        ui.label(tr(c, "legal.deep_dive_title")).classes("text-xs font-semibold uppercase").style("color: var(--cl-ai); letter-spacing: .05em;")
+                                    ui.markdown(explanation).classes("cl-markdown text-sm").style("color: var(--cl-fg);")
+                                divider()
+                                ui.label(tr(c, "legal.procedure")).classes("text-xs font-semibold uppercase").style("color: var(--cl-fg-muted); letter-spacing: .05em;")
                                 for i, step in enumerate(g["steps"], 1):
-                                    ui.label(f"{i}. {step}").classes("text-xs").style("color: var(--cl-fg);")
+                                    with ui.row().classes("items-start gap-2"):
+                                        ui.label(str(i)).classes("cl-badge cl-badge-info").style("min-width: 20px; justify-content: center; flex: none;")
+                                        ui.label(step).classes("text-sm").style("color: var(--cl-fg);")
+                        real_guides_shown = [g for g in r.court_guides if not g.get("isFallback")]
+                        if real_guides_shown and not any(r.concept_explanations.get(g["concept"]) for g in real_guides_shown):
+                            info_banner(tr(c, "legal.deep_dive_unavailable"), "grey")
                     with ui.tab_panel(t_precedents).classes("gap-3"):
-                        section_title(tr(c, "legal.verified_precedents"), tr(c, "legal.verified_precedents_sub"))
-                        data_table([("cit", tr(c, "legal.col_neutral_citation")), ("title", tr(c, "legal.col_case")), ("date", tr(c, "legal.col_decided")), ("disposal", tr(c, "lbl.status")), ("how", tr(c, "legal.col_matched_on"))],
-                                   [{"id": p["cnr"], "cit": p["neutralCitation"], "title": p["title"], "date": p["decisionDate"], "disposal": p["disposal"] or "-", "how": p["matchedOn"]} for p in r.precedents], empty=tr(c, "msg.no_data"))
+                        # The real, substantive content (actual quoted judgment text - what happened,
+                        # what was held) comes first when it exists; the citation-only index records
+                        # come after, clearly labelled as citation records rather than case summaries,
+                        # so it's obvious up front why they don't answer "what happened"/"who won".
                         if r.full_text_excerpts:
                             section_title(tr(c, "legal.full_text_title"), tr(c, "legal.full_text_sub"))
-                            for e in r.full_text_excerpts:
-                                with ui.expansion(f"{e.get('neutralCitation') or e['judgmentId']} - {e.get('title') or ''}").classes("w-full"):
-                                    ui.label(e["text"]).classes("text-xs").style("color: var(--cl-fg-muted);")
+                            for i, e in enumerate(r.full_text_excerpts):
+                                with ui.expansion(f"{e.get('neutralCitation') or e['judgmentId']} - {e.get('title') or ''}", value=(i == 0)).classes("w-full cl-card"):
+                                    ui.label(e["text"]).classes("text-sm").style("color: var(--cl-fg);")
+                        section_title(tr(c, "legal.verified_precedents"), tr(c, "legal.verified_precedents_sub"))
+                        if r.precedents:
+                            for i, p in enumerate(r.precedents, 1):
+                                with ui.column().classes("cl-card w-full gap-2"):
+                                    with ui.row().classes("items-start justify-between w-full flex-wrap gap-2"):
+                                        with ui.column().classes("gap-0"):
+                                            ui.label(p["title"]).classes("text-sm font-semibold").style("color: var(--cl-fg);")
+                                            ui.label(p["neutralCitation"]).classes("text-xs cl-mono").style("color: var(--cl-fg-subtle);")
+                                        if i == 1:
+                                            chip(tr(c, "legal.best_match"), color="success", outline=True)
+                                    with ui.row().classes("gap-2 flex-wrap"):
+                                        chip(p["court"], color="muted", outline=True)
+                                        if p["disposal"]:
+                                            chip(p["disposal"], color="muted", outline=True)
+                                        chip(p["decisionDate"], color="muted", outline=True)
+                                    if p["matchedOn"]:
+                                        ui.label(f'{tr(c, "legal.matched_on_label")}: {p["matchedOn"]}').classes("text-xs").style("color: var(--cl-fg-subtle);")
+                                    divider()
+                                    with ui.row().classes("items-center gap-1"):
+                                        ui.icon("info").classes("text-[13px]").style("color: var(--cl-fg-subtle);")
+                                        ui.label(tr(c, "legal.citation_only_note")).classes("text-xs italic").style("color: var(--cl-fg-subtle);")
+                        else:
+                            state_panel(icon="gavel", title=tr(c, "legal.no_precedents_title"), body=tr(c, "legal.no_precedents_body"))
                         from urllib.parse import quote
 
                         query_text = (problem.value or "")[:300]
-                        with ui.row().classes("cl-card items-center justify-between w-full flex-wrap gap-2").style("background: var(--cl-info-soft); border-color: transparent;"):
+                        with ui.row().classes("cl-card items-center justify-between w-full flex-wrap gap-3").style("background: var(--cl-info-soft); border-color: transparent;"):
                             with ui.column().classes("gap-0"):
                                 ui.label(tr(c, "legal.curated_note")).classes("text-xs font-medium").style("color: var(--cl-info);")
                                 ui.label(tr(c, "legal.curated_note_sub")).classes("text-xs").style("color: var(--cl-info);")
-                            ui.link(tr(c, "legal.search_kanoon"), f"https://indiankanoon.org/search/?formInput={quote(query_text)}").classes("text-sm font-medium").props("target=_blank")
+                            with ui.link(target=f"https://indiankanoon.org/search/?formInput={quote(query_text)}", new_tab=True).classes("cl-link-btn"):
+                                ui.icon("open_in_new").classes("text-[16px]")
+                                ui.label(tr(c, "legal.search_kanoon"))
+                    with ui.tab_panel(t_why).classes("gap-3"):
+                        section_title(tr(c, "legal.why_title"), tr(c, "legal.why_sub"))
+
+                        step_no = {"n": 0}
+
+                        def why_step(icon_name: str, title_key: str, *lines: str, color: str = "var(--cl-fg-muted)") -> None:
+                            # Numbered here, not in the translated string - a step that doesn't apply
+                            # (e.g. no citation check ran) is skipped entirely by its caller below, so
+                            # a fixed "4." baked into the text would leave a visible gap in the list.
+                            step_no["n"] += 1
+                            with ui.row().classes("items-start gap-3"):
+                                ui.icon(icon_name).classes("text-[18px] q-mt-xs").style("color: var(--cl-fg-subtle);")
+                                with ui.column().classes("gap-0"):
+                                    ui.label(f'{step_no["n"]}. {tr(c, title_key)}').classes("text-sm font-medium").style("color: var(--cl-fg);")
+                                    for line in lines:
+                                        ui.label(line).classes("text-sm").style(f"color: {color};")
+
+                        with ui.column().classes("cl-card w-full gap-3"):
+                            why_step("search", "legal.why_step_keywords", ", ".join(r.concepts) if r.concepts else tr(c, "legal.why_no_concepts"))
+                            divider()
+                            why_step("gavel", "legal.why_step_precedents", tr(c, "legal.why_precedents_count", n=len(r.precedents)))
+                            if r.full_text_excerpts:
+                                divider()
+                                why_step("description", "legal.why_step_fulltext", tr(c, "legal.why_fulltext_count", n=len(r.full_text_excerpts)))
+                            divider()
+                            verified = r.citations_check.get("verified", [])
+                            bad = r.citations_check.get("unverified", []) + r.citations_check.get("unverifiable", [])
+                            if verified or bad:
+                                lines = []
+                                if verified:
+                                    lines.append(tr(c, "legal.why_citations_verified", n=len(verified)))
+                                if bad:
+                                    lines.append(tr(c, "legal.why_citations_unverified", n=len(bad)))
+                                why_step("fact_check", "legal.why_step_citation_check", *lines)
+                            else:
+                                why_step("fact_check", "legal.why_step_citation_check", tr(c, "legal.why_citation_check_skipped"))
+                            divider()
+                            why_step("speed", "legal.why_step_confidence", tr(c, CONF_EXPLAIN.get(r.confidence, r.confidence)))
 
         async def analyze(text: str) -> None:
             result.clear()

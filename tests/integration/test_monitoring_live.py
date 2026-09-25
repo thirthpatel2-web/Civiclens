@@ -15,7 +15,12 @@ from sqlalchemy import delete
 from app.core.authorization import AuthContext, Role
 from app.core.config import Settings
 from app.core.exceptions import NotFound
-from app.db.models.interop_platform import ConnectorAlert, ConnectorRegistration, InteropException, InteropTransaction
+from app.db.models.interop_platform import (
+    ConnectorAlert,
+    ConnectorRegistration,
+    InteropException,
+    InteropTransaction,
+)
 from app.db.session import make_engine, make_session_factory
 from app.db.uow import SqlUnitOfWork
 from app.interop import connector_registry

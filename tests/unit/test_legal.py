@@ -6,7 +6,7 @@ from datetime import date
 from pathlib import Path
 
 from app.core.exceptions import DependencyUnavailable
-from app.legal.analysis import LegalAnalysisService, detect_concepts
+from app.legal.analysis import LegalAnalysisService, detect_concepts, detect_concepts_with_llm
 from app.legal.judgment_search import JudgmentExcerpt
 from app.legal.precedents import (
     PrecedentIndex,
@@ -201,9 +201,43 @@ class AnalysisTests(unittest.TestCase):
         self.assertEqual(res.status, "no_verified_precedent")
         self.assertEqual([g["concept"] for g in res.court_guides], ["Right to Information Act, 2005"])
 
-    def test_no_concept_detected_means_no_court_guide_invented(self):
+    def test_no_concept_detected_falls_back_to_general_legal_aid_not_a_dead_end(self):
+        # No SPECIFIC statute is invented for text that matches none - but the citizen still gets a
+        # real, verified, nationwide next step (DLSA/Lok Adalat) instead of being told "no data".
         res = LegalAnalysisService(self.index).analyze("zzzz qqqq unrelated words")
+        self.assertEqual(res.concepts, [])
+        self.assertEqual(len(res.court_guides), 1)
+        self.assertEqual(res.court_guides[0]["concept"], "General legal aid & dispute resolution (India)")
+        self.assertNotRegex(res.court_guides[0]["feeBasis"], r"₹\s?\d")  # still never invents a rupee figure
+
+    def test_blank_problem_gets_no_fallback_guide(self):
+        res = LegalAnalysisService(self.index).analyze("   ")
         self.assertEqual(res.court_guides, [])
+
+    def test_student_fee_and_wage_keywords_are_detected(self):
+        self.assertEqual(detect_concepts("my college fee dispute, they say I never paid"), ["UGC (Redressal of Grievances of Students) Regulations, 2023"])
+        self.assertEqual(detect_concepts("my employer is not paying my salary"), ["Payment of Wages Act, 1936"])
+
+
+class LlmConceptFallbackTests(unittest.TestCase):
+    def test_model_can_only_pick_a_real_known_concept(self):
+        chat = ScriptedChat('["Payment of Wages Act, 1936"]')
+        self.assertEqual(detect_concepts_with_llm("boss hasn't paid me in 2 months", chat), ["Payment of Wages Act, 1936"])
+
+    def test_hallucinated_concept_name_is_rejected(self):
+        chat = ScriptedChat('["Made Up Act, 2099"]')
+        self.assertEqual(detect_concepts_with_llm("something", chat), [])
+
+    def test_empty_array_means_nothing_applies(self):
+        self.assertEqual(detect_concepts_with_llm("something", ScriptedChat("[]")), [])
+
+    def test_degrades_safely_on_bad_json_or_outage(self):
+        self.assertEqual(detect_concepts_with_llm("something", ScriptedChat("not json at all")), [])
+        self.assertEqual(detect_concepts_with_llm("something", ScriptedChat(DependencyUnavailable("down"))), [])
+
+    def test_no_llm_or_blank_text_short_circuits(self):
+        self.assertEqual(detect_concepts_with_llm("something", None), [])
+        self.assertEqual(detect_concepts_with_llm("   ", ScriptedChat('["Right to Information Act, 2005"]')), [])
 
 
 class FullTextIntegrationTests(unittest.TestCase):

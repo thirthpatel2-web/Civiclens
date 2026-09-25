@@ -77,7 +77,7 @@ DANGEROUS = [
 class SecurityPatternTests(unittest.TestCase):
     def test_no_dangerous_patterns_in_application_code(self):
         hits = []
-        for base in (ROOT / "app", ROOT / "scripts", ROOT / "mobile" / "src", ROOT / "mobile" / "app"):
+        for base in (ROOT / "app", ROOT / "scripts", ROOT / "classic-app" / "src", ROOT / "classic-app" / "app"):
             for f in base.rglob("*"):
                 if f.suffix not in (".py", ".ts", ".tsx") or "node_modules" in f.parts or f.name == "test_audits.py":
                     continue
@@ -107,12 +107,12 @@ class SecurityPatternTests(unittest.TestCase):
         self.assertIn("mobile_login", src[src.index('"session_token"') - 900 : src.index('"session_token"')])
 
     def test_mobile_stores_the_token_only_in_the_secure_store(self):
-        for f in (ROOT / "mobile" / "src").rglob("*.ts*"):
+        for f in (ROOT / "classic-app" / "src").rglob("*.ts*"):
             text = f.read_text(encoding="utf-8")
             if re.search(r"from ['\"]@react-native-async-storage", text):  # files that really use AsyncStorage
                 self.assertNotRegex(text, r"setItem\([^)]*token", f)
                 self.assertNotIn("session.token", text, f)
-        self.assertIn("expo-secure-store", (ROOT / "mobile/src/auth/session.ts").read_text(encoding="utf-8"))
+        self.assertIn("expo-secure-store", (ROOT / "classic-app/src/auth/session.ts").read_text(encoding="utf-8"))
 
 
 if __name__ == "__main__":

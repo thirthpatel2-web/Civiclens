@@ -88,12 +88,56 @@ COURT_GUIDES: dict[str, CourtGuide] = {
             "The award can be further appealed to the High Court.",
         ),
     ),
+    # Courts have held education is NOT a "service" a student can sue over as a consumer -
+    # Maharshi Dayanand University v. Surjeet Kaur, (2010) 11 SCC 159; P.T. Koshy v. Ellen
+    # Charitable Trust, (2012) 3 SCC 87 - so this is its own real, purpose-built regulation, not a
+    # Consumer Protection Act matter. Notified in the Gazette of India, 11 April 2023.
+    "UGC (Redressal of Grievances of Students) Regulations, 2023": CourtGuide(
+        forum="The institution's own Student Grievance Redressal Committee first; if unresolved, the institution's appointed Ombudsperson (a retired Vice-Chancellor/senior professor or a former district judge); UGC itself for matters still unresolved.",
+        advocate_mandatory="No - this is a written, internal grievance process; an advocate is not required at any stage.",
+        fee_basis="No fee - filing a grievance under these regulations is free.",
+        steps=(
+            "File a written grievance with the institution's Student Grievance Redressal Committee, stating the facts (e.g. the fee payment proof) clearly.",
+            "The Committee is expected to act and report on the grievance, typically reviewing progress every 15 days.",
+            "If unresolved at the institution level, escalate in writing to the institution's Ombudsperson; regulations expect resolution within a maximum of about 60 days overall.",
+            "If still unresolved, the grievance can be raised directly with the UGC.",
+        ),
+    ),
+    "Payment of Wages Act, 1936": CourtGuide(
+        forum="The Authority appointed under the Payment of Wages Act - usually the Labour Commissioner/Assistant Labour Commissioner for the area; complaints can also be lodged via the government's SAMADHAN portal.",
+        advocate_mandatory="No - a worker may file and pursue a wage claim in person before the Authority.",
+        fee_basis="No court fee to file a wage claim before the Authority; a civil suit for recovery (if pursued instead) carries standard court fees.",
+        steps=(
+            "Send a written demand (or a formal legal notice) to the employer for the unpaid wages, keeping a copy.",
+            "If unresolved, file a claim with the Labour Commissioner/Authority (or via the SAMADHAN portal) - this must generally be done within 1 year of the wages falling due.",
+            "The Authority can summon the employer, examine payroll records, and direct payment of the wages due, along with a penalty.",
+            "A civil suit for recovery of the amount can also be filed separately, within the 3-year limitation period for money claims.",
+        ),
+    ),
+}
+
+# Always-available fallback when nothing above matches - real, nationwide, verified Indian legal-aid
+# infrastructure (Legal Services Authorities Act, 1987), not a per-query AI guess. Shown so "we don't
+# have a specific matched law" is never presented as a dead end.
+GENERAL_FALLBACK_GUIDE: dict[str, object] = {
+    "concept": "General legal aid & dispute resolution (India)",
+    "isFallback": True,  # not a specific matched statute - the UI never asks the model to "deep dive" on this one
+    "forum": "Your District Legal Services Authority (DLSA) - present in every district, chaired by the District Judge - for free legal advice/aid and to convene a Lok Adalat for fast, mutually agreed settlement of civil and compoundable disputes.",
+    "advocateMandatory": "No - DLSA legal aid counsel can be provided free of cost to eligible persons (economically weaker sections, SC/ST, women, and other categories under Section 12 of the Act); anyone can approach Lok Adalat regardless of income.",
+    "feeBasis": "Free legal advice/aid for eligible persons; Lok Adalat proceedings carry no fee, and any court fee already paid is refunded if the matter settles there.",
+    "steps": [
+        "Visit or call your District Legal Services Authority (DLSA) - every district court complex has one - and describe the dispute.",
+        "If you're not filing a claim yet, a legal aid clinic/counsel can advise on which specific law or forum actually applies.",
+        "For a monetary or civil dispute where both sides may be willing to settle, ask about a Lok Adalat - it's fast, free and its award is final and binding.",
+        "If the matter needs to go to court, DLSA can arrange free legal aid counsel if you're eligible, or refer you appropriately.",
+    ],
 }
 
 
 def guides_for(concepts: list[str]) -> list[dict[str, object]]:
-    return [
+    found: list[dict[str, object]] = [
         {"concept": name, "forum": g.forum, "advocateMandatory": g.advocate_mandatory, "feeBasis": g.fee_basis, "steps": list(g.steps)}
         for name in concepts
         if (g := COURT_GUIDES.get(name)) is not None
     ]
+    return found

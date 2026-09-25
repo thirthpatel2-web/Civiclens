@@ -6,6 +6,7 @@ nav item have a page? does every UI string key exist? does any button lack a han
 
 import ast
 import re
+import subprocess
 import unittest
 from pathlib import Path
 
@@ -181,24 +182,51 @@ class UiAuditTests(unittest.TestCase):
                     while isinstance(cur, ast.Call):
                         assign_targets[id(cur)] = n.targets[0].id
                         cur = cur.func.value if isinstance(cur.func, ast.Attribute) else None
+            # A button can also be wired by a reusable local helper - `def wire_mic(mic_btn, ...):
+            # ... mic_btn.on_click(toggle)` - called as `wire_mic(q_mic, ...)`. binder_params maps
+            # each such helper's name to the parameter *positions* it binds a handler onto; a
+            # button passed at one of those positions in a call to that helper is handled too.
+            binder_params: dict[str, set[int]] = {}
+            for n in ast.walk(tree):
+                if isinstance(n, ast.FunctionDef):
+                    param_names = [a.arg for a in n.args.args]
+                    bound_params = {
+                        m.func.value.id
+                        for m in ast.walk(n)
+                        if isinstance(m, ast.Call) and isinstance(m.func, ast.Attribute) and isinstance(m.func.value, ast.Name)
+                        and m.func.value.id in param_names
+                        and (m.func.attr == "on_click" or (m.func.attr == "on" and m.args and isinstance(m.args[0], ast.Constant) and m.args[0].value == "click"))
+                    }
+                    if bound_params:
+                        binder_params[n.name] = {param_names.index(p) for p in bound_params}
+            bound_via_helper: set[str] = set()
+            for n in ast.walk(tree):
+                if isinstance(n, ast.Call) and isinstance(n.func, ast.Name) and n.func.id in binder_params:
+                    for i in binder_params[n.func.id]:
+                        if i < len(n.args) and isinstance(n.args[i], ast.Name):
+                            bound_via_helper.add(n.args[i].id)
             for n in ast.walk(tree):
                 if isinstance(n, ast.Call) and ast.unparse(n.func) == "ui.button" and id(n) not in in_with:
                     name = assign_targets.get(id(n))
-                    has_handler = any(k.arg == "on_click" for k in n.keywords) or (name is not None and name in deferred_bound)
+                    has_handler = any(k.arg == "on_click" for k in n.keywords) or (name is not None and (name in deferred_bound or name in bound_via_helper))
                     self.assertTrue(has_handler, f"{f.name}: ui.button without a handler: {ast.unparse(n)[:80]}")
-        # The ONLY JavaScript/TypeScript allowed is the React Native + Expo clients under mobile/ and
-        # classic-app/ (the zip-ported client); the backend and the web UI stay Python.
-        # Third-party packages (.venv, node_modules) are excluded: they are dependencies, not code this project wrote.
-        excluded_roots = {"mobile", "classic-app", ".venv", "venv", "node_modules", ".git"}
-        js = [p for p in ROOT.rglob("*") if (p.suffix in (".js", ".ts", ".tsx", ".jsx", ".vue") or p.name in ("package.json", "node_modules")) and not excluded_roots & set(p.relative_to(ROOT).parts[:1])]
+        # The ONLY JavaScript/TypeScript allowed is the one React Native + Expo client under
+        # classic-app/ (runs on web + Android + iOS from this single codebase - no separate mobile
+        # app); the backend and the web UI stay Python.
+        # Scoped to files git actually tracks (`git ls-files`), not a raw filesystem walk - a raw
+        # walk also picks up node_modules/build output/other untracked junk that happens to be
+        # sitting on whoever's disk runs the test (already-`npm install`ed dependencies, a stray
+        # deleted-but-not-yet-cleaned folder, ...), none of which is code this project wrote.
+        tracked = subprocess.run(["git", "ls-files"], cwd=ROOT, capture_output=True, text=True, check=True).stdout.splitlines()
+        js = [p for p in tracked if not p.startswith("classic-app/") and (p.endswith((".js", ".ts", ".tsx", ".jsx", ".vue")) or p.endswith("package.json"))]
         self.assertEqual(js, [])
         import json
 
-        for client_dir in ("mobile", "classic-app"):
-            self.assertFalse((ROOT / client_dir / "server").exists(), f"no second (Node) backend under {client_dir}")
-            pkg = json.loads((ROOT / client_dir / "package.json").read_text(encoding="utf-8"))
-            deps = set(pkg.get("dependencies", {})) | set(pkg.get("devDependencies", {}))
-            self.assertEqual(deps & {"express", "koa", "fastify", "pg", "mongoose", "bullmq", "ioredis", "sequelize", "prisma", "@nestjs/core"}, set(), f"{client_dir} must not bundle backend frameworks")
+        client_dir = "classic-app"
+        self.assertFalse((ROOT / client_dir / "server").exists(), f"no second (Node) backend under {client_dir}")
+        pkg = json.loads((ROOT / client_dir / "package.json").read_text(encoding="utf-8"))
+        deps = set(pkg.get("dependencies", {})) | set(pkg.get("devDependencies", {}))
+        self.assertEqual(deps & {"express", "koa", "fastify", "pg", "mongoose", "bullmq", "ioredis", "sequelize", "prisma", "@nestjs/core"}, set(), f"{client_dir} must not bundle backend frameworks")
 
     def test_pages_call_services_not_raw_sql(self):
         for name, src in self.files.items():

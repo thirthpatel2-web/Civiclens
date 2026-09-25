@@ -7,7 +7,11 @@ from __future__ import annotations
 from sqlalchemy.orm import Session
 
 from app.interop import mock_systems
-from app.interop.connectors.base import ConnectorResult, GovernmentConnector, authenticate_via_federation
+from app.interop.connectors.base import (
+    ConnectorResult,
+    GovernmentConnector,
+    authenticate_via_federation,
+)
 
 
 class DeptBConnector(GovernmentConnector):
@@ -31,8 +35,8 @@ class DeptBConnector(GovernmentConnector):
             row = mock_systems.dept_b_get_beneficiary(self._s, entity_id)
             return ConnectorResult(ok=row is not None, data=row, error_code=None if row is not None else "IDENTITY_NOT_FOUND")
         if entity_type == "application":
-            row = mock_systems.dept_b_get_application(self._s, entity_id)
-            return ConnectorResult(ok=row is not None, data=row, error_code=None if row is not None else "IDENTITY_NOT_FOUND")
+            app_row = mock_systems.dept_b_get_application(self._s, entity_id)
+            return ConnectorResult(ok=app_row is not None, data=app_row, error_code=None if app_row is not None else "IDENTITY_NOT_FOUND")
         return ConnectorResult(ok=False, error_code="SCHEMA_VALIDATION_FAILURE", error_message=f"Department B has no entity type {entity_type!r}.")
 
     def query(self, entity_type: str, **filters) -> ConnectorResult:

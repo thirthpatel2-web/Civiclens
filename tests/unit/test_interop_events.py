@@ -8,7 +8,12 @@ import unittest
 
 from app.interop.events.bus import InMemoryInteropEventBus
 from app.interop.events.subscribers import NotificationSubscriber
-from app.interop.events.types import INTEROP_EVENT_TYPES, InteropEvent, event_from_dict, event_to_dict
+from app.interop.events.types import (
+    INTEROP_EVENT_TYPES,
+    InteropEvent,
+    event_from_dict,
+    event_to_dict,
+)
 
 
 class InteropEventTests(unittest.TestCase):

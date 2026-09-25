@@ -57,6 +57,9 @@ class UnitOfWork(Protocol):
     workflow: Any
     government: Any
     legal: Any
+    # The interop subsystem (app/interop, InteropGatewayService) works on the raw SQLAlchemy session -
+    # it only runs on the SQL unit of work, never the in-memory one used by pure-logic tests.
+    session: Any
     master_data: Any
     exceptions: Any
     external_links: Any

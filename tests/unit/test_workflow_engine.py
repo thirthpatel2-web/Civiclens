@@ -9,7 +9,9 @@ from __future__ import annotations
 import unittest
 from datetime import UTC, datetime
 
-from app.db.models.interop_platform import WorkflowDefinition, WorkflowExecution, WorkflowStepExecution
+from app.db.models.interop_platform import (
+    WorkflowStepExecution,
+)
 from app.interop.workflow.engine import StepSpec, WorkflowEngine, define_workflow
 
 

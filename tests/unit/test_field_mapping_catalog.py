@@ -9,7 +9,10 @@ import unittest
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
-from app.interop.canonical.v1.transform import canonical_document_to_dept_b_fields, dept_a_document_to_canonical
+from app.interop.canonical.v1.transform import (
+    canonical_document_to_dept_b_fields,
+    dept_a_document_to_canonical,
+)
 from app.interop.catalog import DEFAULT_FIELD_MAPPINGS, DEFAULT_SERVICES
 
 

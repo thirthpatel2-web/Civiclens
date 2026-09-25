@@ -1,7 +1,7 @@
 """Static link audit: every navigation target in the NiceGUI UI and the React Native app resolves to a real screen.
 
 * NiceGUI: every ``ui.navigate.to(...)`` / ``ui.link(..., target)`` / nav item / redirect literal must match a registered ``@page`` route.
-* Mobile (expo-router): every ``router.push/replace(...)``, ``<Link href=...>``, ``<Redirect href=...>`` literal must match a file under mobile/app.
+* Mobile (expo-router): every ``router.push/replace(...)``, ``<Link href=...>``, ``<Redirect href=...>`` literal must match a file under classic-app/app.
 
     python scripts/audit_ui_links.py       # exit code 0 = clean
 """
@@ -44,7 +44,7 @@ def web_targets() -> list[tuple[str, str]]:
 
 
 def mobile_routes() -> set[str]:
-    base = ROOT / "mobile" / "app"
+    base = ROOT / "classic-app" / "app"
     routes: set[str] = set()
     for f in base.rglob("*.tsx"):
         parts = [p for p in f.relative_to(base).with_suffix("").parts if not (p.startswith("(") and p.endswith(")")) and p != "_layout"]
@@ -59,7 +59,7 @@ def mobile_routes() -> set[str]:
 
 def mobile_targets() -> list[tuple[str, str]]:
     out: list[tuple[str, str]] = []
-    for f in (ROOT / "mobile").rglob("*.tsx"):
+    for f in (ROOT / "classic-app").rglob("*.tsx"):
         if "node_modules" in f.parts:
             continue
         text = f.read_text(encoding="utf-8")

@@ -12,6 +12,7 @@ Registering a new government system means adding one line to ``_CONNECTOR_CLASSE
 from __future__ import annotations
 
 import time
+from collections.abc import Callable
 from dataclasses import replace
 
 from sqlalchemy.orm import Session
@@ -22,7 +23,7 @@ from app.interop.connectors.mock_dept_a import DeptAConnector
 from app.interop.connectors.mock_dept_b import DeptBConnector
 from app.interop.connectors.mock_dept_c import DeptCConnector
 
-_CONNECTOR_CLASSES: dict[str, type[GovernmentConnector]] = {
+_CONNECTOR_CLASSES: dict[str, Callable[[Session], GovernmentConnector]] = {
     "dept_a": DeptAConnector,
     "dept_b": DeptBConnector,
     "dept_c": DeptCConnector,

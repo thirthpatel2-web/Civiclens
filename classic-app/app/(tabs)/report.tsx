@@ -116,7 +116,8 @@ export default function FileRequest() {
       if (!online) { setCivicResult({ kind: 'queued' }); return; }
       await syncNow();
       const d = await draftStore.get(draftId.current);
-      if (d?.status === 'synced') setCivicResult({ kind: 'sent', reference: d.reference! });
+      if (d?.status === 'synced' && d.serverId) { router.replace(`/complaint/${d.serverId}`); return; } // straight into the real result: department, priority, AI classification, timeline
+      else if (d?.status === 'synced') setCivicResult({ kind: 'sent', reference: d.reference! });
       else if (d?.status === 'needs_review') setCivicResult({ kind: 'review' });
       else if (d?.status === 'failed') setCivicError(d.lastError ?? 'The server rejected the complaint.');
       else setCivicResult({ kind: 'queued' });

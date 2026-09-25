@@ -25,13 +25,18 @@ from app.legal.precedents import PrecedentIndex
 from app.providers.geocoding import NominatimProvider
 from app.providers.push import ExpoPushSender
 from app.providers.speech import BHASHINI_DEFAULT_LANGUAGES, BhashiniConfig, BhashiniProvider
-from app.providers.stt import GroqWhisperProvider, SpeechToTextProvider, TranslationProvider, WhisperProvider
+from app.providers.stt import (
+    GroqWhisperProvider,
+    SpeechToTextProvider,
+    TranslationProvider,
+    WhisperProvider,
+)
 from app.providers.vision import OllamaVisionProvider, VisionProvider
 from app.rag.bm25 import BM25Index
+from app.rag.groq import GroqChatProvider
 from app.rag.grounded_generation import GroundedGenerator
 from app.rag.hybrid_retrieval import HybridRetriever, RetrievalConfig
 from app.rag.index import RagIndex
-from app.rag.groq import GroqChatProvider
 from app.rag.ollama import (
     EmbeddingProvider,
     OllamaChatProvider,

@@ -49,19 +49,19 @@ jobs:
       - name: Schema-consistency + unit + API tests
         run: pytest tests/ -q --ignore=tests/end_to_end
 
-  mobile:
+  app:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: mobile
+        working-directory: classic-app
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
           cache: npm
-          cache-dependency-path: mobile/package-lock.json
+          cache-dependency-path: classic-app/package-lock.json
 
       - name: Install dependencies
         run: npm ci
@@ -69,5 +69,5 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
-      - name: Tests (includes i18n byte-identical backend/mobile check)
+      - name: Tests (includes i18n byte-identical backend/app check)
         run: npm test

@@ -20,11 +20,11 @@ from app.db.session import make_engine, make_session_factory
 from app.db.uow import SqlUnitOfWork
 from app.interop import connector_registry, mock_systems
 from app.interop.connectors import runtime as connector_runtime
-from app.interop.federation import idp
 from app.interop.connectors.base import GovernmentConnector
 from app.interop.connectors.mock_dept_a import DeptAConnector
 from app.interop.connectors.mock_dept_b import DeptBConnector
 from app.interop.connectors.mock_dept_c import DeptCConnector
+from app.interop.federation import idp
 
 try:
     _engine = make_engine(Settings.load())

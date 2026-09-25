@@ -80,7 +80,9 @@ class HttpApiTests(unittest.TestCase):
         r = self.client.post("/api/v1/complaints", json={}, headers={**h, "Origin": "https://evil.example"})
         self.assertEqual(r.status_code, 403)
 
-    def test_two_factor_enrolment_and_login_require_otp(self):
+    def test_two_factor_enrolment_still_works_but_login_never_requires_it(self):
+        """Enrollment/confirm remain real, working endpoints for a citizen who wants to opt in -
+        but two-factor is never enforced at login, for any account, enrolled or not."""
         h = self.signup()
         enrol = self.client.post("/api/v1/auth/mfa/enroll", headers=h).json()
         secret = enrol["manual_entry_secret"]
@@ -89,10 +91,7 @@ class HttpApiTests(unittest.TestCase):
         conf = self.client.post("/api/v1/auth/mfa/confirm", json={"otp": code}, headers=h)
         self.assertEqual(len(conf.json()["backup_codes"]), 8)
         self.client.post("/api/v1/auth/logout", headers=h)
-        r = self.client.post("/api/v1/auth/login", json={"email": "asha@example.com", "password": PW})
-        self.assertEqual((r.status_code, r.json()["error"]["code"]), (401, "mfa_required"))
-        self.s.clock.advance(seconds=30)
-        ok = self.client.post("/api/v1/auth/login", json={"email": "asha@example.com", "password": PW, "otp": ReferenceTotp.code_at(secret, self.s.clock.epoch())})
+        ok = self.client.post("/api/v1/auth/login", json={"email": "asha@example.com", "password": PW})
         self.assertEqual((ok.status_code, ok.json()["mfa_verified"]), (200, True))
 
     def test_admin_bootstrap_disabled_without_token(self):

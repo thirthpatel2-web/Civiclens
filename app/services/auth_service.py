@@ -4,7 +4,7 @@ Design rules enforced here (each has a test):
 * self-registration can only ever create a CITIZEN — there is no role parameter;
 * the role used for authorization always comes from the stored user row;
 * login failures are throttled and use one generic message (no user enumeration);
-* an MFA-enabled account cannot obtain a session without a valid OTP;
+* two-factor authentication is optional and never blocks login (see login());
 * logout, password change and password reset revoke server-side sessions;
 * the first admin can only be created once, with an out-of-band setup token.
 """
@@ -22,7 +22,6 @@ from app.core.authorization import AuthContext, Role, can_assign_role, is_privil
 from app.core.exceptions import (
     AuthenticationFailed,
     Conflict,
-    MfaRequired,
     NotFound,
     PermissionDenied,
     ValidationFailed,
@@ -258,14 +257,11 @@ class AuthService:
             self._fail(keys, email_n, "bad_credentials")
             raise AuthenticationFailed(_GENERIC_LOGIN_ERROR)
 
-        mfa_verified = False
-        if self._mfa.is_enabled(user.id):
-            if not otp:
-                raise MfaRequired("Enter the 6-digit code from your authenticator app.")
-            if not self._mfa.verify_login(user.id, otp):
-                self._fail(keys, email_n, "bad_otp")
-                raise AuthenticationFailed(_GENERIC_LOGIN_ERROR)
-            mfa_verified = True
+        # Two-factor authentication is not enforced at login - email + password is enough to get a
+        # session, for every role. (The MFA enrollment/verify machinery in app/services/mfa_service.py
+        # and the settings screen still exist and still work if a citizen wants to opt in for their
+        # own account; it just never blocks anyone from signing in.)
+        mfa_verified = True
 
         for k in keys:
             self._throttle.record_success(k)

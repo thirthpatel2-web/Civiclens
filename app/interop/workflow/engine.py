@@ -34,7 +34,11 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from app.db.models.interop_platform import WorkflowDefinition, WorkflowExecution, WorkflowStepExecution
+from app.db.models.interop_platform import (
+    WorkflowDefinition,
+    WorkflowExecution,
+    WorkflowStepExecution,
+)
 
 StepFn = Callable[[dict[str, Any]], dict[str, Any] | None]
 
@@ -95,6 +99,8 @@ class WorkflowEngine:
         if execution.status != "waiting_approval":
             raise ValueError(f"Execution is {execution.status!r}, not waiting_approval")
         definition = session.get(WorkflowDefinition, execution.workflow_id)
+        if definition is None:
+            raise ValueError(f"Workflow definition {execution.workflow_id!r} no longer exists")
         if approve_step:
             execution.context = {**execution.context, f"_approved:{approve_step}": True}
         execution.status = "running"
