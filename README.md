@@ -15,7 +15,7 @@
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?logo=postgresql&logoColor=white)
 ![License](https://img.shields.io/badge/license-MIT-lightgrey)
 
-**Smart India Hackathon 2026 · Problem Statement SIH26129 · Theme: Smart Automation · Team CodeX**
+**Smart India Hackathon 2026 · Problem Statement SIH26129 · Theme: Miscellaneous · Team CODEXXA (Team ID 159997)**
 
 [The problem](#-the-problem) · [The idea](#-the-idea-in-30-seconds) · [See it](#-see-it) · [How it works](#%EF%B8%8F-how-it-works) · [Run it](#-run-it-locally) · [What's real](#-whats-real-and-whats-a-demo) · [Docs](#-documentation-map)
 
@@ -338,7 +338,7 @@ API Setu · National Data Governance Framework · UMANG · DigiLocker · Aaple S
 
 <div align="center">
 
-**Team CodeX** · Smart India Hackathon 2026
+**Team CODEXXA** · Smart India Hackathon 2026
 
 *CivicLens's own code is MIT-licensed ([`LICENSE`](LICENSE)). The judgment data carries its own licence: see [`THIRD_PARTY_DATA.md`](THIRD_PARTY_DATA.md).*
 

@@ -35,7 +35,7 @@ CONCEPTS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("Motor Vehicles Act, 1988", ("motor vehicle", "driving licence", "road accident claim", "challan")),
     ("Right to Fair Compensation and Transparency in Land Acquisition, Rehabilitation and Resettlement Act, 2013", ("land acquisition", "compensation for land", "resettlement")),
     ("UGC (Redressal of Grievances of Students) Regulations, 2023", ("college fee", "university fee", "school fee", "tuition fee", "hostel fee", "student grievance", "exam grievance", "admission grievance", "scholarship dispute", "college fees", "university fees")),
-    ("Payment of Wages Act, 1936", ("salary not paid", "unpaid salary", "salary is not paid", "not paying my salary", "not paying salary", "wages not paid", "salary dispute", "delayed salary", "withheld salary", "employer not paying")),
+    ("Code on Wages, 2019", ("salary not paid", "unpaid salary", "salary is not paid", "not paying my salary", "not paying salary", "wages not paid", "salary dispute", "delayed salary", "withheld salary", "employer not paying")),
 )
 LIMITATION = "The verified citation index contains case metadata only (parties, bench, dates, citations, disposal) and no judgment text by itself; it cannot show what any case held unless real judgment text was separately retrieved and cited below."
 NOT_LEGAL_ADVICE = "This is an information aid, not legal advice. Consult a qualified advocate."

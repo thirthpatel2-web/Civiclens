@@ -216,13 +216,13 @@ class AnalysisTests(unittest.TestCase):
 
     def test_student_fee_and_wage_keywords_are_detected(self):
         self.assertEqual(detect_concepts("my college fee dispute, they say I never paid"), ["UGC (Redressal of Grievances of Students) Regulations, 2023"])
-        self.assertEqual(detect_concepts("my employer is not paying my salary"), ["Payment of Wages Act, 1936"])
+        self.assertEqual(detect_concepts("my employer is not paying my salary"), ["Code on Wages, 2019"])
 
 
 class LlmConceptFallbackTests(unittest.TestCase):
     def test_model_can_only_pick_a_real_known_concept(self):
-        chat = ScriptedChat('["Payment of Wages Act, 1936"]')
-        self.assertEqual(detect_concepts_with_llm("boss hasn't paid me in 2 months", chat), ["Payment of Wages Act, 1936"])
+        chat = ScriptedChat('["Code on Wages, 2019"]')
+        self.assertEqual(detect_concepts_with_llm("boss hasn't paid me in 2 months", chat), ["Code on Wages, 2019"])
 
     def test_hallucinated_concept_name_is_rejected(self):
         chat = ScriptedChat('["Made Up Act, 2099"]')

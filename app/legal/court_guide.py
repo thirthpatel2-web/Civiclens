@@ -103,15 +103,18 @@ COURT_GUIDES: dict[str, CourtGuide] = {
             "If still unresolved, the grievance can be raised directly with the UGC.",
         ),
     ),
-    "Payment of Wages Act, 1936": CourtGuide(
-        forum="The Authority appointed under the Payment of Wages Act - usually the Labour Commissioner/Assistant Labour Commissioner for the area; complaints can also be lodged via the government's SAMADHAN portal.",
-        advocate_mandatory="No - a worker may file and pursue a wage claim in person before the Authority.",
+    # The Code on Wages, 2019 came into force on 21 November 2025 and repealed the Payment of Wages
+    # Act, 1936 (and the Minimum Wages, Payment of Bonus and Equal Remuneration Acts). Section 45 is
+    # the claims procedure below.
+    "Code on Wages, 2019": CourtGuide(
+        forum="The claims Authority appointed by the government under Section 45 of the Code on Wages, 2019 (an officer not below the rank of Gazetted Officer, typically in the Labour Department); the local Inspector-cum-Facilitator can also help, and complaints can be lodged via the government's SAMADHAN portal.",
+        advocate_mandatory="No - a worker (or their trade union) may file and pursue a wage claim in person before the Authority.",
         fee_basis="No court fee to file a wage claim before the Authority; a civil suit for recovery (if pursued instead) carries standard court fees.",
         steps=(
             "Send a written demand (or a formal legal notice) to the employer for the unpaid wages, keeping a copy.",
-            "If unresolved, file a claim with the Labour Commissioner/Authority (or via the SAMADHAN portal) - this must generally be done within 1 year of the wages falling due.",
-            "The Authority can summon the employer, examine payroll records, and direct payment of the wages due, along with a penalty.",
-            "A civil suit for recovery of the amount can also be filed separately, within the 3-year limitation period for money claims.",
+            "If unresolved, file a claim with the Section 45 Authority (or via the SAMADHAN portal) - within 3 years of the claim arising; a later claim can still be heard if there was sufficient cause for the delay.",
+            "The Authority should aim to decide within 3 months, and can order the wages due plus compensation of up to ten times the amount claimed.",
+            "If the employer still does not pay, the Authority issues a recovery certificate to the district Collector, who recovers it as arrears of land revenue.",
         ),
     ),
 }
