@@ -47,6 +47,10 @@ def register_default_workflows(session: Session) -> None:
     """Idempotent upsert - safe to call on every app start, same convention as the mock-system/
     connector-registry/federation-client seeding."""
     define_workflow(session, workflow_id=RESIDENCE_CERTIFICATE_VERIFICATION, name="Residence certificate verification (Dept B <- Dept A)", steps=RESIDENCE_CERTIFICATE_VERIFICATION_STEPS)
+    # Flushed now, not at commit: the service catalog (app.interop.catalog) has a real FK into this
+    # table, and the ORM has no relationship between the two to order the INSERTs by - so on a fresh
+    # database the catalog row could otherwise be written first and fail the FK check.
+    session.flush()
 
 
 def _canonical_document_from_context(ctx: dict[str, Any]) -> CanonicalDocument:
