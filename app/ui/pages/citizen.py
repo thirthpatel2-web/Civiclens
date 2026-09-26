@@ -1054,6 +1054,19 @@ def register(c: AppContainer) -> None:
                         ui.label(tr(c, "gr.translation_note")).classes("text-xs").style("color: var(--cl-fg-subtle);")
                         ui.label(cm.translated_text).classes("text-sm").style("color: var(--cl-fg-muted);")
 
+                from app.services.complaint_status import FINISHED
+
+                overdue = cm.status not in FINISHED and ((cm.sla_due_at is not None and cm.sla_due_at < c.clock()) or cm.escalation_level > 0)
+                if overdue:
+                    # the statutory next step when a department sits on a complaint: ask, under the RTI
+                    # Act, what action was taken - drafted from this complaint so nothing is retyped
+                    with ui.row().classes("cl-card w-full items-center gap-3 flex-wrap").style("border: 1.5px solid var(--cl-danger); background: var(--cl-danger-soft);"):
+                        ui.icon("gavel").classes("text-[26px]").style("color: var(--cl-danger);")
+                        with ui.column().classes("gap-0").style("flex: 1 1 260px;"):
+                            ui.label(tr(c, "rti.escalate_title")).classes("text-sm font-semibold").style("color: var(--cl-fg);")
+                            ui.label(tr(c, "rti.escalate_body")).classes("text-xs").style("color: var(--cl-fg-muted);")
+                        ui.button(tr(c, "rti.escalate_btn"), icon="edit_document", on_click=lambda: ui.navigate.to(f"/rti?complaint={cm.id}")).props("unelevated color=negative no-caps")
+
                 section_title(tr(c, "lbl.evidence"))
                 if not d["evidence"]:
                     state_panel(icon="attach_file", title=tr(c, "gr.no_evidence"))
@@ -1112,6 +1125,7 @@ def register(c: AppContainer) -> None:
         dept_name_to_code = {d["name"]: d["code"] for d in depts if d["name"]}
         caps = c.voice.capabilities()
 
+        prefill_note = ui.column().classes("w-full")
         with ui.row().classes("gap-6 w-full flex-wrap"):
             with ui.column().classes("cl-card gap-3").style("min-width: 320px; max-width: 520px; flex: 1;"):
                 with ui.element("div").classes("cl-ask w-full"):
@@ -1189,6 +1203,28 @@ def register(c: AppContainer) -> None:
                 name = ui.input(tr(c, "fullName"), value=user.full_name).props("outlined dense").classes("w-full")
                 addr = ui.textarea(tr(c, "residentialAddress"), value=last_address).props("outlined").classes("w-full")
                 field_hint(tr(c, "rti.address_hint"))
+
+                # opened from an overdue complaint ("Draft an RTI"): pre-fill from that complaint - only
+                # the caller's own complaint can be read here, detail_for_citizen enforces ownership
+                from_cid = (ui.context.client.request.query_params.get("complaint") if ui.context.client.request else None) or ""
+                if from_cid:
+                    try:
+                        src = c.complaints.detail_for_citizen(user.ctx, from_cid)["complaint"]
+                    except CivicLensError:
+                        src = None
+                    if src is not None:
+                        subject.value = tr(c, "rti.prefill_subject").replace("{ref}", src.reference).replace("{title}", src.title).replace("{date}", src.created_at.strftime("%d %b %Y"))
+                        code_to_name = {v: k for k, v in dept_name_to_code.items()}
+                        if src.department_code in code_to_name:
+                            authority.value = code_to_name[src.department_code]
+                        location.value = src.address or (src.ward or "")
+                        if src.category in CATEGORIES:
+                            cat_select.value = src.category
+                            draw_records()
+                        questions.value = tr(c, "rti.prefill_questions").replace("{ref}", src.reference)
+                        purpose.value = f"{src.reference}"
+                        with prefill_note:
+                            info_banner(tr(c, "rti.prefilled_from").replace("{ref}", src.reference), "blue")
 
                 # ---- voice: same lightweight mic pattern as the Legal Analyzer screen -----------
                 ui.add_body_html(f"<script>{MIC_JS}</script>")
