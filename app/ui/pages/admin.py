@@ -136,7 +136,8 @@ def register(c: AppContainer) -> None:
             stat_tile(tr(c, "card.overdue"), d["sla"]["breached"], color="danger", icon="report")
             stat_tile(tr(c, "card.at_risk"), d["sla"]["at_risk"], color="warning", icon="schedule")
             stat_tile(tr(c, "card.escalated"), d["escalated"], color="danger", icon="trending_up")
-            stat_tile(tr(c, "col.unrouted"), d["unrouted"], color="muted", icon="alt_route")
+            sat = d.get("satisfaction")
+            stat_tile("Citizen rating", f"{sat['average']} / 5" if sat else "-", color="warning", icon="star", hint=f"from {sat['count']} rated resolution(s)" if sat else "no ratings yet")
         if d["resolution_hours"]:
             with ui.row().classes("cl-card w-full items-center gap-2"):
                 ui.icon("timer").style("color: var(--cl-fg-muted);")

@@ -15,6 +15,7 @@ from app.schemas.api import (
     DraftBody,
     FeedbackBody,
     GovSubmitBody,
+    ReopenBody,
 )
 from app.services.complaint_service import ComplaintInput
 
@@ -100,6 +101,12 @@ def detail(complaint_id: str, ctx: AuthContext = CITIZEN, c: AppContainer = Depe
 @router.post("/{complaint_id}/feedback", status_code=201)
 def feedback(complaint_id: str, body: FeedbackBody, ctx: AuthContext = Depends(guard(Permission.COMPLAINT_FEEDBACK)), c: AppContainer = Depends(get_container)) -> dict:
     return to_jsonable(c.complaints.add_feedback(ctx, complaint_id, body.rating, body.comment))
+
+
+@router.post("/{complaint_id}/reopen")
+def reopen(complaint_id: str, body: ReopenBody, ctx: AuthContext = Depends(guard(Permission.COMPLAINT_FEEDBACK)), c: AppContainer = Depends(get_container)) -> dict:
+    """The citizen says a "resolved" complaint was not actually fixed (see ComplaintService.reopen_by_citizen)."""
+    return complaint_json(c.complaints.reopen_by_citizen(ctx, complaint_id, body.reason))
 
 
 

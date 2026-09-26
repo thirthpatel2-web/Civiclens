@@ -351,6 +351,41 @@ class ComplaintService:
         self._fx.flush(out)
         return fb
 
+    REOPEN_WINDOW_DAYS = 30
+
+    def reopen_by_citizen(self, ctx: AuthContext, complaint_id: str, reason: str) -> ComplaintRecord:
+        """Verified closure: a department marking a complaint "resolved" is not the last word. The
+        citizen who filed it can say it was not actually fixed - within 30 days, with a reason - and
+        it goes back to "in progress" with the assigned officer notified. A closed (confirmed)
+        complaint, or one that has already been rated, cannot be reopened this way."""
+        from datetime import timedelta
+
+        require(ctx, Permission.COMPLAINT_FEEDBACK)
+        if len((reason or "").strip()) < 5:
+            raise ValidationFailed("Say briefly what is still wrong.", details={"field": "reason"})
+        out = Outbox()
+        with self._uow() as uow:
+            c = uow.complaints.get(complaint_id)
+            if c is None or c.citizen_id != ctx.user_id:
+                raise NotFound("Complaint not found.")
+            if c.status is not S.RESOLVED:
+                raise ValidationFailed("Only a complaint marked resolved can be reopened.")
+            if uow.complaints.get_feedback(c.id):
+                raise Conflict("You have already rated this resolution.")
+            now = self._fx.clock()
+            if c.resolved_at is not None and now - c.resolved_at > timedelta(days=self.REOPEN_WINDOW_DAYS):
+                raise ValidationFailed(f"Complaints can be reopened within {self.REOPEN_WINDOW_DAYS} days of being resolved. Please file a new complaint.")
+            ev = apply_transition(c.id, c.status, S.IN_PROGRESS, actor_id=ctx.user_id, actor_label="Citizen", remarks=reason, at=now)
+            self._fx.event(uow, c, "reopened", ctx, from_status=ev.from_status, to_status=ev.to_status, remarks=ev.remarks, actor_label="Citizen")
+            c.status, c.resolved_at, c.updated_at = S.IN_PROGRESS, None, now
+            uow.complaints.update(c)
+            if c.assigned_officer_id:
+                self._fx.notify(uow, out, c.assigned_officer_id, "complaint.reopened", "Citizen says it is not fixed", f"{c.reference}: {reason.strip()[:120]}", c, dedupe_key=f"reopen:{c.id}:{int(now.timestamp())}")
+            self._fx.audit(uow).record("complaint.reopened_by_citizen", actor_id=ctx.user_id, resource_type="complaint", resource_id=c.id, metadata={"reference": c.reference})
+            uow.commit()
+        self._fx.flush(out)
+        return c
+
 
 def _as_event(ev: Any, c: ComplaintRecord, kind: str, details: dict[str, Any]) -> Any:
     from app.services.ports import ComplaintEvent

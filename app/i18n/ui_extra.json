@@ -770,7 +770,17 @@
   "interop.filings": "across {n} filing(s) through CivicLens",
   "interop.reuses": "times your one CivicLens profile was reused instead of re-typing KYC elsewhere",
   "interop.simulate": "Simulate a malformed record (blank required fields, broken status code)",
-  "interop.as_exported": "exactly as that system would export it"
+  "interop.as_exported": "exactly as that system would export it",
+  "fb.title": "The department says this is fixed",
+  "fb.body": "Is it really? Rate the resolution - or tell us it is not fixed and it goes straight back to the officer.",
+  "fb.pick_stars": "Tap the stars to rate first.",
+  "fb.thanks": "Thank you - your rating is recorded against the department.",
+  "fb.not_fixed": "It's not fixed",
+  "fb.reopen_title": "Reopen this complaint",
+  "fb.reopen_why": "What is still wrong? The officer will see this.",
+  "fb.reopen_btn": "Reopen",
+  "fb.reopened": "Reopened - the officer has been notified.",
+  "fb.your_rating": "Your rating"
  },
  "hi": {
   "act.cancel": "रद्द करें",
@@ -1543,7 +1553,17 @@
   "interop.filings": "CivicLens से {n} शिकायतों में",
   "interop.reuses": "बार आपकी एक CivicLens प्रोफ़ाइल दोबारा उपयोग हुई, कहीं और KYC दोबारा भरे बिना",
   "interop.simulate": "गलत रिकॉर्ड का अनुकरण करें (ज़रूरी फ़ील्ड खाली, स्थिति कोड खराब)",
-  "interop.as_exported": "जैसा वह प्रणाली निर्यात करती है"
+  "interop.as_exported": "जैसा वह प्रणाली निर्यात करती है",
+  "fb.title": "विभाग के अनुसार यह ठीक हो गया है",
+  "fb.body": "क्या सच में? समाधान को रेटिंग दें - या बताएँ कि यह ठीक नहीं हुआ, और यह सीधे अधिकारी के पास वापस जाएगी।",
+  "fb.pick_stars": "पहले सितारों पर टैप करके रेटिंग दें।",
+  "fb.thanks": "धन्यवाद - आपकी रेटिंग विभाग के नाम दर्ज हो गई है।",
+  "fb.not_fixed": "यह ठीक नहीं हुआ",
+  "fb.reopen_title": "यह शिकायत फिर से खोलें",
+  "fb.reopen_why": "अभी भी क्या गलत है? अधिकारी इसे देखेंगे।",
+  "fb.reopen_btn": "फिर से खोलें",
+  "fb.reopened": "फिर से खोली गई - अधिकारी को सूचित कर दिया गया है।",
+  "fb.your_rating": "आपकी रेटिंग"
  },
  "mr": {
   "theme.light": "फिकट",
@@ -2316,7 +2336,17 @@
   "interop.filings": "CivicLens मधील {n} तक्रारींमध्ये",
   "interop.reuses": "वेळा तुमचे एक CivicLens प्रोफाइल पुन्हा वापरले गेले, इतरत्र KYC पुन्हा न भरता",
   "interop.simulate": "चुकीच्या नोंदीचे अनुकरण करा (आवश्यक फील्ड रिकामी, स्थिती कोड चुकीचा)",
-  "interop.as_exported": "ती प्रणाली जशी निर्यात करते तशीच"
+  "interop.as_exported": "ती प्रणाली जशी निर्यात करते तशीच",
+  "fb.title": "विभागानुसार हे दुरुस्त झाले आहे",
+  "fb.body": "खरंच? निराकरणाला रेटिंग द्या - किंवा ते दुरुस्त झाले नाही हे सांगा, ते थेट अधिकाऱ्याकडे परत जाईल.",
+  "fb.pick_stars": "आधी तारांवर टॅप करून रेटिंग द्या.",
+  "fb.thanks": "धन्यवाद - तुमचे रेटिंग विभागाच्या नावे नोंदवले आहे.",
+  "fb.not_fixed": "हे दुरुस्त झाले नाही",
+  "fb.reopen_title": "ही तक्रार पुन्हा उघडा",
+  "fb.reopen_why": "अजून काय चुकीचे आहे? अधिकारी हे पाहतील.",
+  "fb.reopen_btn": "पुन्हा उघडा",
+  "fb.reopened": "पुन्हा उघडली - अधिकाऱ्याला कळवले आहे.",
+  "fb.your_rating": "तुमचे रेटिंग"
  },
  "bn": {
   "theme.light": "হালকা",
@@ -3089,7 +3119,17 @@
   "interop.filings": "CivicLens-এর মাধ্যমে {n}টি অভিযোগে",
   "interop.reuses": "বার আপনার একটি CivicLens প্রোফাইল পুনরায় ব্যবহৃত হয়েছে, অন্য কোথাও KYC আবার না লিখে",
   "interop.simulate": "ত্রুটিপূর্ণ রেকর্ড অনুকরণ করুন (প্রয়োজনীয় ঘর ফাঁকা, স্ট্যাটাস কোড ভাঙা)",
-  "interop.as_exported": "ঠিক যেমন সেই সিস্টেম রপ্তানি করে"
+  "interop.as_exported": "ঠিক যেমন সেই সিস্টেম রপ্তানি করে",
+  "fb.title": "বিভাগ বলছে এটি ঠিক হয়ে গেছে",
+  "fb.body": "সত্যিই? সমাধানকে রেটিং দিন - অথবা জানান এটি ঠিক হয়নি, এটি সরাসরি আধিকারিকের কাছে ফিরে যাবে।",
+  "fb.pick_stars": "আগে তারায় ট্যাপ করে রেটিং দিন।",
+  "fb.thanks": "ধন্যবাদ - আপনার রেটিং বিভাগের নামে নথিভুক্ত হয়েছে।",
+  "fb.not_fixed": "এটি ঠিক হয়নি",
+  "fb.reopen_title": "এই অভিযোগ আবার খুলুন",
+  "fb.reopen_why": "এখনও কী সমস্যা? আধিকারিক এটি দেখবেন।",
+  "fb.reopen_btn": "আবার খুলুন",
+  "fb.reopened": "আবার খোলা হয়েছে - আধিকারিককে জানানো হয়েছে।",
+  "fb.your_rating": "আপনার রেটিং"
  },
  "ta": {
   "theme.light": "வெளிர்",
@@ -3862,7 +3902,17 @@
   "interop.filings": "CivicLens வழியாக {n} புகார்களில்",
   "interop.reuses": "முறை உங்கள் ஒரே CivicLens சுயவிவரம் மீண்டும் பயன்படுத்தப்பட்டது, வேறு இடத்தில் KYC மீண்டும் நிரப்பாமல்",
   "interop.simulate": "தவறான பதிவை உருவகப்படுத்து (தேவையான புலங்கள் காலி, நிலைக் குறியீடு உடைந்தது)",
-  "interop.as_exported": "அந்த அமைப்பு ஏற்றுமதி செய்வது போலவே"
+  "interop.as_exported": "அந்த அமைப்பு ஏற்றுமதி செய்வது போலவே",
+  "fb.title": "இது சரிசெய்யப்பட்டதாகத் துறை கூறுகிறது",
+  "fb.body": "உண்மையிலா? தீர்வை மதிப்பிடுங்கள் - அல்லது சரியாகவில்லை என்று சொல்லுங்கள், அது நேரடியாக அலுவலரிடம் திரும்பும்.",
+  "fb.pick_stars": "முதலில் நட்சத்திரங்களைத் தட்டி மதிப்பிடுங்கள்.",
+  "fb.thanks": "நன்றி - உங்கள் மதிப்பீடு துறையின் பெயரில் பதிவு செய்யப்பட்டது.",
+  "fb.not_fixed": "இது சரியாகவில்லை",
+  "fb.reopen_title": "இந்தப் புகாரை மீண்டும் திற",
+  "fb.reopen_why": "இன்னும் என்ன தவறு? அலுவலர் இதைப் பார்ப்பார்.",
+  "fb.reopen_btn": "மீண்டும் திற",
+  "fb.reopened": "மீண்டும் திறக்கப்பட்டது - அலுவலருக்குத் தெரிவிக்கப்பட்டது.",
+  "fb.your_rating": "உங்கள் மதிப்பீடு"
  },
  "te": {
   "theme.light": "తేలికైన",
@@ -4635,7 +4685,17 @@
   "interop.filings": "CivicLens ద్వారా {n} ఫిర్యాదులలో",
   "interop.reuses": "సార్లు మీ ఒక్క CivicLens ప్రొఫైల్ మళ్లీ ఉపయోగించబడింది, ఇంకెక్కడా KYC మళ్లీ నింపకుండా",
   "interop.simulate": "తప్పు రికార్డును అనుకరించండి (అవసరమైన ఫీల్డ్‌లు ఖాళీ, స్థితి కోడ్ విరిగింది)",
-  "interop.as_exported": "ఆ వ్యవస్థ ఎగుమతి చేసినట్లే"
+  "interop.as_exported": "ఆ వ్యవస్థ ఎగుమతి చేసినట్లే",
+  "fb.title": "ఇది సరిచేయబడిందని శాఖ చెబుతోంది",
+  "fb.body": "నిజంగానా? పరిష్కారానికి రేటింగ్ ఇవ్వండి - లేదా సరికాలేదని చెప్పండి, అది నేరుగా అధికారి వద్దకు తిరిగి వెళ్తుంది.",
+  "fb.pick_stars": "ముందుగా నక్షత్రాలను నొక్కి రేటింగ్ ఇవ్వండి.",
+  "fb.thanks": "ధన్యవాదాలు - మీ రేటింగ్ శాఖ పేరున నమోదైంది.",
+  "fb.not_fixed": "ఇది సరికాలేదు",
+  "fb.reopen_title": "ఈ ఫిర్యాదును మళ్లీ తెరవండి",
+  "fb.reopen_why": "ఇంకా ఏమి తప్పుగా ఉంది? అధికారి దీన్ని చూస్తారు.",
+  "fb.reopen_btn": "మళ్లీ తెరవండి",
+  "fb.reopened": "మళ్లీ తెరవబడింది - అధికారికి తెలియజేయబడింది.",
+  "fb.your_rating": "మీ రేటింగ్"
  },
  "kn": {
   "theme.light": "ತಿಳಿ",
@@ -5408,6 +5468,16 @@
   "interop.filings": "CivicLens ಮೂಲಕ {n} ದೂರುಗಳಲ್ಲಿ",
   "interop.reuses": "ಬಾರಿ ನಿಮ್ಮ ಒಂದೇ CivicLens ಪ್ರೊಫೈಲ್ ಮರುಬಳಕೆಯಾಯಿತು, ಬೇರೆಡೆ KYC ಮತ್ತೆ ತುಂಬದೆ",
   "interop.simulate": "ದೋಷಪೂರಿತ ದಾಖಲೆಯನ್ನು ಅನುಕರಿಸಿ (ಅಗತ್ಯ ಕ್ಷೇತ್ರಗಳು ಖಾಲಿ, ಸ್ಥಿತಿ ಕೋಡ್ ಮುರಿದಿದೆ)",
-  "interop.as_exported": "ಆ ವ್ಯವಸ್ಥೆ ರಫ್ತು ಮಾಡುವಂತೆಯೇ"
+  "interop.as_exported": "ಆ ವ್ಯವಸ್ಥೆ ರಫ್ತು ಮಾಡುವಂತೆಯೇ",
+  "fb.title": "ಇದು ಸರಿಯಾಗಿದೆ ಎಂದು ಇಲಾಖೆ ಹೇಳುತ್ತಿದೆ",
+  "fb.body": "ನಿಜವಾಗಿಯೂ? ಪರಿಹಾರಕ್ಕೆ ರೇಟಿಂಗ್ ನೀಡಿ - ಅಥವಾ ಸರಿಯಾಗಿಲ್ಲ ಎಂದು ತಿಳಿಸಿ, ಅದು ನೇರವಾಗಿ ಅಧಿಕಾರಿಗೆ ಮರಳುತ್ತದೆ.",
+  "fb.pick_stars": "ಮೊದಲು ನಕ್ಷತ್ರಗಳನ್ನು ಒತ್ತಿ ರೇಟಿಂಗ್ ನೀಡಿ.",
+  "fb.thanks": "ಧನ್ಯವಾದಗಳು - ನಿಮ್ಮ ರೇಟಿಂಗ್ ಇಲಾಖೆಯ ಹೆಸರಿನಲ್ಲಿ ದಾಖಲಾಗಿದೆ.",
+  "fb.not_fixed": "ಇದು ಸರಿಯಾಗಿಲ್ಲ",
+  "fb.reopen_title": "ಈ ದೂರನ್ನು ಮತ್ತೆ ತೆರೆಯಿರಿ",
+  "fb.reopen_why": "ಇನ್ನೂ ಏನು ತಪ್ಪಾಗಿದೆ? ಅಧಿಕಾರಿ ಇದನ್ನು ನೋಡುತ್ತಾರೆ.",
+  "fb.reopen_btn": "ಮತ್ತೆ ತೆರೆಯಿರಿ",
+  "fb.reopened": "ಮತ್ತೆ ತೆರೆಯಲಾಗಿದೆ - ಅಧಿಕಾರಿಗೆ ತಿಳಿಸಲಾಗಿದೆ.",
+  "fb.your_rating": "ನಿಮ್ಮ ರೇಟಿಂಗ್"
  }
 }

@@ -162,7 +162,7 @@ EVENT_LOOK: dict[str, tuple[str, str]] = {
     "escalated": ("Escalated", "trending_up"), "category_corrected": ("Category corrected", "edit"), "transferred": ("Transferred to another department", "swap_horiz"),
     "field_visit": ("Field visit scheduled", "directions_walk"), "inspection": ("Inspection findings", "fact_check"), "work_order": ("Work order raised", "build"),
     "coordination": ("Coordinated with another team", "groups"), "progress": ("Progress update", "trending_up"), "remark": ("Note", "chat"),
-    "assigned": ("Assigned", "assignment_ind"), "routed": ("Routed", "alt_route"), "workflow": ("Automation rule ran", "account_tree"), "feedback": ("Citizen feedback", "rate_review"),
+    "assigned": ("Assigned", "assignment_ind"), "reopened": ("Reopened by the citizen", "replay"), "routed": ("Routed", "alt_route"), "workflow": ("Automation rule ran", "account_tree"), "feedback": ("Citizen feedback", "rate_review"),
 }  # fmt: skip
 
 
@@ -1052,7 +1052,7 @@ def register(c: AppContainer) -> None:
                             chip(cm.severity, color=theme.PRIORITY_COLOR.get(cm.severity, "muted"))
                         with ui.column().classes("gap-0"):
                             ui.label(tr(c, "lbl.department")).classes("text-xs").style("color: var(--cl-fg-subtle);")
-                            ui.label(cm.department_code or "-").classes("text-sm font-medium").style("color: var(--cl-fg);")
+                            ui.label(run_in_uow(c, lambda uow: {x.code: x.name for x in uow.config.departments()}).get(cm.department_code or "", cm.department_code or "-")).classes("text-sm font-medium").style("color: var(--cl-fg);")
                         with ui.column().classes("gap-0"):
                             ui.label(tr(c, "lbl.priority")).classes("text-xs").style("color: var(--cl-fg-subtle);")
                             chip(cm.priority, color=theme.PRIORITY_COLOR.get(cm.priority, "muted"))
@@ -1078,6 +1078,54 @@ def register(c: AppContainer) -> None:
                             ui.label(tr(c, "rti.escalate_body")).classes("text-xs").style("color: var(--cl-fg-muted);")
                         ui.button(tr(c, "rti.escalate_btn"), icon="edit_document", on_click=lambda: ui.navigate.to(f"/rti?complaint={cm.id}")).props("unelevated color=negative no-caps")
 
+                if str(cm.status) in ("resolved", "closed") and not d["feedback"]:
+                    # verified closure: the citizen confirms the fix with a rating, or says it is not fixed
+                    with ui.column().classes("cl-card gap-3 w-full").style("border: 1.5px solid var(--cl-success);"):
+                        with ui.row().classes("items-center gap-2"):
+                            ui.icon("task_alt").classes("text-[24px]").style("color: var(--cl-success);")
+                            ui.label(tr(c, "fb.title")).classes("text-base font-semibold").style("color: var(--cl-fg);")
+                        ui.label(tr(c, "fb.body")).classes("text-sm").style("color: var(--cl-fg-muted);")
+                        stars = ui.rating(value=0, max=5, size="2.2em", icon="star_border", icon_selected="star", color="amber")
+                        comment = ui.textarea(tr(c, "lbl.comment")).props("outlined autogrow rows=2").classes("w-full")
+
+                        def send() -> None:
+                            if not stars.value:
+                                ui.notify(tr(c, "fb.pick_stars"), type="warning")
+                                return
+                            try:
+                                c.complaints.add_feedback(user.ctx, cm.id, int(stars.value), comment.value)
+                            except CivicLensError as exc:
+                                ui.notify(exc.message, type="negative")
+                                return
+                            ui.notify(tr(c, "fb.thanks"), type="positive")
+                            ui.navigate.reload()
+
+                        def reopen_dialog() -> None:
+                            with ui.dialog() as dlg, ui.column().classes("cl-card gap-3 w-full max-w-md"):
+                                ui.label(tr(c, "fb.reopen_title")).classes("text-base font-semibold").style("color: var(--cl-fg);")
+                                why = ui.textarea(tr(c, "fb.reopen_why")).props("outlined autogrow").classes("w-full")
+
+                                def go() -> None:
+                                    try:
+                                        c.complaints.reopen_by_citizen(user.ctx, cm.id, why.value or "")
+                                    except CivicLensError as exc:
+                                        ui.notify(exc.message, type="negative")
+                                        return
+                                    ui.notify(tr(c, "fb.reopened"), type="positive")
+                                    ui.navigate.reload()
+
+                                ui.button(tr(c, "fb.reopen_btn"), icon="replay", on_click=go).props("unelevated color=negative no-caps")
+                            dlg.open()
+
+                        with ui.row().classes("gap-2 items-center flex-wrap"):
+                            ui.button(tr(c, "act.submit"), icon="send", on_click=send).props("unelevated color=positive no-caps")
+                            if str(cm.status) == "resolved":
+                                ui.button(tr(c, "fb.not_fixed"), icon="replay", on_click=reopen_dialog).props("flat no-caps color=negative")
+                elif d["feedback"]:
+                    with ui.row().classes("items-center gap-2"):
+                        ui.rating(value=d["feedback"].rating, max=5, size="1.4em", icon="star_border", icon_selected="star", color="amber").props("readonly")
+                        ui.label(tr(c, "fb.your_rating")).classes("text-xs").style("color: var(--cl-fg-subtle);")
+
                 section_title(tr(c, "lbl.evidence"))
                 if not d["evidence"]:
                     state_panel(icon="attach_file", title=tr(c, "gr.no_evidence"))
@@ -1085,7 +1133,7 @@ def register(c: AppContainer) -> None:
                     with ui.row().classes("gap-2 flex-wrap"):
                         for ev in d["evidence"]:
                             chip(f"{ev.name} · {ev.analysis_status}", color="info", outline=True)
-                if str(cm.status) not in ("closed", "rejected"):
+                if cm.status not in FINISHED:
                     def add_more(e: Any) -> None:
                         try:
                             rec = c.complaints.upload_evidence(user.ctx, e.name, e.content.read(), e.type)
@@ -1100,20 +1148,6 @@ def register(c: AppContainer) -> None:
 
                 government_panel(c, user.ctx, cm.id)
 
-                if str(cm.status) in ("resolved", "closed") and not d["feedback"]:
-                    section_title(tr(c, "gr.rate_resolution"))
-                    with ui.column().classes("cl-card gap-3 w-full max-w-lg"):
-                        rating = ui.slider(min=1, max=5, value=5, step=1).props("label-always color=primary").classes("w-full")
-                        comment = ui.textarea(tr(c, "lbl.comment")).props("outlined").classes("w-full")
-
-                        def send() -> None:
-                            c.complaints.add_feedback(user.ctx, cm.id, int(rating.value), comment.value)
-                            ui.notify(tr(c, "msg.saved"), type="positive")
-                            ui.navigate.reload()
-
-                        ui.button(tr(c, "act.submit"), on_click=send).props("color=primary unelevated")
-                elif d["feedback"]:
-                    chip(f"Your rating: {d['feedback'].rating}/5", color="success")
 
             with ui.column().classes("gap-4").style("min-width: 280px; max-width: 340px; flex: 1;"):
                 section_title(tr(c, "gr.status_timeline"))

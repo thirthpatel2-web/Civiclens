@@ -75,6 +75,10 @@ class FeedbackBody(Strict):
     comment: str | None = Field(default=None, max_length=1000)
 
 
+class ReopenBody(Strict):
+    reason: str = Field(min_length=5, max_length=500)
+
+
 class ClassifyPreviewBody(Strict):
     title: str = Field(default="", max_length=200)
     description: str = Field(default="", max_length=5000)

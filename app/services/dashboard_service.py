@@ -77,8 +77,11 @@ class DashboardService:
                 if r.assigned_officer_id and r.status not in FINISHED:
                     loads[r.assigned_officer_id] = loads.get(r.assigned_officer_id, 0) + 1
             anomalies = uow.anomalies.list(status="open", department_code=dept, limit=20)
+            # what citizens said about "resolved": the accountability number a resolved count alone hides
+            ratings = [fb.rating for r in rows if r.status in FINISHED and (fb := uow.complaints.get_feedback(r.id)) is not None]
         out = summarize(rows, now, calc)
-        out.update({"department_code": dept, "workload": loads, "anomalies": anomalies, "priority_counts": out["by_priority"]})
+        out.update({"department_code": dept, "workload": loads, "anomalies": anomalies, "priority_counts": out["by_priority"],
+                    "satisfaction": {"average": round(sum(ratings) / len(ratings), 1), "count": len(ratings)} if ratings else None})  # fmt: skip
         return out
 
     def history(self, ctx: AuthContext, *, days: int = 30) -> dict[str, Any]:
