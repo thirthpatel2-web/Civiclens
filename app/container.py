@@ -197,7 +197,7 @@ class AppContainer:
         self.rag_index = RagIndex(BM25Index(s.bm25_k1, s.bm25_b), self.vector_index if hasattr(self.vector_index, "add") else None)  # pgvector is queried, not mirrored in memory
         retr = HybridRetriever(self.rag_index.chunks, self.rag_index.bm25, self.vector_index, self.embedder, config=RetrievalConfig(rrf_k=s.rrf_k, rerank_top_k=s.rerank_top_k, final_top_k=s.rag_top_k, min_relevance=s.rag_min_relevance))
         self.rag = RagService(retr, GroundedGenerator(self.llm), build_query_registry(self.uow_factory), access_filter=document_access_filter)
-        self.assistant = AssistantService(self.uow_factory, self.rag, self.clock)
+        self.assistant = AssistantService(self.uow_factory, self.rag, self.clock, llm=self.llm)
         self.dashboards = DashboardService(self.uow_factory, self.clock, self.system_status)
         self.investigations = InvestigationService(self.uow_factory, self.clock, self._rag_lookup, self._legal_lookup)
         self.admin = AdminService(self.uow_factory, self.auth_for, self.clock)

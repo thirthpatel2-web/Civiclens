@@ -11,6 +11,7 @@ Rules enforced here (each has a test):
 
 from __future__ import annotations
 
+import unicodedata
 import uuid
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -24,6 +25,21 @@ from app.providers.speech import MAX_AUDIO_BYTES, sniff_audio
 from app.providers.stt import SpeechToTextProvider, TranslationProvider
 
 AUTO = "auto"
+NO_SPEECH_MESSAGE = "No clear speech was recognised. Please speak a little closer to the microphone and try again."
+# Whisper's well-known inventions for silence/noise; a real civic question is never just one of these.
+_SILENCE_HALLUCINATIONS = frozenset({"thank you", "thanks", "thank you for watching", "thanks for watching", "you", "bye", "please subscribe", "subtitles by the amara.org community"})
+
+
+def looks_like_noise(text: str, avg_logprob: float | None = None) -> bool:
+    """True when a transcript is almost certainly the engine hallucinating on silence or noise rather than
+    real speech: no real letters, one character repeated (a tone read as 'ಠಠಠ'), a stock silence phrase, or
+    very low decoder confidence on a very short result. Real sentences pass untouched."""
+    letters = [ch for ch in text if unicodedata.category(ch)[0] in ("L", "M")]
+    if len(letters) < 2 or len(set(letters)) <= 2:
+        return True
+    if text.strip().strip(".!?,।").strip().lower() in _SILENCE_HALLUCINATIONS:
+        return True
+    return avg_logprob is not None and avg_logprob < -0.55 and len(text.split()) <= 3
 
 
 @dataclass
@@ -87,7 +103,10 @@ class VoiceService:
             except CivicLensError as exc:
                 rec.status, rec.error = "FAILED", exc.message
             else:
-                self._apply(rec, t.text, t.language, t.detected_language, t.confidence, t.translated)
+                if looks_like_noise(t.text, t.extra.get("avg_logprob")):
+                    rec.status, rec.error = "FAILED", NO_SPEECH_MESSAGE
+                else:
+                    self._apply(rec, t.text, t.language, t.detected_language, t.confidence, t.translated)
         with self._uow() as uow:
             uow.voice.add(rec)
             uow.commit()

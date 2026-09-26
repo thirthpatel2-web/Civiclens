@@ -18,7 +18,7 @@ from app.core.exceptions import CivicLensError
 from app.rag.grounded_generation import AnswerStatus, GeneratedAnswer, GroundedGenerator
 from app.rag.hybrid_retrieval import HybridRetriever
 from app.rag.models import Chunk, RetrievalResult
-from app.rag.query_router import QueryRegistry, QueryRouter
+from app.rag.query_router import QueryRegistry, QueryRouter, RoutePlan
 
 logger = logging.getLogger("civiclens.rag.service")
 SMALLTALK_REPLY = "Hello! Ask me about complaints, RTI applications, departments or your documents."
@@ -59,10 +59,20 @@ class RagService:
         """Evidence only (backs POST /documents/search and /rag/retrieve)."""
         return self._retriever.retrieve(question, visible=lambda c: self._access(ctx, c))
 
-    def ask(self, question: str, ctx: AuthContext, *, language: str = "English") -> RagResponse:
+    @property
+    def router(self) -> QueryRouter:
+        return self._router
+
+    def query_catalogue(self) -> list[tuple[str, str]]:
+        """(name, description) of every allowlisted query - what an LLM router may choose from."""
+        return [(n, spec.description) for n in self._registry.names() if (spec := self._registry.get(n)) is not None]
+
+    def ask(self, question: str, ctx: AuthContext, *, language: str = "English", plan: RoutePlan | None = None) -> RagResponse:
+        """``plan`` lets a caller supply a route it already validated (e.g. an allowlisted LLM
+        suggestion via ``router.validate_llm_route``); by default the rule-based router decides."""
         timings: dict[str, float] = {}
         t0 = time.perf_counter()
-        plan = self._router.route(question)
+        plan = plan or self._router.route(question)
         route = {"needsDb": plan.needs_db, "query": plan.query_name, "needsDocs": plan.needs_docs, "reasons": plan.reasons}
         if plan.smalltalk:
             return RagResponse("smalltalk", SMALLTALK_REPLY, route=route)

@@ -283,7 +283,7 @@ def register(c: AppContainer) -> None:
             state["recording"] = True
             mic.props("icon=stop").classes(add="cl-mic-live")
             hint.set_text(tr(c, "assistant.listening"))
-            await ui.run_javascript("window.clStartRec()")
+            ui.run_javascript("window.clStartRec()")  # fire-and-forget: the permission prompt can take far longer than run_javascript's 1 s timeout; failures come back as cl_audio_error
 
         mic.on_click(toggle_mic)
         render()
@@ -558,7 +558,7 @@ def register(c: AppContainer) -> None:
                 _active_mic["target"] = {"field": target_field, "lang": lang_select, "hint": hint_label, "voice": voice_state, "btn": mic_btn}
                 mic_btn.props("icon=stop").classes(add="cl-mic-live")
                 hint_label.set_text(tr(c, "assistant.listening"))
-                await ui.run_javascript("window.clStartRec()")
+                ui.run_javascript("window.clStartRec()")  # fire-and-forget: the permission prompt can take far longer than run_javascript's 1 s timeout; failures come back as cl_audio_error
 
             mic_btn.on_click(toggle)
 
@@ -1114,7 +1114,7 @@ def register(c: AppContainer) -> None:
                     rec_state["recording"] = True
                     r_mic.props("icon=stop").classes(add="cl-mic-live")
                     r_voice_hint.set_text(tr(c, "assistant.listening"))
-                    await ui.run_javascript("window.clStartRec()")
+                    ui.run_javascript("window.clStartRec()")  # fire-and-forget: the permission prompt can take far longer than run_javascript's 1 s timeout; failures come back as cl_audio_error
 
                 r_mic.on_click(toggle_mic)
 
@@ -1495,7 +1495,7 @@ def register(c: AppContainer) -> None:
             state["recording"] = True
             mic.props("icon=stop").classes(add="cl-mic-live")
             voice_hint.set_text(tr(c, "assistant.listening"))
-            await ui.run_javascript("window.clStartRec()")
+            ui.run_javascript("window.clStartRec()")  # fire-and-forget: the permission prompt can take far longer than run_javascript's 1 s timeout; failures come back as cl_audio_error
 
         mic.on_click(toggle_mic)
 
@@ -1507,68 +1507,225 @@ def register(c: AppContainer) -> None:
 
     @page(c, "/copilot", "nav.copilot")
     async def copilot(c: AppContainer, user: UiUser) -> None:
-        state: dict[str, Any] = {"cid": None}
-        page_header(tr(c, "chatbotTitle"), tr(c, "page.copilot_help"), icon="smart_toy")
-        if c.llm is None:
-            info_banner(tr(c, "copilot.no_model"), "orange")
-        with ui.column().classes("cl-card w-full max-w-3xl !p-0 gap-0"):
-            log = ui.column().classes("w-full gap-1 q-pa-md").style("min-height: 240px; max-height: 55vh; overflow-y: auto;")
-            with ui.row().classes("q-pa-sm gap-2 items-center w-full cl-hairline"):
-                box = ui.input(placeholder=tr(c, "chatbotPlaceholder")).props("outlined dense rounded").classes("flex-1")
-                send_btn = ui.button(icon="send", on_click=lambda: send()).props("round unelevated color=primary")
-        q0 = ui.context.client.request.query_params.get("q") if ui.context.client.request else None
-        if q0:
-            box.value = q0
+        """Civic Saathi: typed or spoken questions in any supported language, answered from the user's own
+        records, verified documents, or clearly-labelled general guidance - never mixed up."""
+        import base64
+        import html
+        import re
 
-        with log:
-            chat_bubble("Ask about your complaints, RTI deadlines, or civic documents. I only answer from what's actually on record.", is_user=False)
+        from nicegui import run
 
-        async def send() -> None:
-            text = (box.value or "").strip()
+        state: dict[str, Any] = {"cid": None, "recording": False, "busy": False, "suggestions": None}
+        client = ui.context.client  # captured once: handlers may run inside elements this page later deletes (the suggestion cards)
+        caps = c.voice.capabilities()
+        voice_on = caps["state"] == "CONFIGURED"
+        ui.add_body_html(f"<script>{MIC_JS}</script>")
+        db_marker = re.compile(r"\s*[\[【]\s*DB\s*[\]】]")
+
+        with ui.column().classes("cl-saathi gap-4"):
+            with ui.row().classes("cl-saathi-hero w-full items-center gap-4"):
+                with ui.element("div").classes("cl-orb"):
+                    ui.icon("smart_toy").classes("text-[28px]")
+                with ui.column().classes("gap-1 flex-1 cl-saathi-intro"):
+                    ui.label(tr(c, "chatbotTitle")).classes("cl-title text-2xl")
+                    ui.label(tr(c, "saathi.subtitle")).classes("text-sm").style("color: var(--cl-fg-muted);")
+                    with ui.row().classes("gap-2 q-mt-xs flex-wrap"):
+                        for icon, key in [("mic", "saathi.cap_voice"), ("folder_shared", "saathi.cap_records"), ("gavel", "saathi.cap_rti"), ("lock", "saathi.cap_private")]:
+                            with ui.element("span").classes("cl-cap"):
+                                ui.icon(icon)
+                                ui.label(tr(c, key))
+                ui.button(tr(c, "saathi.new_chat"), icon="add_comment", on_click=lambda: reset()).props("flat no-caps color=primary").classes("self-start")
+            if c.llm is None:
+                info_banner(tr(c, "copilot.no_model"), "orange")
+
+            with ui.column().classes("cl-saathi-panel w-full gap-0"):
+                log = ui.column().classes("cl-saathi-log w-full gap-1 q-pa-md")
+                with ui.column().classes("cl-saathi-bar w-full q-pa-sm gap-1"):
+                    with ui.row().classes("items-center gap-2 q-px-sm") as listening_row:
+                        with ui.element("span").classes("cl-wave"):
+                            for _ in range(5):
+                                ui.element("span")
+                        status_lbl = ui.label(tr(c, "saathi.tap_stop")).classes("text-xs").style("color: var(--cl-danger);")
+                    listening_row.set_visibility(False)
+                    with ui.row().classes("items-center gap-2 w-full cl-saathi-inputrow"):
+                        mic = ui.button(icon="mic").props("round unelevated color=primary").classes("cl-mic-btn")
+                        spoken_opts = {"auto": "🌐 " + tr(c, "report.auto_detect")} | {lg["code"]: lg["native"] for lg in caps["languages"]}
+                        spoken = ui.select(spoken_opts, value=lang() if lang() in spoken_opts and lang() != "en" else "auto").props("dense outlined options-dense").classes("w-44 cl-spoken")
+                        spoken.tooltip(tr(c, "saathi.speak_in"))
+                        box = ui.input(placeholder=tr(c, "chatbotPlaceholder")).props("outlined dense rounded").classes("flex-1 cl-saathi-box")
+                        send_btn = ui.button(icon="send", on_click=lambda: send()).props("round unelevated color=primary")
+                    tip = ui.label(tr(c, "saathi.lang_tip")).classes("text-[11px] q-px-sm").style("color: var(--cl-fg-subtle);")
+            if not voice_on:
+                mic.disable()
+                mic.tooltip(tr(c, "assistant.mic_off"))
+                spoken.set_visibility(False)
+                tip.set_visibility(False)
+
+        def scroll() -> None:
+            client.run_javascript(f"const el = document.getElementById('c{log.id}'); if (el) el.scrollTop = el.scrollHeight;")
+
+        def avatar() -> None:
+            with ui.element("div").classes("cl-chat-avatar q-mr-sm"):
+                ui.icon("auto_awesome").classes("text-[16px]")
+
+        def welcome() -> None:
+            with log:
+                chat_bubble(tr(c, "saathi.welcome"), is_user=False)
+                with ui.column().classes("w-full q-mt-sm gap-2") as sug:
+                    ui.label(tr(c, "saathi.suggest_title")).classes("text-[11px] text-weight-bold").style("color: var(--cl-fg-subtle); letter-spacing: .08em; text-transform: uppercase;")
+                    with ui.element("div").classes("w-full cl-suggest-grid"):
+                        for icon, key in [("assignment", "saathi.s1"), ("schedule", "saathi.s2"), ("help_outline", "saathi.s3"), ("trending_up", "saathi.s4")]:
+                            q = tr(c, key)
+                            with ui.row().classes("cl-suggest items-center gap-3 no-wrap").props("tabindex=0 role=button") as card:
+                                ui.icon(icon).classes("text-[20px]")
+                                ui.label(q).classes("text-sm")
+                            card.on("click", lambda _e, q=q: send(q))
+                            card.on("keydown.enter", lambda _e, q=q: send(q))
+            state["suggestions"] = sug
+
+        def reset() -> None:
+            state["cid"] = None
+            log.clear()
+            welcome()
+
+        def source_badge(r: dict[str, Any]) -> None:
+            status = r["status"]
+            if status == "answered" and r["database_facts"] is not None:
+                kind, icon, key = "records", "folder_shared", "saathi.badge_records"
+            elif status == "answered" and r["citations"]:
+                kind, icon, key = "docs", "description", "saathi.badge_docs"
+            elif status == "general_guidance":
+                kind, icon, key = "guidance", "lightbulb", "saathi.badge_guidance"
+            elif status in ("ungrounded", "insufficient_evidence", "model_unavailable"):
+                kind, icon, key = "unverified", "help", "saathi.badge_unverified"
+            else:
+                return
+            with ui.element("span").classes(f"cl-src {kind} q-mb-xs"):
+                ui.icon(icon)
+                ui.label(tr(c, key))
+
+        def render_answer(r: dict[str, Any]) -> None:
+            if r["status"] == "model_unavailable":
+                text = "The language model is unavailable; sources are listed below."
+            else:
+                text = r["answer"] or tr(c, "msg.insufficient")
+            text = db_marker.sub("", text).strip()
+            with log:
+                with ui.row().classes("cl-chat-row cl-assistant no-wrap"):
+                    avatar()
+                    with ui.column().classes("gap-1").style("max-width: 82%;"):
+                        with ui.element("div").classes("cl-chat-bubble").style("max-width: 100%;"):
+                            source_badge(r)
+                            ui.markdown(html.escape(text, quote=False)).classes("cl-chat-md")  # model output is escaped: rendered as text, never HTML
+                        with ui.row().classes("gap-1 items-center"):
+                            ui.button(icon="content_copy", on_click=lambda t=text: copy(t)).props("flat round dense size=sm color=grey").tooltip(tr(c, "act.copy"))
+                        for cit in r["citations"]:
+                            with ui.expansion(f"[{cit['marker']}] {cit['documentName']}" + (f" - p.{cit['page']}" if cit.get("page") else ""), icon="description").classes("w-full"):
+                                ui.label(cit["excerpt"]).classes("text-xs").style("color: var(--cl-fg-muted);")
+                        for w in r["warnings"]:
+                            ui.label(w).classes("text-[11px]").style("color: var(--cl-fg-subtle);")
+
+        async def copy(text: str) -> None:
+            import json
+
+            client.run_javascript(f"navigator.clipboard.writeText({json.dumps(text)})")
+            with log:
+                ui.notify(tr(c, "msg.copied"), type="positive")
+
+        async def send(text: str | None = None, reply_lang: str = "auto") -> None:
+            if state["busy"]:
+                return
+            text = (text if text is not None else box.value or "").strip()
             if not text:
                 return
             box.value = ""
+            if state["suggestions"] is not None:
+                state["suggestions"].delete()
+                state["suggestions"] = None
+            state["busy"] = True
             with log:
                 chat_bubble(text, is_user=True)
-                with ui.row().classes("cl-chat-row cl-assistant") as spinner_row:
-                    with ui.element("div").classes("cl-chat-avatar"):
-                        ui.icon("auto_awesome").classes("text-[16px]")
-                    ui.spinner(size="sm")
+                with ui.row().classes("cl-chat-row cl-assistant no-wrap") as typing:
+                    avatar()
+                    with ui.element("div").classes("cl-typing"):
+                        for _ in range(3):
+                            ui.element("span")
+            scroll()
             try:
-                r = await run_with_loading(send_btn, c.assistant.ask, user.ctx, text, conversation_id=state["cid"], language={"en": "English", "hi": "Hindi", "mr": "Marathi", "bn": "Bengali", "ta": "Tamil", "te": "Telugu", "kn": "Kannada"}[lang()])
+                r = await run_with_loading(send_btn, c.assistant.ask, user.ctx, text, conversation_id=state["cid"], language=reply_lang, ui_language=lang())
             except CivicLensError as exc:
-                spinner_row.delete()
+                typing.delete()
+                state["busy"] = False
 
                 async def _retry() -> None:
-                    # NiceGUI awaits a handler's *return value* when it is directly Awaitable
-                    # (see nicegui.events.handle_event); `lambda: (setattr(...), send())` returned
-                    # a tuple containing the coroutine, not the coroutine itself, so it was never
-                    # detected or awaited - the retry button reset the input and silently did
-                    # nothing else. An async function whose body actually awaits send() fixes both
-                    # the mypy complaint and the real bug behind it.
-                    box.value = text
-                    await send()
+                    await send(text, reply_lang)
 
                 with log:
                     error_banner(exc.message)
-                    ui.button(tr(c, "act.retry"), on_click=_retry).props("flat dense")
+                    ui.button(tr(c, "act.retry"), icon="refresh", on_click=_retry).props("flat dense")
+                scroll()
                 return
-            spinner_row.delete()
+            typing.delete()
+            state["busy"] = False
             state["cid"] = r["conversation_id"]
-            with log:
-                answer = r["answer"] or tr(c, "msg.insufficient") if r["status"] != "model_unavailable" else "The language model is unavailable; sources are listed below."
-                chat_bubble(answer, is_user=False)
-                if r["database_facts"] is not None:
-                    with ui.row().classes("cl-card items-start gap-2 q-ml-10").style("background: var(--cl-info-soft); border-color: transparent; max-width: 75%;"):
-                        ui.icon("dataset").classes("text-[14px]").style("color: var(--cl-info);")
-                        ui.label(str(r["database_facts"])).classes("text-xs").style("color: var(--cl-info);")
-                for cit in r["citations"]:
-                    with ui.expansion(f"[{cit['marker']}] {cit['documentName']}" + (f" - p.{cit['page']}" if cit.get("page") else "")).classes("w-full q-ml-10").style("max-width: 75%;"):
-                        ui.label(cit["excerpt"]).classes("text-xs").style("color: var(--cl-fg-muted);")
-                for w in r["warnings"]:
-                    ui.label(w).classes("text-xs q-ml-10").style("color: var(--cl-warning);")
+            render_answer(r)
+            scroll()
 
-        box.on("keydown.enter", send)
+        # ---- voice: record in the browser, transcribe server-side in the chosen (or detected) language
+        def stop_ui() -> None:
+            state["recording"] = False
+            mic.props("icon=mic").classes(remove="cl-mic-live")
+
+        async def on_audio(e: Any) -> None:
+            stop_ui()
+            try:
+                raw = base64.b64decode(e.args["b64"])
+            except (KeyError, ValueError):
+                listening_row.set_visibility(False)
+                ui.notify(tr(c, "assistant.mic_failed"), type="negative")
+                return
+            status_lbl.set_text(tr(c, "saathi.transcribing"))
+            try:
+                v = await run.io_bound(c.voice.transcribe, user.ctx, raw, e.args.get("mime") or "audio/webm", spoken.value or "auto")
+            except CivicLensError as exc:
+                listening_row.set_visibility(False)
+                ui.notify(exc.message, type="negative")
+                return
+            listening_row.set_visibility(False)
+            if v.status != "OK" or not v.transcript:
+                ui.notify(v.error or tr(c, "assistant.mic_failed"), type="warning")
+                return
+            for w in v.warnings:
+                ui.notify(w, type="warning")
+            detected = spoken.value if spoken.value != "auto" else (v.language_detected or "auto")
+            await send(v.transcript, reply_lang=detected)  # the citizen's own words, in their own script, never translated
+
+        def on_audio_error(e: Any) -> None:
+            stop_ui()
+            listening_row.set_visibility(False)
+            ui.notify(tr(c, "assistant.mic_denied") + " " + str(e.args.get("message", "")), type="negative")
+
+        ui.on("cl_audio", on_audio)
+        ui.on("cl_audio_error", on_audio_error)
+
+        async def toggle_mic() -> None:
+            if state["recording"]:
+                stop_ui()
+                ui.run_javascript("window.clStopRec()")
+                return
+            state["recording"] = True
+            mic.props("icon=stop").classes(add="cl-mic-live")
+            status_lbl.set_text(tr(c, "saathi.tap_stop"))
+            listening_row.set_visibility(True)
+            ui.run_javascript("window.clStartRec()")  # fire-and-forget: the permission prompt can take far longer than run_javascript's 1 s timeout; failures come back as cl_audio_error
+
+        mic.on_click(toggle_mic)
+        box.on("keydown.enter", lambda: send())
+
+        welcome()
+        q0 = ui.context.client.request.query_params.get("q") if ui.context.client.request else None
+        if q0:
+            box.value = q0
 
     @page(c, "/gis", "nav.gis")
     def gis(c: AppContainer, user: UiUser) -> None:

@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import io
 import json
+import math
 import urllib.error
 import urllib.request
 import uuid
@@ -163,4 +164,7 @@ class GroqWhisperProvider:
             raise ValidationFailed("No speech could be recognised in the recording.")
         raw_detected = parsed.get("language")
         detected = _GROQ_LANGUAGE_NAME_TO_CODE.get(str(raw_detected).strip().lower()) if raw_detected else None
-        return Transcript(text, language or detected or "", self.name, detected)
+        logprobs = [float(seg["avg_logprob"]) for seg in parsed.get("segments") or [] if isinstance(seg, dict) and "avg_logprob" in seg]
+        avg_logprob = sum(logprobs) / len(logprobs) if logprobs else None
+        confidence = round(math.exp(avg_logprob), 3) if avg_logprob is not None else None
+        return Transcript(text, language or detected or "", self.name, detected, confidence, extra={"avg_logprob": avg_logprob})

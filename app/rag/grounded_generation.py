@@ -116,6 +116,10 @@ class GroundedGenerator:
             return GeneratedAnswer(AnswerStatus.MODEL_UNAVAILABLE, None, citations, database_facts, warnings, quarantined)
 
         check = validate_answer_citations(raw, citations, db_available=has_db)
+        if not check.is_grounded and has_db and not safe and not check.invalid_markers and check.cleaned_answer:
+            # The only evidence supplied was the user's own database facts, so an untagged answer can only
+            # have come from them (models often drop the [DB] tag outside English). Tag it instead of hiding it.
+            check = validate_answer_citations(check.cleaned_answer + " [DB]", citations, db_available=True)
         if check.invalid_markers:
             warnings.append(f"Removed reference(s) to non-existent sources: {', '.join(check.invalid_markers)}.")
         if not check.is_grounded:

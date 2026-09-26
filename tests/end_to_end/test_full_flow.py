@@ -222,11 +222,16 @@ class FullFlowTests(unittest.TestCase):
         c.jobs.dispatch([job])
         self.assertEqual(c.jobs.drain("worker-1")[0].status, "succeeded")
         self.assertEqual(str(s.stores.documents[doc.id].status), "ready")
-        s.chat.replies = ["Rs. 5,00,000 was allocated for road repair in Ward 12 [E1]."]
+        # first reply: the multilingual router (not a records question); second: the grounded answer
+        s.chat.replies = ['{"sqlFunction": null}', "Rs. 5,00,000 was allocated for road repair in Ward 12 [E1]."]
         ans = c.assistant.ask(cit, "What is allocated for road repair in Ward 12?")
         self.assertEqual((ans["status"], ans["citations"][0]["documentName"]), ("answered", "ward-budget.txt"))
         self.assertEqual(sorted(ans["citations"][0]["foundVia"]), ["bm25", "semantic"])
-        self.assertTrue(c.assistant.ask(bala, "What is allocated for road repair in Ward 12?")["insufficient_evidence"])  # private document invisible to another citizen
+        # private document invisible to another citizen: at most clearly-labelled general guidance, never its content or citation
+        s.chat.replies = ['{"sqlFunction": null}', "Ward budgets are published by the municipal corporation."]
+        other = c.assistant.ask(bala, "What is allocated for road repair in Ward 12?")
+        self.assertEqual((other["status"], other["citations"], other["database_facts"]), ("general_guidance", [], None))
+        self.assertNotIn("5,00,000", other["answer"])
 
         # ---------------- GIS, dashboards, integrations, anomalies, audit (admin)
         gis = c.gis.radar(admin)
