@@ -33,6 +33,7 @@ Nothing here fabricates a success.
 from __future__ import annotations
 
 import logging
+import re
 import uuid
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
@@ -43,12 +44,15 @@ from sqlalchemy import inspect, select
 from app.core.authorization import AuthContext, Permission, require
 from app.core.exceptions import NotFound, PermissionDenied, ValidationFailed
 from app.core.logging import correlation_id_var
+from app.db.models.identity import ProfileModel, UserModel
 from app.db.models.interop_platform import (
     IdentityMatchCandidate,
     InteropConsentGrant,
     InteropException,
     InteropTransaction,
     MasterEntity,
+    MockDeptBApplication,
+    MockDeptBBeneficiary,
     UnifiedApplication,
     UnifiedApplicationEvent,
     WorkflowDefinition,
@@ -71,6 +75,7 @@ from app.interop.identity_resolution import IdentityResolutionService
 from app.interop.monitoring import alerts as connector_alerts
 from app.interop.quality.engine import DataQualityEngine, QualityRule
 from app.services.audit_service import AuditService
+from app.services.notification_service import NotificationService
 from app.services.uow import UowFactory
 
 CONSENT_VALIDITY = timedelta(days=30)
@@ -186,19 +191,26 @@ class InteropGatewayService:
                 consent = self._find_consent(s, master_id=master_id, data_category=document_type, status="granted")
                 if consent is None or (consent.expires_at is not None and consent.expires_at <= self._clock()):
                     pending = self._find_consent(s, master_id=master_id, data_category=document_type, status="pending")
+                    owner = self._citizen_account_for(s, resident.mobile, beneficiary.mobile_number)
                     if pending is None:
                         pending = InteropConsentGrant(
-                            consent_id=str(uuid.uuid4()), master_id=master_id, citizen_user_id=ctx.user_id,
+                            consent_id=str(uuid.uuid4()), master_id=master_id, citizen_user_id=owner or ctx.user_id,
                             requesting_system="dept_b", providing_system="dept_a",
                             purpose=f"Verify {document_type.replace('_', ' ')} for application {application_no}",
                             data_category=document_type, fields=list(REQUIRED_DOCUMENT_FIELDS),
                             status="pending", created_at=self._clock(),
                         )
                         s.add(pending)
-                        AuditService(uow.audit, self._clock).record("interop.consent_requested", actor_id=ctx.user_id, resource_type="interop_consent", resource_id=pending.consent_id, metadata={"master_id": master_id, "application_no": application_no, "document_type": document_type})
+                        AuditService(uow.audit, self._clock).record("interop.consent_requested", actor_id=ctx.user_id, resource_type="interop_consent", resource_id=pending.consent_id, metadata={"master_id": master_id, "application_no": application_no, "document_type": document_type, "citizen_linked": owner is not None})
+                        if owner:
+                            NotificationService(self._clock).notify(
+                                uow.notifications, owner, "interop.consent_requested", f"{mock_systems.DEPT_B_NAME} is asking to use your {document_type.replace('_', ' ')}",
+                                f"Allow {mock_systems.DEPT_B_NAME} to fetch your already-verified {document_type.replace('_', ' ')} from {mock_systems.DEPT_A_NAME} for application {application_no}? "
+                                f"Only these fields are shared: {', '.join(REQUIRED_DOCUMENT_FIELDS)}. Open My data sharing to allow or deny.",
+                                data={"consent_id": pending.consent_id, "route": "/my-data"}, dedupe_key=f"consent:{pending.consent_id}")
                     uow.commit()
                     self._publish(InteropEvent(event_type="ConsentRequested", source_system="dept_b", destination="dept_a", entity_id=pending.consent_id, correlation_id=correlation_id, payload={"master_id": master_id, "application_no": application_no, "data_category": document_type}))
-                    return {"status": "consent_required", "consent_id": pending.consent_id, "master_id": master_id}
+                    return {"status": "consent_required", "consent_id": pending.consent_id, "master_id": master_id, "citizen_linked": pending.citizen_user_id != ctx.user_id}
 
                 result, events = self._execute_exchange(uow, ctx, master_id=master_id, consent=consent, application_no=application_no, document_type=document_type, resident=resident, correlation_id=correlation_id)
                 uow.commit()
@@ -207,6 +219,49 @@ class InteropGatewayService:
                 return result
         finally:
             correlation_id_var.reset(token)
+
+    @staticmethod
+    def _citizen_account_for(session, *mobiles: str | None) -> str | None:
+        """The CivicLens citizen whose profile mobile matches the department records, so the consent
+        request lands with the person it is about. Exactly one match or nothing - never a guess."""
+        wanted = {re.sub(r"\D", "", m)[-10:] for m in mobiles if m and len(re.sub(r"\D", "", m)) >= 10}
+        if not wanted:
+            return None
+        rows = session.execute(
+            select(ProfileModel.user_id, ProfileModel.phone).join(UserModel, UserModel.id == ProfileModel.user_id)
+            .where(ProfileModel.phone.is_not(None), UserModel.role == "citizen", UserModel.is_active.is_(True))
+        ).all()
+        matches = {str(uid) for uid, phone in rows if re.sub(r"\D", "", phone or "")[-10:] in wanted}
+        return next(iter(matches)) if len(matches) == 1 else None
+
+    def list_demo_applications(self, ctx: AuthContext) -> list[dict]:
+        """Department B applications (demo system) the console can run the no-reupload exchange for."""
+        require(ctx, Permission.INTEROP_READ)
+        with self._uow() as uow:
+            s = uow.session
+            rows = s.execute(select(MockDeptBApplication, MockDeptBBeneficiary.full_name).join(MockDeptBBeneficiary, MockDeptBBeneficiary.beneficiary_code == MockDeptBApplication.beneficiary_code).order_by(MockDeptBApplication.application_no)).all()
+            return [{**_row(a), "applicant": name} for a, name in rows]
+
+    def reset_demo_scenario(self, ctx: AuthContext) -> dict:
+        """Demo only: reopen the seeded Department B applications and withdraw their open consents, with a
+        recorded reason, so the full no-reupload flow can be shown again. History and audit rows are kept."""
+        require(ctx, Permission.INTEROP_MANAGE)
+        with self._uow() as uow:
+            s = uow.session
+            now = self._clock()
+            apps = list(s.execute(select(MockDeptBApplication)).scalars().all())
+            for a in apps:
+                a.status, a.document_status, a.document_reference, a.updated_at = "pending_document", "missing", None, now
+                s.add(a)
+            withdrawn = 0
+            for g in s.execute(select(InteropConsentGrant).where(InteropConsentGrant.status.in_(("granted", "pending")))).scalars().all():
+                if any(a.application_no in (g.purpose or "") for a in apps):
+                    g.status, g.revoked_at, g.revocation_reason = "revoked", now, "Demo scenario reset"
+                    s.add(g)
+                    withdrawn += 1
+            AuditService(uow.audit, self._clock).record("interop.demo_reset", actor_id=ctx.user_id, resource_type="interop_demo", resource_id="dept_b_applications", metadata={"applications": [a.application_no for a in apps], "consents_withdrawn": withdrawn})
+            uow.commit()
+            return {"applications_reopened": len(apps), "consents_withdrawn": withdrawn}
 
     def _find_matching_dept_a_resident(self, session, *, beneficiary):
         result = connector_runtime.call(session, "dept_a", "query", "resident", mobile=beneficiary.mobile_number)

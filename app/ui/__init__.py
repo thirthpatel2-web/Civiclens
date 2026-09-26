@@ -8,9 +8,9 @@ from typing import Any
 def mount_ui(fastapi_app: Any, container: Any, settings: Any) -> None:
     from nicegui import ui
 
-    from app.ui.pages import admin, citizen, public, staff
+    from app.ui.pages import admin, citizen, gateway, public, staff
 
-    for module in (public, citizen, staff, admin):
+    for module in (public, citizen, staff, admin, gateway):
         module.register(container)
     secret = settings.session_secret or settings.app_secret_key
     if settings.is_production and not secret:

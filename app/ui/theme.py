@@ -265,7 +265,7 @@ body.body--dark a:not(.q-btn):not(.q-item):not(.q-tab):not(.cl-nav-item) {{ colo
   position: fixed; top: -48px; left: 12px; z-index: 4000; background: var(--cl-surface); color: var(--cl-fg);
   padding: 10px 16px; border-radius: var(--cl-radius-sm); box-shadow: var(--cl-shadow-lift); transition: top .15s ease;
 }}
-.cl-skip-link:focus {{ top: 12px; }}
+.cl-skip-link:focus-visible {{ top: 12px; }}  /* keyboard focus only: a dialog handing focus back must not flash it */
 
 /* ---- layout shell ------------------------------------------------------------------------ */
 .cl-page {{ max-width: 1280px; margin: 0 auto; width: 100%; }}

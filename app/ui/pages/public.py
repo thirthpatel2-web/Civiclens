@@ -29,7 +29,7 @@ from app.ui.components import (
 )
 
 logger = logging.getLogger("civiclens.ui")
-PRIV = (Role.ADMIN, Role.SUPER_ADMIN)
+PRIV = (Role.ADMIN, Role.SUPER_ADMIN, Role.INTEGRATION_ADMIN, Role.AUDITOR)  # every privileged staff role signs in through the administration door
 DESK = (Role.OFFICER, Role.ADMIN, Role.SUPER_ADMIN)
 
 

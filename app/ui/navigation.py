@@ -12,6 +12,8 @@ CIT = frozenset({Role.CITIZEN})
 STAFF = frozenset({Role.OFFICER})
 ADMINS = frozenset({Role.ADMIN, Role.SUPER_ADMIN})
 OFFICER_UP = frozenset({Role.OFFICER, Role.ADMIN, Role.SUPER_ADMIN})
+# Everyone who holds INTEROP_READ: the interoperability console (auditors see it read-only).
+GATEWAY = frozenset({Role.OFFICER, Role.ADMIN, Role.SUPER_ADMIN, Role.INTEGRATION_ADMIN, Role.AUDITOR})
 
 
 @dataclass(frozen=True)
@@ -32,7 +34,8 @@ NAVIGATION: tuple[NavGroup, ...] = (
     NavGroup(None, (NavItem("nav.dashboard", "/dashboard", "dashboard", CIT), NavItem("nav.assistant", "/assistant", "record_voice_over", ALL))),
     NavGroup("nav.services", (NavItem("nav.report", "/report", "add_circle", CIT), NavItem("nav.rti", "/rti", "gavel", CIT), NavItem("nav.legal", "/legal", "balance", CIT))),
     NavGroup("nav.intelligence", (NavItem("nav.copilot", "/copilot", "smart_toy", ALL), NavItem("nav.gis", "/gis", "map", ALL), NavItem("nav.locator", "/locator", "place", ALL), NavItem("nav.interop", "/interop", "hub", ALL))),
-    NavGroup("nav.track", (NavItem("nav.grievances", "/grievances", "assignment", CIT),)),
+    NavGroup("nav.track", (NavItem("nav.grievances", "/grievances", "assignment", CIT), NavItem("nav.my_data", "/my-data", "how_to_reg", CIT))),
+    NavGroup("nav.interop_gateway", (NavItem("nav.interop_gateway", "/gateway", "hub", GATEWAY),)),
     NavGroup("nav.emergency", (NavItem("nav.emergency", "/emergency", "emergency", ALL),)),
     NavGroup("nav.account", (NavItem("nav.profile", "/profile", "person", ALL), NavItem("nav.settings", "/settings", "shield", ALL), NavItem("nav.notifications", "/notifications", "notifications", ALL),
                              NavItem("nav.documents", "/documents", "folder", ALL), NavItem("nav.security", "/security", "lock", ALL))),
@@ -48,7 +51,13 @@ NAVIGATION: tuple[NavGroup, ...] = (
 
 
 def home_for(role: Role) -> str:
-    return "/dashboard" if role is Role.CITIZEN else "/officer" if role is Role.OFFICER else "/admin"
+    if role is Role.CITIZEN:
+        return "/dashboard"
+    if role is Role.OFFICER:
+        return "/officer"
+    if role in (Role.INTEGRATION_ADMIN, Role.AUDITOR):
+        return "/gateway"  # neither holds admin-page permissions; /admin would bounce them in a loop
+    return "/admin"
 
 
 def visible(role: Role) -> list[NavGroup]:
