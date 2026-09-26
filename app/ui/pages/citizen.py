@@ -473,6 +473,21 @@ def register(c: AppContainer) -> None:
         qp = ui.context.client.request.query_params if ui.context.client.request else {}
         pre_text = (qp.get("text") or "")[:1500]
         pre_voice = qp.get("voice") or None
+        # Text handed over from the Voice Assistant keeps the language it was spoken in (Devanagari alone
+        # cannot tell Marathi from Hindi); typed text in another script gets its script's language.
+        from app.i18n.languages import LANGUAGES, detect_language
+
+        pre_lang = lang()
+        if pre_voice:
+            try:
+                vr = c.voice.get_for_user(user.ctx, pre_voice)
+                spoken = vr.language_requested if vr.language_requested != "auto" else vr.language_detected
+                pre_lang = spoken if spoken in LANGUAGES else pre_lang
+            except CivicLensError:
+                pass
+        elif pre_text:
+            guess, _ambiguous = detect_language(pre_text)
+            pre_lang = guess if guess in LANGUAGES else pre_lang
         q_voice_state: dict[str, Any] = {"id": pre_voice}
         d_voice_state: dict[str, Any] = {"id": pre_voice}
 
@@ -619,7 +634,7 @@ def register(c: AppContainer) -> None:
 
                 with ui.row().classes("gap-3 w-full flex-wrap items-end"):
                     q_where = ui.input(tr(c, "report.q_where")).props("outlined dense").classes("flex-1").style("min-width: 220px;")
-                    q_language = ui.select({k: f"{v.native} ({k})" for k, v in LANGUAGES.items()}, value=lang(), label=tr(c, "lbl.language")).props("outlined dense").classes("w-44")
+                    q_language = ui.select({k: f"{v.native} ({k})" for k, v in LANGUAGES.items()}, value=pre_lang, label=tr(c, "lbl.language")).props("outlined dense").classes("w-44")
                 field_hint(tr(c, "report.q_where_hint"))
                 ui.label(tr(c, "report.manual_location_hint")).classes("text-xs").style("color: var(--cl-fg-subtle); font-style: italic;")
                 ui.label(tr(c, "report.q_voice_lang_hint")).classes("text-xs").style("color: var(--cl-fg-subtle); font-style: italic;")

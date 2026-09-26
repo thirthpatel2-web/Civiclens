@@ -35,7 +35,7 @@ CATEGORY_KEYWORDS: dict[str, tuple[str, ...]] = {
 }  # fmt: skip
 CRITICAL_TERMS = ("exposed wire", "live wire", "sparking", "collapsed", "collapse", "gas leak", "fire", "open manhole", "electrocut", "drowning", "आग", "खुला मैनहोल", "करंट", "विजेचा धक्का", "उघडे मॅनहोल")
 HIGH_TERMS = ("accident", "injur", "sewage overflow", "contaminated", "no water", "outbreak", "burst", "flood", "waterlogging", "stomach", "diarrh", "vomit", "fell ill", "dangerous", "unsafe", "leaning", "sagging", "दुर्घटना", "घायल", "जलभराव", "खतरनाक", "बीमार", "अपघात", "जखमी", "जख्मी", "धोकादायक", "आजारी")
-SAFETY_TERMS = ("accident", "injur", "fire", "electrocut", "collapse", "exposed wire", "live wire", "manhole", "sparking", "dangerous", "leaning", "sagging", "दुर्घटना", "घायल", "आग", "करंट", "अपघात", "जखमी", "धोकादायक", "विजेचा धक्का")
+SAFETY_TERMS = ("accident", "injur", "fire", "electrocut", "collapse", "exposed wire", "live wire", "manhole", "sparking", "dangerous", "leaning", "sagging", "दुर्घटना", "घायल", "आग", "करंट", "अपघात", "जखमी", "जख्मी", "धोकादायक", "विजेचा धक्का")
 SENSITIVE_SITE_TERMS = ("school", "hospital", "clinic", "college", "anganwadi", "स्कूल", "अस्पताल", "कॉलेज", "शाळा", "शाळे", "रुग्णालय", "दवाखाना", "महाविद्यालय")
 
 
