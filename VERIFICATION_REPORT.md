@@ -2,7 +2,7 @@
 
 > **Historical report — read this first.** This document records the *early* build, verified in an
 > offline sandbox before any server, database or model had run (hence "not run" throughout).
-> Everything it lists as unexecuted has since been run for real: the full suite is now **727 tests,
+> Everything it lists as unexecuted has since been run for real: the full suite is now **765 tests,
 > passing against a live PostgreSQL database**, and a single live end-to-end session passed **31/31**
 > checks across the whole interoperability platform. Current status lives in
 > [`docs/REQUIREMENT_TRACEABILITY.md`](docs/REQUIREMENT_TRACEABILITY.md) and the

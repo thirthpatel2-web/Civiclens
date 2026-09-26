@@ -16,6 +16,7 @@ from app.container import AppContainer
 from app.core.authorization import Role
 from app.core.exceptions import AuthenticationFailed, CivicLensError, MfaRequired
 from app.core.transactions import run_in_uow
+from app.providers.stt import WHISPER_LANGUAGES
 from app.services.profile_service import CONSENT_PURPOSES
 from app.ui import navigation
 from app.ui.base import UiUser, info_banner, page, sign_in, tr
@@ -202,7 +203,7 @@ def register(c: AppContainer) -> None:
 
             # Every number here is read from this server's live configuration, never hard-coded copy.
             with ui.element("div").classes("cl-hero-strip q-mt-lg"):
-                for value, label_key in ((str(len(c.ui_text.languages)), "hero.stat_languages"), (str(len(CATEGORIES)), "hero.stat_categories"), (str(c.settings.rti_response_days), "hero.stat_rti_days")):
+                for value, label_key in ((str(len(WHISPER_LANGUAGES)), "hero.stat_languages"), (str(len(CATEGORIES)), "hero.stat_categories"), (str(c.settings.rti_response_days), "hero.stat_rti_days")):
                     with ui.column().classes("items-center gap-0"):
                         ui.label(value).classes("cl-hero-stat-n")
                         ui.label(tr(c, label_key)).classes("cl-hero-stat-l")
