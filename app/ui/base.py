@@ -190,7 +190,7 @@ def public_topbar(c: AppContainer, *, home: bool = False) -> None:
             app.storage.user["dark"] = new_value
             theme_btn.props(f"icon={'light_mode' if new_value else 'dark_mode'}")
 
-        theme_btn = ui.button(icon="light_mode" if dm.value else "dark_mode", on_click=flip).props("flat round dense").style("color: var(--cl-fg);")
+        theme_btn = ui.button(icon="light_mode" if dm.value else "dark_mode", on_click=flip).props('flat round dense aria-label="Switch light or dark mode"').style("color: var(--cl-fg);")
         theme_btn.tooltip(tr(c, "theme.toggle"))
 
         from app.i18n.languages import LANGUAGES as _LANGS
@@ -241,7 +241,7 @@ def shell(c: AppContainer, user: UiUser, route: str, title_key: str) -> None:
                         ui.label(tr(c, item.key))
 
     with ui.header(elevated=False).classes("cl-shell-header items-center q-px-md").style("height: 64px;"):
-        ui.button(icon="menu", on_click=drawer.toggle).props("flat round dense").tooltip(tr(c, "nav.open_menu")).style("color: var(--cl-fg);")
+        ui.button(icon="menu", on_click=drawer.toggle).props('flat round dense aria-label="Open or close the menu"').tooltip(tr(c, "nav.open_menu")).style("color: var(--cl-fg);")
         with ui.column().classes("gap-0 gt-xs q-ml-sm"):
             ui.label(tr(c, title_key)).classes("text-sm font-semibold").style("color: var(--cl-fg); line-height: 1.1;")
             ui.label(_role_label(c, user.ctx.role) + (f" · {user.ctx.department_id}" if user.ctx.department_id else "")).classes("text-xs").style("color: var(--cl-fg-muted);")
@@ -266,10 +266,10 @@ def shell(c: AppContainer, user: UiUser, route: str, title_key: str) -> None:
             theme_btn.props(f"icon={'light_mode' if new_value else 'dark_mode'}")
             theme_btn.tooltip(tr(c, "theme.dark") if not new_value else tr(c, "theme.light"))
 
-        theme_btn = ui.button(icon="light_mode" if dm.value else "dark_mode", on_click=flip_theme).props("flat round dense").style("color: var(--cl-fg);")
+        theme_btn = ui.button(icon="light_mode" if dm.value else "dark_mode", on_click=flip_theme).props('flat round dense aria-label="Switch light or dark mode"').style("color: var(--cl-fg);")
         theme_btn.tooltip(tr(c, "theme.toggle"))
 
-        bell = ui.button(icon="notifications", on_click=lambda: ui.navigate.to("/notifications")).props("flat round dense").style("color: var(--cl-fg);")
+        bell = ui.button(icon="notifications", on_click=lambda: ui.navigate.to("/notifications")).props('flat round dense aria-label="Notifications"').style("color: var(--cl-fg);")
         bell.tooltip(tr(c, "nav.notifications"))
         with bell:
             count = ui.badge("0", color="danger").props("floating")
@@ -290,7 +290,7 @@ def shell(c: AppContainer, user: UiUser, route: str, title_key: str) -> None:
             sign_out(c)
             ui.navigate.to("/login")
 
-        with ui.button(icon="account_circle").props("flat round dense").style("color: var(--cl-fg);"):
+        with ui.button(icon="account_circle").props('flat round dense aria-label="Account menu"').style("color: var(--cl-fg);"):
             with ui.menu().props("anchor='bottom right' self='top right'"):
                 with ui.column().classes("q-pa-sm gap-0").style("min-width: 200px;"):
                     ui.label(user.full_name or user.email).classes("text-sm font-semibold q-px-sm")
@@ -300,7 +300,7 @@ def shell(c: AppContainer, user: UiUser, route: str, title_key: str) -> None:
                 ui.menu_item(tr(c, "nav.settings"), lambda: ui.navigate.to("/settings"))
                 with ui.row().classes("items-center justify-between w-full q-px-sm q-py-xs"):
                     ui.label(tr(c, "lbl.appearance")).classes("text-sm")
-                    ui.button(icon="light_mode" if dm.value else "dark_mode", on_click=flip_theme).props("flat round dense size=sm")
+                    ui.button(icon="light_mode" if dm.value else "dark_mode", on_click=flip_theme).props('flat round dense size=sm aria-label="Switch light or dark mode"')
                 ui.separator()
                 ui.menu_item(tr(c, "act.sign_out"), _do_sign_out)
 

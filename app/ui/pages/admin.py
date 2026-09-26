@@ -374,7 +374,7 @@ def register(c: AppContainer) -> None:
         page_header(tr(c, "nav.audit"), icon="fact_check")
         with ui.row().classes("gap-2 items-center w-full"):
             prefix = ui.input(tr(c, "ad.action_prefix")).props("outlined dense").classes("w-72")
-            ui.button(icon="search", on_click=lambda: draw()).props("round unelevated color=primary")
+            ui.button(icon="search", on_click=lambda: draw()).props('round unelevated color=primary aria-label="Search"')
         box = ui.column().classes("w-full")
 
         def draw() -> None:

@@ -248,7 +248,7 @@ def register(c: AppContainer) -> None:
             with ui.element("div").classes("cl-ask w-full"):
                 ui.icon("auto_awesome").classes("text-[20px]").style("color: var(--cl-ai);")
                 box = ui.input(placeholder=tr(c, "assistant.placeholder")).props("borderless debounce=400").classes("flex-1")
-                mic = ui.button(icon="mic").props("round unelevated").style("background: var(--cl-ai); color: #fff;")
+                mic = ui.button(icon="mic").props('round unelevated aria-label="Speak instead of typing"').style("background: var(--cl-ai); color: #fff;")
                 mic.tooltip(tr(c, "assistant.mic_tip") if caps["state"] == "CONFIGURED" else tr(c, "assistant.mic_off"))
                 mic.set_enabled(caps["state"] == "CONFIGURED")
             hint = ui.label(tr(c, "assistant.hint")).classes("text-xs").style("color: var(--cl-fg-subtle);")
@@ -542,7 +542,7 @@ def register(c: AppContainer) -> None:
                 with ui.element("div").classes("cl-ask w-full"):
                     ui.icon("add_location_alt").classes("text-[20px]").style("color: var(--cl-primary, var(--cl-ai));")
                     q_desc = ui.textarea(tr(c, "report.q_what"), value=pre_text).props("borderless autogrow rows=3").classes("flex-1")
-                    q_mic = ui.button(icon="mic").props("round unelevated")
+                    q_mic = ui.button(icon="mic").props('round unelevated aria-label="Speak instead of typing"')
                 q_voice_hint = ui.label("").classes("text-xs").style("color: var(--cl-fg-subtle);")
                 field_hint(tr(c, "report.q_what_hint"))
                 # live preview with the same rule classifier the server runs first - instant, local,
@@ -795,7 +795,7 @@ def register(c: AppContainer) -> None:
                     with ui.element("div").classes("cl-ask w-full"):
                         ui.icon("edit_note").classes("text-[20px]").style("color: var(--cl-ai);")
                         desc = ui.textarea(tr(c, "lbl.description"), value=pre_text).props("borderless autogrow rows=3").classes("flex-1")
-                        d1_mic = ui.button(icon="mic").props("round unelevated")
+                        d1_mic = ui.button(icon="mic").props('round unelevated aria-label="Speak instead of typing"')
                     d1_voice_hint = ui.label("").classes("text-xs").style("color: var(--cl-fg-subtle);")
                     field_hint(tr(c, "report.desc_hint"))
 
@@ -916,7 +916,7 @@ def register(c: AppContainer) -> None:
                         info_banner(tr(c, "report.stt_off"), "orange")
                     else:
                         with ui.row().classes("gap-3 items-center"):
-                            d3_mic = ui.button(icon="mic").props("round unelevated")
+                            d3_mic = ui.button(icon="mic").props('round unelevated aria-label="Speak instead of typing"')
                             ui.label(tr(c, "report.record_audio")).classes("text-sm").style("color: var(--cl-fg);")
                         d3_voice_hint = ui.label("").classes("text-xs").style("color: var(--cl-fg-subtle);")
                         wire_mic(d3_mic, desc, language, d3_voice_hint, d_voice_state)
@@ -1176,7 +1176,7 @@ def register(c: AppContainer) -> None:
                 with ui.element("div").classes("cl-ask w-full"):
                     ui.icon("gavel").classes("text-[20px]").style("color: var(--cl-ai);")
                     subject = ui.textarea(tr(c, "rti.subject_label")).props("borderless autogrow rows=2").classes("flex-1")
-                    r_mic = ui.button(icon="mic").props("round unelevated")
+                    r_mic = ui.button(icon="mic").props('round unelevated aria-label="Speak instead of typing"')
                     r_mic.set_enabled(caps["state"] == "CONFIGURED")
                     r_mic.tooltip(tr(c, "assistant.mic_tip") if caps["state"] == "CONFIGURED" else tr(c, "assistant.mic_off"))
                 r_voice_hint = ui.label("").classes("text-xs").style("color: var(--cl-fg-subtle);")
@@ -1440,7 +1440,7 @@ def register(c: AppContainer) -> None:
         with ui.element("div").classes("cl-ask w-full max-w-3xl"):
             ui.icon("balance").classes("text-[20px]").style("color: var(--cl-ai);")
             problem = ui.textarea(tr(c, "caseInputLabel"), value=(_qp.get("text") or "")[:2000]).props("borderless autogrow").classes("flex-1")
-            mic = ui.button(icon="mic").props("round unelevated").style("background: var(--cl-ai); color: #fff;")
+            mic = ui.button(icon="mic").props('round unelevated aria-label="Speak instead of typing"').style("background: var(--cl-ai); color: #fff;")
             mic.tooltip(tr(c, "assistant.mic_tip") if caps["state"] == "CONFIGURED" else tr(c, "assistant.mic_off"))
             mic.set_enabled(caps["state"] == "CONFIGURED")
         voice_hint = ui.label("").classes("text-xs").style("color: var(--cl-fg-subtle);")
@@ -1747,12 +1747,12 @@ def register(c: AppContainer) -> None:
                         status_lbl = ui.label(tr(c, "saathi.tap_stop")).classes("text-xs").style("color: var(--cl-danger);")
                     listening_row.set_visibility(False)
                     with ui.row().classes("items-center gap-2 w-full cl-saathi-inputrow"):
-                        mic = ui.button(icon="mic").props("round unelevated color=primary").classes("cl-mic-btn")
+                        mic = ui.button(icon="mic").props('round unelevated color=primary aria-label="Speak instead of typing"').classes("cl-mic-btn")
                         spoken_opts = {"auto": "🌐 " + tr(c, "report.auto_detect")} | {lg["code"]: lg["native"] for lg in caps["languages"]}
                         spoken = ui.select(spoken_opts, value=lang() if lang() in spoken_opts and lang() != "en" else "auto").props("dense outlined options-dense").classes("w-44 cl-spoken")
                         spoken.tooltip(tr(c, "saathi.speak_in"))
                         box = ui.input(placeholder=tr(c, "chatbotPlaceholder")).props("outlined dense rounded").classes("flex-1 cl-saathi-box")
-                        send_btn = ui.button(icon="send", on_click=lambda: send()).props("round unelevated color=primary")
+                        send_btn = ui.button(icon="send", on_click=lambda: send()).props('round unelevated color=primary aria-label="Send"')
                     tip = ui.label(tr(c, "saathi.lang_tip")).classes("text-[11px] q-px-sm").style("color: var(--cl-fg-subtle);")
             if not voice_on:
                 mic.disable()
@@ -2266,7 +2266,7 @@ def register(c: AppContainer) -> None:
                         for rec in items:
                             with ui.row().classes("items-center justify-between w-full"):
                                 ui.label(f"{rec.id_type.replace('_', ' ').upper()} · ···{rec.last4 or '----'}").classes("text-sm cl-mono").style("color: var(--cl-fg);")
-                                ui.button(icon="delete_outline", on_click=lambda i=rec.id: _unlink_id(i)).props("flat dense round color=negative")
+                                ui.button(icon="delete_outline", on_click=lambda i=rec.id: _unlink_id(i)).props('flat dense round color=negative aria-label="Remove"')
 
                 draw_ids()
                 divider()
@@ -2307,7 +2307,7 @@ def register(c: AppContainer) -> None:
                                 with ui.column().classes("gap-0"):
                                     ui.label(f"{rec.platform} · {rec.external_reference}").classes("text-sm font-medium cl-mono").style("color: var(--cl-fg);")
                                     ui.label(rec.title + (f" — {rec.status_note}" if rec.status_note else "")).classes("text-xs").style("color: var(--cl-fg-muted);")
-                                ui.button(icon="delete_outline", on_click=lambda i=rec.id: _remove_link(i)).props("flat dense round color=negative")
+                                ui.button(icon="delete_outline", on_click=lambda i=rec.id: _remove_link(i)).props('flat dense round color=negative aria-label="Remove"')
 
                 draw_links()
                 divider()
@@ -2449,7 +2449,7 @@ def register(c: AppContainer) -> None:
         section_title(tr(c, "doc.search"))
         with ui.row().classes("gap-2 w-full max-w-xl items-center"):
             q = ui.input(tr(c, "doc.search")).props("outlined dense").classes("flex-1")
-            ui.button(icon="search", on_click=lambda: search()).props("round unelevated color=primary")
+            ui.button(icon="search", on_click=lambda: search()).props('round unelevated color=primary aria-label="Search"')
         out = ui.column().classes("w-full max-w-xl gap-2")
 
         def search() -> None:
