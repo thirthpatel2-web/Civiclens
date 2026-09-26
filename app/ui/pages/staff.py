@@ -11,7 +11,9 @@ from nicegui import ui
 from app.container import AppContainer
 from app.core.authorization import Role
 from app.core.exceptions import CivicLensError
+from app.core.transactions import run_in_uow
 from app.services.complaint_status import TRANSITIONS, ComplaintStatus
+from app.services.sla_service import SlaCalculator, SlaSubject
 from app.ui import theme
 from app.ui.base import UiUser, data_table, info_banner, page, tr
 from app.ui.components import chip, divider, page_header, section_title, stat_tile, state_panel
@@ -54,12 +56,16 @@ def register(c: AppContainer) -> None:
         with ui.row().classes("gap-4 w-full flex-wrap"):
             with ui.column().classes("cl-card").style("flex: 1; min-width: 320px;"):
                 section_title(tr(c, "of.by_category"))
-                ui.echart({"tooltip": {}, "series": [{"type": "pie", "radius": "70%", "data": [{"name": k, "value": v} for k, v in d["by_category"].items()]}]}).classes("w-full h-56")
+                # donut + legend: the old outer labels overlapped whenever two small slices sat side by side
+                ui.echart({"tooltip": {"trigger": "item", "formatter": "{b}: {c} ({d}%)"}, "legend": {"orient": "vertical", "right": 0, "top": "middle", "textStyle": {"color": "#9aa3b8"}},
+                           "series": [{"type": "pie", "radius": ["45%", "72%"], "center": ["38%", "50%"], "label": {"show": False}, "itemStyle": {"borderColor": "#0f1220", "borderWidth": 2},
+                                       "data": [{"name": k.replace("_", " ").capitalize(), "value": v} for k, v in sorted(d["by_category"].items(), key=lambda kv: -kv[1])]}]}).classes("w-full h-56")  # fmt: skip
             with ui.column().classes("cl-card").style("flex: 1.4; min-width: 380px;"):
                 section_title(tr(c, "of.per_day"))
                 ui.echart({"grid": {"left": 36, "right": 12, "top": 12, "bottom": 24}, "xAxis": {"type": "category", "data": [t["date"][5:] for t in d["trend_daily"]]}, "yAxis": {"type": "value"}, "series": [{"type": "line", "areaStyle": {}, "data": [t["count"] for t in d["trend_daily"]]}]}).classes("w-full h-56")
         section_title(tr(c, "col.workload"))
-        data_table([("officer", tr(c, "role.officer")), ("open", tr(c, "card.open"))], [{"id": k, "officer": k[:8], "open": v} for k, v in d["workload"].items()], empty=tr(c, "of.no_work"))
+        names = run_in_uow(c, lambda uow: {k: uow.officers.user_label(k) for k in d["workload"]})
+        data_table([("officer", tr(c, "role.officer")), ("open", tr(c, "card.open"))], [{"id": k, "officer": names.get(k) or k[:8], "open": v} for k, v in sorted(d["workload"].items(), key=lambda kv: -kv[1])], empty=tr(c, "of.no_work"))
         if d["anomalies"]:
             section_title(tr(c, "of.open_anomalies"))
             with ui.column().classes("gap-2 w-full"):
@@ -68,22 +74,59 @@ def register(c: AppContainer) -> None:
 
     @page(c, "/officer/queue", "nav.officer_queue", roles=STAFF)
     def queue(c: AppContainer, user: UiUser) -> None:
-        page_header(tr(c, "nav.officer_queue"), icon="inbox")
+        page_header(tr(c, "nav.officer_queue"), "Most urgent first: overdue, then at risk, then by priority. Click a row to act on it.", icon="inbox")
         with ui.row().classes("gap-3 items-center w-full flex-wrap"):
+            search = ui.input(placeholder="Search reference or title").props("outlined dense clearable").classes("w-72")
+            with search.add_slot("prepend"):
+                ui.icon("search")
             mine = ui.switch("Only mine").props("color=primary")
             status = ui.select({"": "All", **{s.value: s.value.replace("_", " ") for s in ComplaintStatus}}, value="", label=tr(c, "lbl.status")).props("outlined dense").classes("w-52")
+        summary = ui.row().classes("gap-2 flex-wrap")
         box = ui.column().classes("w-full")
+        calc = SlaCalculator(run_in_uow(c, lambda uow: list(uow.config.sla_policies())))
+        now = c.clock()
+        urgency = {"breached": 0, "at_risk": 1, "on_track": 2, "no_policy": 3, "finished": 4}
+        rank = {"critical": 0, "high": 1, "medium": 2, "low": 3}
+        label = {"breached": "Overdue", "at_risk": "At risk", "on_track": "On track", "no_policy": "No SLA policy", "finished": "Closed"}
 
         def draw() -> None:
             box.clear()
+            summary.clear()
+            items = c.officer.queue(user.ctx, mine_only=mine.value, statuses=[ComplaintStatus(status.value)] if status.value else None)
+            q = (search.value or "").strip().lower()
+            if q:
+                items = [x for x in items if q in x.reference.lower() or q in (x.title or "").lower()]
+            st = {x.id: calc.status(SlaSubject(x.id, x.priority, x.department_code, x.status, x.created_at, x.sla_due_at, x.escalation_level), now) for x in items}
+            items.sort(key=lambda x: (urgency.get(st[x.id].state, 9), rank.get(x.priority, 9), x.created_at))
+
+            def due_text(x: Any) -> str:
+                s = st[x.id]
+                if s.due_at is None:
+                    return label[s.state]
+                hours = (s.due_at - now).total_seconds() / 3600
+                when = f"{abs(hours):.0f} h overdue" if hours < 0 else (f"{hours:.0f} h left" if hours < 48 else f"{hours / 24:.0f} d left")
+                return f"{label[s.state]} · {when}"
+
+            counts: dict[str, int] = {}
+            for s in st.values():
+                counts[s.state] = counts.get(s.state, 0) + 1
+            with summary:
+                chip(f"{len(items)} in view", color="muted", outline=True)
+                for key, tone in (("breached", "danger"), ("at_risk", "warning"), ("on_track", "success"), ("no_policy", "muted")):
+                    if counts.get(key):
+                        chip(f"{label[key]}: {counts[key]}", color=tone)
+                if counts.get("no_policy") and user.ctx.role is not Role.OFFICER:
+                    ui.link("Set SLA policies", "/admin/sla").classes("text-xs")
             with box:
-                items = c.officer.queue(user.ctx, mine_only=mine.value, statuses=[ComplaintStatus(status.value)] if status.value else None)
-                rows = [{"id": x.id, "ref": x.reference, "title": x.title, "status": str(x.status).replace("_", " "), "prio": x.priority, "ward": x.ward or "-", "due": x.sla_due_at.strftime("%d %b %H:%M") if x.sla_due_at else "no SLA"} for x in items]
+                rows = [{"id": x.id, "ref": x.reference, "title": x.title, "status": str(x.status).replace("_", " "), "prio": x.priority, "ward": x.ward or "-", "due": due_text(x)} for x in items]
                 data_table([("ref", tr(c, "lbl.reference")), ("title", tr(c, "lbl.title")), ("status", tr(c, "lbl.status")), ("prio", tr(c, "lbl.priority")), ("ward", tr(c, "lbl.ward")), ("due", tr(c, "lbl.due"))], rows,
-                           on_row=lambda r: ui.navigate.to(f"/officer/complaints/{r['id']}"))
+                           on_row=lambda r: ui.navigate.to(f"/officer/complaints/{r['id']}"), empty="Nothing in this view. New complaints routed to your department appear here in real time.")
 
         mine.on_value_change(lambda e: draw())
         status.on_value_change(lambda e: draw())
+        search.on("keydown.enter", lambda e: draw())
+        search.on("clear", lambda e: draw())
+        search.on_value_change(lambda e: draw() if not e.value else None)
         draw()
 
     @page(c, "/officer/complaints/{cid}", "nav.officer_queue", roles=OFFICER_UP)

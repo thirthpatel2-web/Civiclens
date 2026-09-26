@@ -459,6 +459,23 @@ class InteropGatewayService:
                 q = q.where(InteropConsentGrant.status == status)
             return [_row(r) for r in s.execute(q).scalars().all()]
 
+    def my_data_access_log(self, ctx: AuthContext, *, limit: int = 50) -> list[dict]:
+        """Every exchange that actually moved this citizen's data under one of their own consents -
+        who read it, who received it, which fields, and when. Consent says what *may* happen; this
+        says what *did*. Only successful transfers are listed: a blocked attempt read nothing."""
+        require(ctx, Permission.PROFILE_MANAGE)
+        with self._uow() as uow:
+            s = uow.session
+            q = (
+                select(InteropTransaction, InteropConsentGrant.purpose)
+                .join(InteropConsentGrant, InteropConsentGrant.consent_id == InteropTransaction.consent_id)
+                .where(InteropConsentGrant.citizen_user_id == ctx.user_id, InteropTransaction.status == "success")
+                .order_by(InteropTransaction.created_at.desc())
+                .limit(limit)
+            )
+            return [{"transaction_id": t.transaction_id, "correlation_id": t.correlation_id, "at": t.created_at, "from_system": t.source_system,
+                     "to_system": t.target_system, "fields": list(t.approved_fields or []), "purpose": purpose} for t, purpose in s.execute(q).all()]  # fmt: skip
+
     # -----------------------------------------------------------------------------------------
     # Manual identity review - the required path for anything the resolver would not auto-link.
     # -----------------------------------------------------------------------------------------

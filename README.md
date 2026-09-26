@@ -218,6 +218,8 @@ python scripts/seed.py                     # departments, cities, routing rules,
 python run.py                              # 👉 open http://localhost:8080
 ```
 
+`run.py` also starts the background worker and scheduler in the same process, so SLA escalation, RTI deadline reminders, anomaly detection and queued jobs all run with that one command. Set `EMBEDDED_WORKER=0` if you run `python -m app.workers.run all` separately (Docker Compose does this).
+
 Register as a citizen in the app, or create the first admin with `scripts/create_admin.py`. The demo departments and connectors are seeded automatically on first start. `docs/DEMO_GUIDE.md` walks through the whole cross-department exchange, call by call.
 
 <details>

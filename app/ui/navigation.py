@@ -12,8 +12,9 @@ CIT = frozenset({Role.CITIZEN})
 STAFF = frozenset({Role.OFFICER})
 ADMINS = frozenset({Role.ADMIN, Role.SUPER_ADMIN})
 OFFICER_UP = frozenset({Role.OFFICER, Role.ADMIN, Role.SUPER_ADMIN})
-# Everyone who holds INTEROP_READ: the interoperability console (auditors see it read-only).
-GATEWAY = frozenset({Role.OFFICER, Role.ADMIN, Role.SUPER_ADMIN, Role.INTEGRATION_ADMIN, Role.AUDITOR})
+# Everyone who holds INTEROP_READ: the interoperability console (auditors see it read-only). Officers
+# do not hold it - consent and identity data stay with the platform team, not the complaint desk.
+GATEWAY = frozenset({Role.ADMIN, Role.SUPER_ADMIN, Role.INTEGRATION_ADMIN, Role.AUDITOR})
 
 
 @dataclass(frozen=True)
@@ -37,7 +38,7 @@ NAVIGATION: tuple[NavGroup, ...] = (
     NavGroup("nav.track", (NavItem("nav.grievances", "/grievances", "assignment", CIT), NavItem("nav.my_data", "/my-data", "how_to_reg", CIT))),
     NavGroup("nav.interop_gateway", (NavItem("nav.interop_gateway", "/gateway", "hub", GATEWAY),)),
     NavGroup("nav.emergency", (NavItem("nav.emergency", "/emergency", "emergency", ALL),)),
-    NavGroup("nav.account", (NavItem("nav.profile", "/profile", "person", ALL), NavItem("nav.settings", "/settings", "shield", ALL), NavItem("nav.notifications", "/notifications", "notifications", ALL),
+    NavGroup("nav.account", (NavItem("nav.profile", "/profile", "person", CIT), NavItem("nav.my_profile", "/profile", "person", ALL - CIT), NavItem("nav.settings", "/settings", "shield", ALL), NavItem("nav.notifications", "/notifications", "notifications", ALL),
                              NavItem("nav.documents", "/documents", "folder", ALL), NavItem("nav.security", "/security", "lock", ALL))),
     NavGroup("nav.officer", (NavItem("nav.dashboard", "/officer", "space_dashboard", OFFICER_UP), NavItem("nav.officer_queue", "/officer/queue", "inbox", STAFF),
                              NavItem("nav.investigations", "/officer/investigations", "search", OFFICER_UP))),

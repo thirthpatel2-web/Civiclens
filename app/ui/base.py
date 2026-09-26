@@ -117,12 +117,21 @@ def stat_card(label: str, value: Any, color: str = "primary", hint: str | None =
             ui.label(hint).classes("text-xs").style("color: var(--cl-fg-subtle);")
 
 
-def data_table(columns: list[tuple[str, str]], rows: list[dict[str, Any]], *, on_row: Callable[[dict[str, Any]], None] | None = None, empty: str = "No data yet.", key: str = "id") -> None:
+def data_table(columns: list[tuple[str, str]], rows: list[dict[str, Any]], *, on_row: Callable[[dict[str, Any]], None] | None = None, empty: str = "No data yet.", key: str = "id", search: str | None = None) -> None:
     if not rows:
         empty_state(empty)
         return
-    t = ui.table(columns=[{"name": n, "label": label, "field": n, "align": "left", "sortable": True} for n, label in columns], rows=rows, row_key=key, pagination=15).classes("w-full cl-card !p-0")
+    # booleans read as Yes/No, never the raw "true"/"false" the table would otherwise print
+    shown = [{k: ("Yes" if v else "No") if isinstance(v, bool) and k != key else v for k, v in r.items()} for r in rows]
+    box = None
+    if search:
+        box = ui.input(placeholder=search).props("outlined dense clearable").classes("w-72")
+        with box.add_slot("prepend"):
+            ui.icon("search")
+    t = ui.table(columns=[{"name": n, "label": label, "field": n, "align": "left", "sortable": True} for n, label in columns], rows=shown, row_key=key, pagination=15).classes("w-full cl-card !p-0")
     t.props("flat")
+    if box is not None:
+        box.bind_value_to(t, "filter")
     if on_row:
         t.on("rowClick", lambda e: on_row(e.args[1]))
 

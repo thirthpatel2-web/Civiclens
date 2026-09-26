@@ -9,6 +9,7 @@ from typing import Any
 from nicegui import app, ui
 
 from app.container import AppContainer
+from app.core.authorization import Permission, Role
 from app.core.exceptions import CivicLensError
 from app.core.transactions import run_in_uow
 from app.services.classification_service import CATEGORIES
@@ -302,6 +303,17 @@ def register(c: AppContainer) -> None:
                     ui.icon("info").style("color: var(--cl-info);")
                     ui.label(tr(c, "page.onboarding")).classes("text-sm").style("color: var(--cl-info);")
                 ui.button(tr(c, "act.open"), on_click=lambda: ui.navigate.to("/onboarding")).props("outline dense")
+
+        try:  # a department asking to reuse this citizen's verified record is the one thing that needs them now
+            waiting = len(c.interop_gateway.list_my_consents(user.ctx, status="pending"))
+        except CivicLensError:
+            waiting = 0
+        if waiting:
+            with ui.row().classes("cl-card w-full items-center justify-between gap-3 flex-wrap").style("border: 1.5px solid var(--cl-warning); background: var(--cl-warning-soft);"):
+                with ui.row().classes("items-center gap-2 no-wrap").style("flex: 1 1 320px;"):
+                    ui.icon("how_to_reg").classes("text-[22px]").style("color: var(--cl-warning);")
+                    ui.label(tr(c, "dash.consent_waiting").replace("{n}", str(waiting))).classes("text-sm font-medium").style("color: var(--cl-fg);")
+                ui.button(tr(c, "dash.consent_review"), icon="arrow_forward", on_click=lambda: ui.navigate.to("/my-data")).props("unelevated color=warning text-color=dark no-caps")
 
         with ui.row().classes("gap-3 w-full flex-wrap"):
             stat_tile(tr(c, "card.active"), d["open"], color="info", icon="assignment")
@@ -1849,10 +1861,19 @@ def register(c: AppContainer) -> None:
         section_title(tr(c, "interop.frag_numbers"))
         with ui.row().classes("gap-3 w-full flex-wrap"):
             stat_tile(tr(c, "interop.stat_umang"), f"{NATIONAL_UMANG_SERVICES:,}+", color="info", icon="apps", hint=f"across {NATIONAL_UMANG_DEPARTMENTS}+ departments — {NATIONAL_UMANG_SOURCE}")
-            mine = c.complaints.list_mine(user.ctx, filter_name="all")
-            diag = personal_diagnostic([m.department_code for m in mine])
-            stat_tile(tr(c, "interop.stat_departments"), diag.distinct_departments, color="primary", icon="apartment", hint=f"across {diag.total_filings} filing(s) through CivicLens")
-            stat_tile(tr(c, "interop.stat_reentries"), diag.profile_reuses, color="success", icon="badge", hint="times your one CivicLens profile was reused instead of re-typing KYC elsewhere")
+            if user.ctx.has(Permission.COMPLAINT_READ_OWN):  # a personal diagnostic only means something for a citizen's own filings
+                mine = c.complaints.list_mine(user.ctx, filter_name="all")
+                diag = personal_diagnostic([m.department_code for m in mine])
+                stat_tile(tr(c, "interop.stat_departments"), diag.distinct_departments, color="primary", icon="apartment", hint=f"across {diag.total_filings} filing(s) through CivicLens")
+                stat_tile(tr(c, "interop.stat_reentries"), diag.profile_reuses, color="success", icon="badge", hint="times your one CivicLens profile was reused instead of re-typing KYC elsewhere")
+        if user.ctx.has(Permission.INTEROP_READ):
+            with ui.row().classes("cl-card w-full items-center justify-between gap-3 flex-wrap"):
+                ui.label("This lab shows how records are normalised. The live, consent-gated exchange between departments runs in the Gateway console.").classes("text-sm").style("color: var(--cl-fg-muted);")
+                ui.button("Open Interoperability Gateway", icon="hub", on_click=lambda: ui.navigate.to("/gateway")).props("color=primary unelevated no-caps")
+        elif user.ctx.role is Role.CITIZEN:
+            with ui.row().classes("cl-card w-full items-center justify-between gap-3 flex-wrap"):
+                ui.label("Departments can only reuse your records with your permission. See and control every request in My data & consent.").classes("text-sm").style("color: var(--cl-fg-muted);")
+                ui.button(tr(c, "nav.my_data"), icon="verified_user", on_click=lambda: ui.navigate.to("/my-data")).props("outline no-caps")
 
         divider()
         section_title(tr(c, "interop.demo_title"), tr(c, "interop.demo_sub"))
@@ -1913,7 +1934,7 @@ def register(c: AppContainer) -> None:
     @page(c, "/profile", "nav.profile")
     def profile(c: AppContainer, user: UiUser) -> None:
         p = c.profiles.get(user.ctx)
-        page_header(tr(c, "profileSection"), icon="person")
+        page_header(tr(c, "profileSection") if user.ctx.role is Role.CITIZEN else tr(c, "nav.my_profile"), icon="person")
         with ui.column().classes("cl-card w-full max-w-md gap-3"):
             name = ui.input(tr(c, "fullName"), value=p.full_name).props("outlined dense").classes("w-full")
             phone = ui.input(tr(c, "phoneNumber"), value=p.phone or "").props("outlined dense").classes("w-full")
@@ -1932,7 +1953,7 @@ def register(c: AppContainer) -> None:
 
     @page(c, "/settings", "nav.settings")
     def settings(c: AppContainer, user: UiUser) -> None:
-        page_header(tr(c, "settingsTitle"), icon="settings")
+        page_header(tr(c, "settingsTitle") if user.ctx.role is Role.CITIZEN else tr(c, "nav.settings"), icon="settings")
         with ui.column().classes("w-full max-w-2xl gap-5"):
             with ui.column().classes("cl-card gap-3 w-full"):
                 section_title(tr(c, "nav.notifications"))
@@ -1956,13 +1977,16 @@ def register(c: AppContainer) -> None:
                     c.profiles.set_consent(user.ctx, p, bool(e.value))
                     ui.notify(tr(c, "msg.saved"), type="positive")
 
+                plain = {"privacy_policy": "I accept the privacy policy", "ai_processing": "Let AI help classify and route my complaints", "data_sharing_government": "Share my complaints with government grievance platforms",
+                         "document_storage": "Store documents I upload", "notifications_email": "Send me updates by e-mail"}  # fmt: skip
                 for purpose, cstate in consents.items():
-                    ui.switch(purpose.replace("_", " ").capitalize(), value=cstate["granted"], on_change=lambda e, p=purpose: _on_consent_change(e, p)).props("color=primary")
+                    ui.switch(plain.get(purpose, purpose.replace("_", " ").capitalize()), value=cstate["granted"], on_change=lambda e, p=purpose: _on_consent_change(e, p)).props("color=primary")
                 divider()
                 ui.label(tr(c, "set.gov_sharing")).classes("text-xs").style("color: var(--cl-fg-subtle);")
                 with ui.row().classes("gap-2 flex-wrap"):
                     for _platform, a in c.adapters.items():
-                        chip(f"{a.display_name}: {a.state.value}", color="muted", outline=True)
+                        live = a.state.value == "CONNECTED"
+                        chip(f"{a.display_name}: {'connected' if live else 'not connected'}", color="success" if live else "muted", outline=not live)
 
             def _on_language_change(e: Any) -> None:
                 app.storage.user["lang"] = e.value

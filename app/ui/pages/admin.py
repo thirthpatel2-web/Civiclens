@@ -49,7 +49,52 @@ def _danger_action(c: AppContainer, label: str, on_click: Any) -> None:
     ui.button(label, icon="delete_outline", on_click=open_dialog).props("outline dense color=negative")
 
 
+def _status_rows(s: dict[str, Any]) -> None:
+    """The platform's moving parts as plain-language rows with a coloured state, instead of raw dict dumps."""
+    q = s.get("queue") or {}
+    by = q.get("by_status") or {}
+    rag = s.get("rag") or {}
+    adapters = s.get("adapters") or {}
+    connected = sum(1 for v in adapters.values() if v == "CONNECTED")
+    rows = [
+        ("Job queue", "success" if q.get("backend_reachable") else "danger", "reachable" if q.get("backend_reachable") else "not reachable",
+         ", ".join(f"{v} {k}" for k, v in sorted(by.items())) or "no jobs yet"),
+        ("Background workers", "success" if q.get("workers") else "warning", f"{len(q.get('workers') or {})} running",
+         "jobs wait in the queue until a worker starts" if not q.get("workers") else "heartbeats received"),
+        ("Knowledge base", "success" if rag.get("chunks") else "warning", f"{rag.get('chunks', 0)} passages",
+         f"semantic search {'on' if rag.get('semantic_search') else 'off'} · language model {'connected' if rag.get('model') else 'not connected'}"),
+        ("Live updates", "info", f"{s.get('websocket_connections', 0)} open", "browsers and phones receiving real-time pushes"),
+        ("Government platforms", "success" if connected else "muted", f"{connected}/{len(adapters)} connected",
+         "no credentials supplied yet - nothing is sent" if not connected else ", ".join(k for k, v in adapters.items() if v == "CONNECTED")),
+    ]  # fmt: skip
+    for name, tone, state, detail in rows:
+        with ui.row().classes("items-center w-full gap-2"):
+            ui.label(name).classes("text-sm font-medium").style("color: var(--cl-fg); min-width: 150px;")
+            chip(state, color=tone)
+            ui.label(detail).classes("text-xs").style("color: var(--cl-fg-subtle);")
+
+
+# A starting point an admin applies in one click and then edits - hours rise as priority drops and
+# the lowest tier stays inside the 21-day ceiling CPGRAMS sets for public grievances.
+SUGGESTED_SLA = (("sla-critical", "critical", 24, 12), ("sla-high", "high", 72, 24), ("sla-medium", "medium", 168, 48), ("sla-low", "low", 504, 72))
+
+# One-click workflow templates, each a rule WorkflowService's validator accepts.
+WORKFLOW_TEMPLATES: tuple[tuple[str, str, str, str, dict[str, Any], dict[str, Any]], ...] = (
+    ("critical-alert", "Alert admins about every critical complaint", "complaint.created", "notify_admins", {"priority_min": "critical"}, {}),
+    ("auto-assign", "Assign new complaints to the least-loaded officer", "complaint.created", "assign_least_loaded", {}, {}),
+    ("stale-escalate", "Escalate complaints still open after 72 hours", "scheduled", "escalate", {"age_hours_min": 72, "statuses": ["submitted", "ai_routed", "assigned"]}, {}),
+    ("auto-close", "Close resolved complaints after 7 days without feedback", "scheduled", "auto_close", {"age_hours_min": 168, "statuses": ["resolved"]}, {}),
+)
+
+
 def register(c: AppContainer) -> None:
+    def _shortcuts() -> None:
+        """Where an admin usually goes next - one click instead of hunting through the sidebar."""
+        with ui.row().classes("gap-2 flex-wrap w-full"):
+            for label, icon, route in (("Interoperability Gateway", "hub", "/gateway"), ("Unrouted complaints", "call_split", "/admin/triage"), ("SLA policies", "timer", "/admin/sla"),
+                                       ("Workflow rules", "account_tree", "/admin/workflow-rules"), ("Audit log", "fact_check", "/admin/audit"), ("System health", "monitor_heart", "/admin/monitoring")):  # fmt: skip
+                ui.button(label, icon=icon, on_click=lambda r=route: ui.navigate.to(r)).props("outline dense no-caps")
+
     @page(c, "/admin", "nav.admin_overview", roles=ADMINS)
     def overview(c: AppContainer, user: UiUser) -> None:
         d = c.dashboards.admin(user.ctx)
@@ -70,20 +115,19 @@ def register(c: AppContainer) -> None:
                 section_title(tr(c, "ad.routing_accuracy"), tr(c, "ad.routing_accuracy_sub"))
                 with ui.row().classes("gap-2 flex-wrap"):
                     if d["routing_sources"]:
+                        how = {"rule": "matched a routing rule", "ai": "AI fallback", "manual": "routed by hand", "unrouted": "waiting for triage"}
                         for k, v in d["routing_sources"].items():
-                            chip(f"{k}: {v}", color="info", outline=True)
+                            chip(f"{v} {how.get(k, k)}", color="info", outline=True)
                     else:
                         ui.label(tr(c, "msg.no_data")).classes("text-sm").style("color: var(--cl-fg-subtle);")
             with ui.column().classes("cl-card gap-2").style("flex: 1; min-width: 300px;"):
-                s = d["system"] or {}
                 section_title(tr(c, "col.system"))
-                q = s.get("queue", {})
-                ui.label(f"Queue: {'reachable' if q.get('backend_reachable') else 'NOT reachable / not configured'} · jobs {q.get('by_status')}").classes("text-xs").style("color: var(--cl-fg-muted);")
-                ui.label(f"Workers: {list((q.get('workers') or {}).keys())}").classes("text-xs").style("color: var(--cl-fg-muted);")
-                ui.label(f"RAG: {s.get('rag')} · Ollama: {s.get('ollama')} · WebSocket connections: {s.get('websocket_connections')}").classes("text-xs").style("color: var(--cl-fg-muted);")
-                ui.label("Integrations: " + ", ".join(f"{k}={v}" for k, v in (s.get("adapters") or {}).items())).classes("text-xs").style("color: var(--cl-fg-muted);")
+                _status_rows(d["system"] or {})
+        _shortcuts()
         section_title(tr(c, "ad.recent_audit"))
-        data_table([("at", tr(c, "legal.col_when")), ("action", tr(c, "col.action")), ("actor", tr(c, "col.actor"))], [{"id": str(i), "at": e.occurred_at.strftime("%d %b %H:%M"), "action": e.action, "actor": (e.actor_id or "system")[:8]} for i, e in enumerate(d["recent_audit"])])
+        labels = run_in_uow(c, lambda uow: {a: uow.officers.user_label(a) for a in {e.actor_id for e in d["recent_audit"] if e.actor_id}})
+        data_table([("at", tr(c, "legal.col_when")), ("action", tr(c, "col.action")), ("actor", tr(c, "col.actor"))],
+                   [{"id": str(i), "at": e.occurred_at.strftime("%d %b %H:%M"), "action": e.action.replace("_", " "), "actor": labels.get(e.actor_id or "") or (e.actor_id or "system")[:8]} for i, e in enumerate(d["recent_audit"])])  # fmt: skip
         if not d["has_data"]:
             info_banner(tr(c, "msg.no_data"))
 
@@ -94,7 +138,8 @@ def register(c: AppContainer) -> None:
         items = c.admin.list_users(user.ctx)
         with ui.row().classes("gap-6 w-full flex-wrap"):
             with ui.column().classes("gap-3").style("flex: 1.4; min-width: 380px;"):
-                data_table([("email", tr(c, "lbl.email")), ("name", tr(c, "col.name")), ("role", tr(c, "col.role")), ("dept", tr(c, "lbl.department")), ("active", tr(c, "filter.active"))], [{"id": u.id, "email": u.email, "name": u.full_name, "role": u.role.value, "dept": u.department_id or "-", "active": u.is_active} for u in items])
+                data_table([("email", tr(c, "lbl.email")), ("name", tr(c, "col.name")), ("role", tr(c, "col.role")), ("dept", tr(c, "lbl.department")), ("active", tr(c, "filter.active"))], [{"id": u.id, "email": u.email, "name": u.full_name, "role": u.role.value.replace("_", " "), "dept": u.department_id or "-", "active": u.is_active} for u in items],
+                           search="Search name, e-mail or role")
             with ui.column().classes("gap-4").style("flex: 1; min-width: 300px;"):
                 with ui.column().classes("cl-card gap-2 w-full"):
                     section_title(tr(c, "ad.create_staff"))
@@ -193,6 +238,14 @@ def register(c: AppContainer) -> None:
         page_header(tr(c, "nav.workflow"), icon="account_tree")
         ov = c.admin.workflow_overview(user.ctx)
         info_banner(tr(c, "ad.workflow_note"))
+        existing = {r.id for r in ov["rules"]}
+        todo = [t for t in WORKFLOW_TEMPLATES if t[0] not in existing]
+        if todo:
+            with ui.column().classes("cl-card gap-2 w-full"):
+                section_title("Quick start templates", "Each adds one ready-made rule; edit or delete it afterwards.")
+                with ui.row().classes("gap-2 flex-wrap"):
+                    for tpl in todo:
+                        ui.button(tpl[1], icon="add", on_click=_act(c, lambda a=tpl: c.admin.save_workflow_rule(user.ctx, a[0], a[1], a[2], a[3], conditions=a[4], params=a[5]))).props("outline dense no-caps")
         data_table([("id", tr(c, "col.rule")), ("name", tr(c, "col.name")), ("trigger", tr(c, "col.trigger")), ("cond", tr(c, "col.conditions")), ("action", tr(c, "col.action")), ("active", tr(c, "filter.active"))],
                    [{"id": r.id, "name": r.name, "trigger": r.trigger, "cond": json.dumps(r.conditions, ensure_ascii=False), "action": r.action, "active": r.active} for r in ov["rules"]], empty=tr(c, "ad.no_workflow_rules"))
         with ui.column().classes("cl-card gap-3 w-full"):
@@ -244,6 +297,14 @@ def register(c: AppContainer) -> None:
         page_header(tr(c, "nav.sla"), icon="timer")
         ref = c.admin.reference_data(user.ctx)
         info_banner(tr(c, "ad.sla_note"), "orange")
+        if not ref["sla_policies"]:
+            def apply_suggested() -> None:
+                for pid, prio, hrs, gap in SUGGESTED_SLA:
+                    c.admin.save_sla_policy(user.ctx, pid, prio, hrs, escalation_gap_hours=gap)
+
+            with ui.column().classes("cl-card gap-2 w-full"):
+                section_title("Start from a suggested policy", "Critical 24 h · High 3 days · Medium 7 days · Low 21 days (the CPGRAMS ceiling). Apply, then edit any row to match your citizen charter.")
+                ui.button("Apply suggested policies", icon="auto_fix_high", on_click=_act(c, apply_suggested)).props("color=primary unelevated")
         data_table([("id", tr(c, "col.policy")), ("prio", tr(c, "lbl.priority")), ("dept", tr(c, "lbl.department")), ("hours", tr(c, "col.hours")), ("gap", "Escalation gap (h)"), ("max", tr(c, "col.max_level"))],
                    [{"id": p.id, "prio": p.priority, "dept": p.department_code or "(all)", "hours": p.resolution_hours, "gap": p.escalation_gap_hours, "max": p.max_level} for p in ref["sla_policies"]], empty=tr(c, "ad.no_sla"))
         with ui.row().classes("cl-card gap-3 items-end w-full flex-wrap"):
@@ -283,8 +344,17 @@ def register(c: AppContainer) -> None:
             box.clear()
             with box:
                 ev = c.admin.audit_log(user.ctx, action_prefix=prefix.value or None, limit=200)
+                names = {u.id: u.full_name or u.email for u in c.admin.list_users(user.ctx, limit=1000)}
+
+                def details(meta: Any) -> str:
+                    # readable "key: value" pairs; empty values dropped, so no raw dicts or 'None' reach the table
+                    if not isinstance(meta, dict):
+                        return str(meta or "")[:140]
+                    return " · ".join(f"{k.replace('_', ' ')}: {v}" for k, v in meta.items() if v not in (None, "", [], {}))[:140]
+
                 data_table([("at", tr(c, "legal.col_when")), ("action", tr(c, "col.action")), ("actor", tr(c, "col.actor")), ("res", tr(c, "col.resource")), ("meta", tr(c, "col.details"))],
-                           [{"id": str(i), "at": e.occurred_at.strftime("%d %b %Y %H:%M:%S"), "action": e.action, "actor": (e.actor_id or "system")[:8], "res": f"{e.resource_type or ''} {(e.resource_id or '')[:8]}", "meta": str(e.metadata)[:120]} for i, e in enumerate(ev)])
+                           [{"id": str(i), "at": e.occurred_at.strftime("%d %b %Y %H:%M:%S"), "action": e.action, "actor": names.get(e.actor_id or "", (e.actor_id or "system")[:8]),
+                             "res": f"{(e.resource_type or '').replace('_', ' ')} {(e.resource_id or '')[:8]}".strip(), "meta": details(e.metadata)} for i, e in enumerate(ev)])  # fmt: skip
 
         prefix.on("keydown.enter", draw)
         draw()
@@ -375,9 +445,9 @@ def register(c: AppContainer) -> None:
         s = c.system_status()
         q = s["queue"]
         section_title(tr(c, "ad.queue_workers"))
-        with ui.row().classes("cl-card w-full items-center gap-2"):
-            chip("Redis reachable" if q["backend_reachable"] else "Redis unreachable", color="success" if q["backend_reachable"] else "danger")
-            ui.label(f"depth {q['backend_depth']} · jobs by status: {q['by_status']}").classes("text-xs").style("color: var(--cl-fg-muted);")
+        with ui.column().classes("cl-card w-full gap-2"):
+            _status_rows(s)
+            ui.label(f"Queue depth right now: {q['backend_depth']}").classes("text-xs").style("color: var(--cl-fg-subtle);")
         data_table([("id", tr(c, "col.worker")), ("seen", tr(c, "col.last_seen"))], [{"id": k, "seen": v.get("last_seen", "-")} for k, v in q["workers"].items()], empty=tr(c, "ad.no_heartbeats"))
         section_title(tr(c, "ad.recent_jobs"), "queued -> running -> succeeded | retrying -> dead")
         jobs = run_in_uow(c, lambda uow: uow.jobs.list_recent(30))
@@ -395,8 +465,6 @@ def register(c: AppContainer) -> None:
             chip(f"Push (Expo): {'enabled' if c.push_sender else 'NOT enabled'}", color="success" if c.push_sender else "muted")
         gov = run_in_uow(c, lambda uow: uow.government.counts_by_state())
         ui.label("Government submissions: " + (", ".join(f"{k}: {v}" for k, v in sorted(gov.items())) or "none yet")).classes("text-xs").style("color: var(--cl-fg-muted);")
-        ui.label(f"RAG index: {s['rag']} · Ollama: {s['ollama']} · WebSocket connections: {s['websocket_connections']}").classes("text-xs").style("color: var(--cl-fg-muted);")
-        ui.label(f"Adapters: {s['adapters']}").classes("text-xs").style("color: var(--cl-fg-muted);")
         ui.label("Translation coverage (extras): " + str(c.ui_text.extras_coverage())).classes("text-xs").style("color: var(--cl-fg-subtle);")
 
     @page(c, "/admin/exceptions", "nav.exceptions", roles=ADMINS)

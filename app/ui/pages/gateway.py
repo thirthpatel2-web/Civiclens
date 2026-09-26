@@ -495,6 +495,20 @@ def register(c: AppContainer) -> None:
                         ui.label(r["purpose"]).classes("text-sm font-medium")
                         ui.label(f"{tr(c, 'mydata.valid_until')} {_when(r['expires_at'])} · " + ", ".join(FIELD_LABELS.get(f, f) for f in r["fields"])).classes("text-xs").style("color: var(--cl-fg-muted);")
                     ui.button(tr(c, "mydata.revoke"), icon="block", on_click=lambda _e, i=r["consent_id"]: revoke(i)).props("outline dense no-caps color=negative")
+            used = g.my_data_access_log(user.ctx)
+            section_title(tr(c, "mydata.used_title"), tr(c, "mydata.used_sub"))
+            if not used:
+                ui.label(tr(c, "mydata.used_none")).classes("text-sm").style("color: var(--cl-fg-muted);")
+            for u in used:
+                with ui.row().classes("cl-card w-full items-center gap-3 flex-wrap"):
+                    ui.icon("swap_horiz").classes("text-[22px]").style("color: var(--cl-success);")
+                    with ui.column().classes("gap-0").style("flex: 1 1 260px;"):
+                        ui.label(f"{SYSTEM_NAMES.get(u['from_system'], u['from_system'])} → {SYSTEM_NAMES.get(u['to_system'], u['to_system'])}").classes("text-sm font-semibold")
+                        ui.label(u["purpose"]).classes("text-xs").style("color: var(--cl-fg-muted);")
+                        with ui.row().classes("gap-1 flex-wrap q-mt-xs"):
+                            for f in u["fields"]:
+                                chip(FIELD_LABELS.get(f, f), color="muted", outline=True)
+                    ui.label(_when(u["at"])).classes("text-xs cl-mono").style("color: var(--cl-fg-subtle);")
             if past:
                 section_title(tr(c, "mydata.history"))
                 data_table([("purpose", tr(c, "mydata.col_purpose")), ("status", tr(c, "lbl.status")), ("when", tr(c, "lbl.created"))],

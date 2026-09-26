@@ -64,6 +64,7 @@ services:
       # startup when the binary is missing (same as STT_PROVIDER=whisper without faster-whisper) -
       # so override to none here rather than let a host-only setting crash the container.
       OCR_PROVIDER: none
+      EMBEDDED_WORKER: "0"  # the worker service below runs jobs + scheduler
     ports: ["8080:8080"]
     volumes:
       - uploads:/srv/civiclens/uploads

@@ -72,8 +72,12 @@ class CitizenOwnedConsentTests(DocumentExchangeEndToEndTests):
         self.assertIn("interop.consent_requested", kinds)
         me = AuthContext(citizen, Role.CITIZEN, None, True)
         self.assertEqual([c["consent_id"] for c in self.gateway.list_my_consents(me)], [first["consent_id"]])
+        self.assertEqual(self.gateway.my_data_access_log(me), [])  # consent pending: nothing has moved yet
         self.assertEqual(self.gateway.grant_consent(me, consent_id=first["consent_id"])["status"], "granted")  # the citizen decides
         self.assertEqual(self.gateway.request_document_exchange(self.admin, application_no=self.application_no)["status"], "success")
+        used = self.gateway.my_data_access_log(me)  # ...and then sees exactly what moved, from where to where
+        self.assertEqual([(u["from_system"], u["to_system"]) for u in used], [("dept_a", "dept_b")])
+        self.assertTrue(used[0]["fields"])
 
     def test_two_accounts_with_the_same_number_are_never_guessed_between(self) -> None:
         self._citizen("9812345678")

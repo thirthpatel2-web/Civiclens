@@ -713,7 +713,13 @@
   "mydata.valid_until": "Valid until",
   "mydata.revoke": "Revoke",
   "mydata.history": "History",
-  "mydata.col_purpose": "Purpose"
+  "mydata.col_purpose": "Purpose",
+  "nav.my_profile": "My Profile",
+  "dash.consent_waiting": "{n} request(s) from government departments are waiting for your permission to reuse your verified documents.",
+  "dash.consent_review": "Review now",
+  "mydata.used_title": "Where your data was used",
+  "mydata.used_sub": "Every time a department actually received your details under a permission you gave - nothing moves without one.",
+  "mydata.used_none": "No department has used your data yet."
  },
  "hi": {
   "act.cancel": "रद्द करें",
@@ -1429,7 +1435,13 @@
   "mydata.valid_until": "मान्य तक",
   "mydata.revoke": "रद्द करें",
   "mydata.history": "इतिहास",
-  "mydata.col_purpose": "उद्देश्य"
+  "mydata.col_purpose": "उद्देश्य",
+  "nav.my_profile": "मेरी प्रोफ़ाइल",
+  "dash.consent_waiting": "सरकारी विभागों के {n} अनुरोध आपके सत्यापित दस्तावेज़ों के पुन: उपयोग के लिए आपकी अनुमति की प्रतीक्षा कर रहे हैं।",
+  "dash.consent_review": "अभी देखें",
+  "mydata.used_title": "आपका डेटा कहाँ उपयोग हुआ",
+  "mydata.used_sub": "हर बार जब किसी विभाग को आपकी दी गई अनुमति के तहत आपका विवरण वास्तव में मिला - अनुमति के बिना कुछ भी नहीं जाता।",
+  "mydata.used_none": "अभी तक किसी विभाग ने आपका डेटा उपयोग नहीं किया है।"
  },
  "mr": {
   "theme.light": "फिकट",
@@ -2145,7 +2157,13 @@
   "mydata.valid_until": "पर्यंत वैध",
   "mydata.revoke": "रद्द करा",
   "mydata.history": "इतिहास",
-  "mydata.col_purpose": "उद्देश"
+  "mydata.col_purpose": "उद्देश",
+  "nav.my_profile": "माझी प्रोफाइल",
+  "dash.consent_waiting": "सरकारी विभागांच्या {n} विनंत्या तुमची सत्यापित कागदपत्रे पुन्हा वापरण्यासाठी तुमच्या परवानगीची वाट पाहत आहेत.",
+  "dash.consent_review": "आता पहा",
+  "mydata.used_title": "तुमचा डेटा कुठे वापरला गेला",
+  "mydata.used_sub": "तुम्ही दिलेल्या परवानगीनुसार एखाद्या विभागाला तुमचा तपशील प्रत्यक्ष मिळाला ती प्रत्येक वेळ - परवानगीशिवाय काहीही जात नाही.",
+  "mydata.used_none": "अद्याप कोणत्याही विभागाने तुमचा डेटा वापरलेला नाही."
  },
  "bn": {
   "theme.light": "হালকা",
@@ -2861,7 +2879,13 @@
   "mydata.valid_until": "বৈধ পর্যন্ত",
   "mydata.revoke": "প্রত্যাহার করুন",
   "mydata.history": "ইতিহাস",
-  "mydata.col_purpose": "উদ্দেশ্য"
+  "mydata.col_purpose": "উদ্দেশ্য",
+  "nav.my_profile": "আমার প্রোফাইল",
+  "dash.consent_waiting": "সরকারি বিভাগের {n}টি অনুরোধ আপনার যাচাইকৃত নথি পুনরায় ব্যবহারের জন্য আপনার অনুমতির অপেক্ষায় আছে।",
+  "dash.consent_review": "এখনই দেখুন",
+  "mydata.used_title": "আপনার ডেটা কোথায় ব্যবহৃত হয়েছে",
+  "mydata.used_sub": "আপনার দেওয়া অনুমতির অধীনে কোনো বিভাগ যখনই আপনার তথ্য পেয়েছে - অনুমতি ছাড়া কিছুই যায় না।",
+  "mydata.used_none": "এখনও কোনো বিভাগ আপনার ডেটা ব্যবহার করেনি।"
  },
  "ta": {
   "theme.light": "வெளிர்",
@@ -3577,7 +3601,13 @@
   "mydata.valid_until": "செல்லுபடி வரை",
   "mydata.revoke": "ரத்து செய்",
   "mydata.history": "வரலாறு",
-  "mydata.col_purpose": "நோக்கம்"
+  "mydata.col_purpose": "நோக்கம்",
+  "nav.my_profile": "என் சுயவிவரம்",
+  "dash.consent_waiting": "உங்கள் சரிபார்க்கப்பட்ட ஆவணங்களை மீண்டும் பயன்படுத்த அரசுத் துறைகளின் {n} கோரிக்கைகள் உங்கள் அனுமதிக்காகக் காத்திருக்கின்றன.",
+  "dash.consent_review": "இப்போது பார்க்கவும்",
+  "mydata.used_title": "உங்கள் தரவு எங்கே பயன்படுத்தப்பட்டது",
+  "mydata.used_sub": "நீங்கள் அளித்த அனுமதியின் கீழ் ஒரு துறை உங்கள் விவரங்களை உண்மையில் பெற்ற ஒவ்வொரு முறையும் - அனுமதியின்றி எதுவும் செல்லாது.",
+  "mydata.used_none": "இதுவரை எந்தத் துறையும் உங்கள் தரவைப் பயன்படுத்தவில்லை."
  },
  "te": {
   "theme.light": "తేలికైన",
@@ -4293,7 +4323,13 @@
   "mydata.valid_until": "వరకు చెల్లుతుంది",
   "mydata.revoke": "రద్దు చేయి",
   "mydata.history": "చరిత్ర",
-  "mydata.col_purpose": "ప్రయోజనం"
+  "mydata.col_purpose": "ప్రయోజనం",
+  "nav.my_profile": "నా ప్రొఫైల్",
+  "dash.consent_waiting": "మీ ధృవీకరించిన పత్రాలను మళ్లీ ఉపయోగించడానికి ప్రభుత్వ శాఖల నుండి {n} అభ్యర్థనలు మీ అనుమతి కోసం వేచి ఉన్నాయి.",
+  "dash.consent_review": "ఇప్పుడే చూడండి",
+  "mydata.used_title": "మీ డేటా ఎక్కడ ఉపయోగించబడింది",
+  "mydata.used_sub": "మీరు ఇచ్చిన అనుమతి కింద ఒక శాఖ మీ వివరాలను నిజంగా అందుకున్న ప్రతిసారీ - అనుమతి లేకుండా ఏదీ వెళ్లదు.",
+  "mydata.used_none": "ఇంకా ఏ శాఖా మీ డేటాను ఉపయోగించలేదు."
  },
  "kn": {
   "theme.light": "ತಿಳಿ",
@@ -5009,6 +5045,12 @@
   "mydata.valid_until": "ವರೆಗೆ ಮಾನ್ಯ",
   "mydata.revoke": "ರದ್ದುಗೊಳಿಸಿ",
   "mydata.history": "ಇತಿಹಾಸ",
-  "mydata.col_purpose": "ಉದ್ದೇಶ"
+  "mydata.col_purpose": "ಉದ್ದೇಶ",
+  "nav.my_profile": "ನನ್ನ ಪ್ರೊಫೈಲ್",
+  "dash.consent_waiting": "ನಿಮ್ಮ ಪರಿಶೀಲಿಸಿದ ದಾಖಲೆಗಳನ್ನು ಮರುಬಳಕೆ ಮಾಡಲು ಸರ್ಕಾರಿ ಇಲಾಖೆಗಳ {n} ವಿನಂತಿಗಳು ನಿಮ್ಮ ಅನುಮತಿಗಾಗಿ ಕಾಯುತ್ತಿವೆ.",
+  "dash.consent_review": "ಈಗ ನೋಡಿ",
+  "mydata.used_title": "ನಿಮ್ಮ ಡೇಟಾ ಎಲ್ಲಿ ಬಳಕೆಯಾಯಿತು",
+  "mydata.used_sub": "ನೀವು ನೀಡಿದ ಅನುಮತಿಯಡಿ ಇಲಾಖೆಯೊಂದು ನಿಮ್ಮ ವಿವರಗಳನ್ನು ನಿಜವಾಗಿ ಪಡೆದ ಪ್ರತಿ ಬಾರಿ - ಅನುಮತಿ ಇಲ್ಲದೆ ಏನೂ ಹೋಗುವುದಿಲ್ಲ.",
+  "mydata.used_none": "ಇನ್ನೂ ಯಾವುದೇ ಇಲಾಖೆ ನಿಮ್ಮ ಡೇಟಾವನ್ನು ಬಳಸಿಲ್ಲ."
  }
 }
