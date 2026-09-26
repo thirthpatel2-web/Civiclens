@@ -510,7 +510,7 @@ def register(c: AppContainer) -> None:
                     ui.label(tr(c, "mydata.only_fields")).classes("text-xs").style("color: var(--cl-fg-muted);")
                     with ui.row().classes("gap-1 flex-wrap"):
                         for f in r["fields"]:
-                            chip(FIELD_LABELS.get(f, f), color="info", icon="check")
+                            chip(tr(c, f"field.{f}") if f in ("reference", "status", "issued_on") else FIELD_LABELS.get(f, f), color="info", icon="check")
                     ui.label(tr(c, "mydata.expiry_note")).classes("text-[11px]").style("color: var(--cl-fg-subtle);")
                     with ui.row().classes("gap-2"):
                         ui.button(tr(c, "mydata.allow"), icon="check", on_click=lambda _e, i=r["consent_id"]: decide(g.grant_consent, i)).props("unelevated color=positive no-caps")
@@ -522,7 +522,7 @@ def register(c: AppContainer) -> None:
                 with ui.row().classes("cl-card w-full items-center justify-between gap-2 flex-wrap"):
                     with ui.column().classes("gap-0").style("flex: 1 1 260px;"):
                         ui.label(r["purpose"]).classes("text-sm font-medium")
-                        ui.label(f"{tr(c, 'mydata.valid_until')} {_when(r['expires_at'])} · " + ", ".join(FIELD_LABELS.get(f, f) for f in r["fields"])).classes("text-xs").style("color: var(--cl-fg-muted);")
+                        ui.label(f"{tr(c, 'mydata.valid_until')} {_when(r['expires_at'])} · " + ", ".join(tr(c, f"field.{f}") if f in ("reference", "status", "issued_on") else FIELD_LABELS.get(f, f) for f in r["fields"])).classes("text-xs").style("color: var(--cl-fg-muted);")
                     ui.button(tr(c, "mydata.revoke"), icon="block", on_click=lambda _e, i=r["consent_id"]: revoke(i)).props("outline dense no-caps color=negative")
             used = g.my_data_access_log(user.ctx)
             section_title(tr(c, "mydata.used_title"), tr(c, "mydata.used_sub"))
@@ -536,7 +536,7 @@ def register(c: AppContainer) -> None:
                         ui.label(u["purpose"]).classes("text-xs").style("color: var(--cl-fg-muted);")
                         with ui.row().classes("gap-1 flex-wrap q-mt-xs"):
                             for f in u["fields"]:
-                                chip(FIELD_LABELS.get(f, f), color="muted", outline=True)
+                                chip(tr(c, f"field.{f}") if f in ("reference", "status", "issued_on") else FIELD_LABELS.get(f, f), color="muted", outline=True)
                     ui.label(_when(u["at"])).classes("text-xs cl-mono").style("color: var(--cl-fg-subtle);")
             if past:
                 section_title(tr(c, "mydata.history"))

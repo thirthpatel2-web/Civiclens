@@ -389,7 +389,7 @@ def register(c: AppContainer) -> None:
             from app.ui.pages.citizen import CONSENT_LABELS
 
             current = c.profiles.consents(user.ctx)
-            boxes = {p: ui.checkbox(CONSENT_LABELS.get(p, p.replace("_", " ").capitalize()), value=current[p]["granted"]) for p in CONSENT_PURPOSES}
+            boxes = {p: ui.checkbox(tr(c, f"consent.{p}") if p in CONSENT_LABELS else p.replace("_", " ").capitalize(), value=current[p]["granted"]) for p in CONSENT_PURPOSES}
             field_hint(tr(c, "onb.ai_hint"))
 
             def save() -> None:

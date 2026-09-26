@@ -87,6 +87,37 @@ WORKFLOW_TEMPLATES: tuple[tuple[str, str, str, str, dict[str, Any], dict[str, An
 )
 
 
+TRIGGER_WORDS = {"complaint.created": "When a complaint is filed", "complaint.status_changed": "When a complaint's status changes", "scheduled": "Every 15 minutes, for complaints"}
+ACTION_WORDS = {"notify_admins": "alert the administrators", "escalate": "escalate it one level", "auto_close": "close it", "assign_least_loaded": "assign it to the least-loaded officer",
+                "add_internal_note": "add an internal note"}  # fmt: skip
+
+
+def _duration(hours: float) -> str:
+    return f"{hours:.0f} h" if hours < 48 else f"{hours / 24:.0f} days" if hours % 24 == 0 else f"{hours / 24:.1f} days"
+
+
+def _conditions(cond: dict[str, Any]) -> str:
+    """A workflow rule's conditions as a phrase an administrator can read aloud."""
+    parts = []
+    if cond.get("priority_min"):
+        parts.append(f"priority {cond['priority_min']} or higher")
+    if cond.get("categories"):
+        parts.append("category " + " / ".join(cond["categories"]))
+    if cond.get("departments"):
+        parts.append("department " + " / ".join(cond["departments"]))
+    if cond.get("wards"):
+        parts.append("ward " + " / ".join(cond["wards"]))
+    if cond.get("statuses"):
+        parts.append("status " + " / ".join(s.replace("_", " ") for s in cond["statuses"]))
+    if cond.get("languages"):
+        parts.append("language " + " / ".join(cond["languages"]))
+    if cond.get("unrouted"):
+        parts.append("not yet routed")
+    if cond.get("age_hours_min") is not None:
+        parts.append(f"older than {_duration(float(cond['age_hours_min']))}")
+    return ", ".join(parts) or "any complaint"
+
+
 def register(c: AppContainer) -> None:
     def _shortcuts() -> None:
         """Where an admin usually goes next - one click instead of hunting through the sidebar."""
@@ -220,7 +251,8 @@ def register(c: AppContainer) -> None:
         ref = c.admin.reference_data(user.ctx)
         info_banner(tr(c, "ad.routing_note"))
         data_table([("id", tr(c, "col.rule")), ("prio", tr(c, "lbl.priority")), ("dept", tr(c, "lbl.department")), ("cats", tr(c, "col.categories")), ("kw", tr(c, "col.keywords")), ("active", tr(c, "filter.active"))],
-                   [{"id": r.id, "prio": r.priority, "dept": r.department_code, "cats": ", ".join(sorted(r.categories)), "kw": ", ".join(r.keywords_any), "active": r.active} for r in ref["routing_rules"]], empty=tr(c, "ad.no_routing_rules"))
+                   [{"id": r.id, "prio": r.priority, "dept": {d.code: d.name for d in ref["departments"]}.get(r.department_code, r.department_code), "cats": ", ".join(sorted(r.categories)) or "-", "kw": ", ".join(r.keywords_any) or "-", "active": r.active}
+                    for r in ref["routing_rules"]], empty=tr(c, "ad.no_routing_rules"))  # fmt: skip
         with ui.column().classes("cl-card gap-3 w-full"):
             with ui.row().classes("gap-3 items-end flex-wrap"):
                 rid, prio = ui.input(tr(c, "ad.rule_id")).props("outlined dense"), ui.number(tr(c, "lbl.priority"), value=100, format="%d").props("outlined dense")
@@ -246,8 +278,9 @@ def register(c: AppContainer) -> None:
                 with ui.row().classes("gap-2 flex-wrap"):
                     for tpl in todo:
                         ui.button(tpl[1], icon="add", on_click=_act(c, lambda a=tpl: c.admin.save_workflow_rule(user.ctx, a[0], a[1], a[2], a[3], conditions=a[4], params=a[5]))).props("outline dense no-caps")
-        data_table([("id", tr(c, "col.rule")), ("name", tr(c, "col.name")), ("trigger", tr(c, "col.trigger")), ("cond", tr(c, "col.conditions")), ("action", tr(c, "col.action")), ("active", tr(c, "filter.active"))],
-                   [{"id": r.id, "name": r.name, "trigger": r.trigger, "cond": json.dumps(r.conditions, ensure_ascii=False), "action": r.action, "active": r.active} for r in ov["rules"]], empty=tr(c, "ad.no_workflow_rules"))
+        data_table([("name", tr(c, "col.name")), ("rule", "What it does"), ("active", tr(c, "filter.active"))],
+                   [{"id": r.id, "name": r.name, "rule": f"{TRIGGER_WORDS.get(r.trigger, r.trigger)} ({_conditions(r.conditions)}), {ACTION_WORDS.get(r.action, r.action)}.", "active": r.active} for r in ov["rules"]],
+                   empty=tr(c, "ad.no_workflow_rules"))  # fmt: skip
         with ui.column().classes("cl-card gap-3 w-full"):
             with ui.row().classes("gap-3 items-end flex-wrap"):
                 rid, name = ui.input(tr(c, "ad.rule_id")).props("outlined dense"), ui.input(tr(c, "col.name")).props("outlined dense")
@@ -269,7 +302,8 @@ def register(c: AppContainer) -> None:
             dele = ui.select([r.id for r in ov["rules"]], label=tr(c, "ad.delete_rule")).props("outlined dense").classes("w-56")
             _danger_action(c, tr(c, "act.delete"), lambda: c.admin.delete_workflow_rule(user.ctx, dele.value))
         section_title(tr(c, "ad.recent_executions"))
-        data_table([("when", tr(c, "legal.col_when")), ("rule", tr(c, "col.rule")), ("complaint", tr(c, "col.complaint")), ("action", tr(c, "col.action"))], [{"id": str(i), "when": e.executed_at.strftime("%d %b %H:%M"), "rule": e.rule_id, "complaint": e.complaint_id[:8], "action": e.outcome} for i, e in enumerate(ov["executions"])], empty=tr(c, "ad.no_rule_runs"))
+        refs = run_in_uow(c, lambda uow: {e.complaint_id: (x.reference if (x := uow.complaints.get(e.complaint_id)) else e.complaint_id[:8]) for e in ov["executions"]})
+        data_table([("when", tr(c, "legal.col_when")), ("rule", tr(c, "col.rule")), ("complaint", tr(c, "col.complaint")), ("action", tr(c, "col.action"))], [{"id": str(i), "when": e.executed_at.strftime("%d %b %H:%M"), "rule": {r.id: r.name for r in ov["rules"]}.get(e.rule_id, e.rule_id), "complaint": refs.get(e.complaint_id, e.complaint_id[:8]), "action": ACTION_WORDS.get(e.outcome, e.outcome.replace("_", " "))} for i, e in enumerate(ov["executions"])], empty=tr(c, "ad.no_rule_runs"))
 
     @page(c, "/admin/emergency", "nav.emergency_admin", roles=ADMINS)
     def emergency_admin(c: AppContainer, user: UiUser) -> None:
@@ -305,8 +339,10 @@ def register(c: AppContainer) -> None:
             with ui.column().classes("cl-card gap-2 w-full"):
                 section_title("Start from a suggested policy", "Critical 24 h · High 3 days · Medium 7 days · Low 21 days (the CPGRAMS ceiling). Apply, then edit any row to match your citizen charter.")
                 ui.button("Apply suggested policies", icon="auto_fix_high", on_click=_act(c, apply_suggested)).props("color=primary unelevated")
-        data_table([("id", tr(c, "col.policy")), ("prio", tr(c, "lbl.priority")), ("dept", tr(c, "lbl.department")), ("hours", tr(c, "col.hours")), ("gap", "Escalation gap (h)"), ("max", tr(c, "col.max_level"))],
-                   [{"id": p.id, "prio": p.priority, "dept": p.department_code or "(all)", "hours": p.resolution_hours, "gap": p.escalation_gap_hours, "max": p.max_level} for p in ref["sla_policies"]], empty=tr(c, "ad.no_sla"))
+        order = {"critical": 0, "high": 1, "medium": 2, "low": 3}
+        data_table([("prio", tr(c, "lbl.priority")), ("dept", tr(c, "lbl.department")), ("hours", "Resolve within"), ("gap", "Escalate again every"), ("max", tr(c, "col.max_level")), ("id", tr(c, "col.policy"))],
+                   [{"id": p.id, "prio": p.priority.capitalize(), "dept": p.department_code or "All departments", "hours": _duration(p.resolution_hours), "gap": _duration(p.escalation_gap_hours), "max": f"up to level {p.max_level}"}
+                    for p in sorted(ref["sla_policies"], key=lambda x: (order.get(x.priority, 9), x.department_code or ""))], empty=tr(c, "ad.no_sla"))  # fmt: skip
         with ui.row().classes("cl-card gap-3 items-end w-full flex-wrap"):
             pid, prio, hours = ui.input(tr(c, "ad.policy_id")).props("outlined dense"), ui.select(["low", "medium", "high", "critical"], label=tr(c, "lbl.priority")).props("outlined dense"), ui.number(tr(c, "ad.resolution_hours"), value=72, format="%d").props("outlined dense")
             dept = ui.select([""] + [d.code for d in ref["departments"]], value="", label=tr(c, "lbl.department")).props("outlined dense")

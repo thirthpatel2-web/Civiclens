@@ -61,7 +61,15 @@ def helpline_cards(c: AppContainer) -> None:
                     ui.label(h["number"]).classes("text-2xl font-extrabold").style("color: var(--cl-emergency);")
                     ui.icon("phone_in_talk").classes("text-[20px] cl-helpline-call").style("color: var(--cl-emergency);")
                 if not h["translated"]:
-                    chip("English only", color="muted", outline=True)
+                    chip(tr(c, "em.english_only"), color="muted", outline=True)
+
+
+STAGE_KEYS = {"Submitted": "st.submitted", "AI Routed": "st.ai_routed", "Assigned": "st.assigned", "Under Review": "st.under_review", "In Progress": "st.in_progress", "Resolved": "st.resolved"}
+
+
+def status_label(c: AppContainer, status: Any) -> str:
+    """A complaint status in the reader's language (st.* keys cover every ComplaintStatus)."""
+    return tr(c, f"st.{status}")
 
 
 CONSENT_LABELS = {"privacy_policy": "I accept the privacy policy", "ai_processing": "Let AI help classify and route my complaints", "data_sharing_government": "Share my complaints with government grievance platforms",
@@ -82,7 +90,7 @@ def complaint_card(c: AppContainer, x: Any) -> None:
             with ui.column().classes("gap-0").style("min-width: 0;"):
                 ui.label(x.title).classes("text-sm font-semibold cl-clip-1").style("color: var(--cl-fg);")
                 ui.label(f"{x.reference} · {x.created_at:%d %b %Y}").classes("text-xs cl-mono").style("color: var(--cl-fg-subtle);")
-            chip(status.replace("_", " "), color=tone)
+            chip(status_label(c, status), color=tone)
         with ui.row().classes("items-center gap-2 flex-wrap"):
             if x.department_code:
                 chip(x.department_code.replace("_", " ").capitalize(), color="muted", outline=True, icon="apartment")
@@ -93,7 +101,7 @@ def complaint_card(c: AppContainer, x: Any) -> None:
         if idx is not None:
             n = len(TIMELINE_STAGES)
             ui.linear_progress(value=(idx + 1) / n, show_value=False, size="6px", color="positive" if idx == n - 1 else "primary").props("rounded")
-            ui.label(f"Step {idx + 1} of {n}: {TIMELINE_STAGES[idx][0]}").classes("text-[11px]").style("color: var(--cl-fg-muted);")
+            ui.label(tr(c, "card.step", n=idx + 1, total=n, stage=tr(c, STAGE_KEYS.get(TIMELINE_STAGES[idx][0], "")) if TIMELINE_STAGES[idx][0] in STAGE_KEYS else TIMELINE_STAGES[idx][0])).classes("text-[11px]").style("color: var(--cl-fg-muted);")
     card.on("click", lambda _e, i=x.id: ui.navigate.to(f"/grievances/{i}"))
 
 
@@ -142,7 +150,10 @@ def government_panel(c: AppContainer, ctx: Any, complaint_id: str) -> None:
 
 
 def _timeline(c: AppContainer, steps: list[Any]) -> None:
-    status_timeline(steps)
+    from types import SimpleNamespace as _NS
+
+    # stage names in the reader's language; the step objects themselves are left untouched
+    status_timeline([_NS(label=tr(c, STAGE_KEYS[s.label]) if s.label in STAGE_KEYS else s.label, state=s.state, at=getattr(s, "at", None)) for s in steps])
 
 
 # What each timeline event kind means, in words a citizen or officer would use.
@@ -1024,7 +1035,7 @@ def register(c: AppContainer) -> None:
                 ui.label(cm.reference).classes("text-xs cl-mono").style("color: var(--cl-fg-subtle);")
                 ui.label(cm.title).classes("text-xl font-semibold").style("color: var(--cl-fg);")
                 with ui.row().classes("gap-2 items-center flex-wrap"):
-                    chip(str(cm.status).replace("_", " "), color=theme.STATUS_COLOR.get(str(cm.status), "muted"))
+                    chip(status_label(c, cm.status), color=theme.STATUS_COLOR.get(str(cm.status), "muted"))
                     if cm.escalation_level:
                         chip(f"Escalated L{cm.escalation_level}", color="danger")
         with ui.row().classes("gap-6 w-full flex-wrap"):
@@ -1942,7 +1953,7 @@ def register(c: AppContainer) -> None:
                                 return "Ward " + ", ".join(wards)
                             if cities:
                                 name = min(cities, key=lambda ct: (ct[1] - h["lat"]) ** 2 + (ct[2] - h["lng"]) ** 2)[0]
-                                return f"Near {name}"
+                                return tr(c, "gis.near", city=name)
                             return f"{h['lat']:.3f}, {h['lng']:.3f}"
 
                         for h in r["hotspots"][:8]:
@@ -1951,9 +1962,9 @@ def register(c: AppContainer) -> None:
                                 with ui.column().classes("gap-0"):
                                     ui.label(place(h)).classes("text-sm font-medium").style("color: var(--cl-fg);")
                                     ui.label(" · ".join(k.replace("_", " ") for k in list(h["categories"])[:3]) or "-").classes("text-xs").style("color: var(--cl-fg-subtle);")
-                                chip(f"{h['count']} report{'s' if h['count'] != 1 else ''}", color="danger" if h["severity_score"] >= 3 else "warning")
+                                chip(tr(c, "gis.reports", n=h["count"]), color="danger" if h["severity_score"] >= 3 else "warning")
                             row.on("click", lambda _e, la=h["lat"], ln=h["lng"]: fly(la, ln))
-                        ui.label("Click a hotspot to zoom the map to it.").classes("text-xs").style("color: var(--cl-fg-subtle);")
+                        ui.label(tr(c, "gis.click_hint")).classes("text-xs").style("color: var(--cl-fg-subtle);")
                         if r["ward_boundaries"] == "not_available":
                             ui.label(tr(c, "gis.no_polygons")).classes("text-xs").style("color: var(--cl-fg-subtle);")
 
@@ -2042,15 +2053,15 @@ def register(c: AppContainer) -> None:
             if user.ctx.has(Permission.COMPLAINT_READ_OWN):  # a personal diagnostic only means something for a citizen's own filings
                 mine = c.complaints.list_mine(user.ctx, filter_name="all")
                 diag = personal_diagnostic([m.department_code for m in mine])
-                stat_tile(tr(c, "interop.stat_departments"), diag.distinct_departments, color="primary", icon="apartment", hint=f"across {diag.total_filings} filing(s) through CivicLens")
-                stat_tile(tr(c, "interop.stat_reentries"), diag.profile_reuses, color="success", icon="badge", hint="times your one CivicLens profile was reused instead of re-typing KYC elsewhere")
+                stat_tile(tr(c, "interop.stat_departments"), diag.distinct_departments, color="primary", icon="apartment", hint=tr(c, "interop.filings", n=diag.total_filings))
+                stat_tile(tr(c, "interop.stat_reentries"), diag.profile_reuses, color="success", icon="badge", hint=tr(c, "interop.reuses"))
         if user.ctx.has(Permission.INTEROP_READ):
             with ui.row().classes("cl-card w-full items-center justify-between gap-3 flex-wrap"):
                 ui.label("This lab shows how records are normalised. The live, consent-gated exchange between departments runs in the Gateway console.").classes("text-sm").style("color: var(--cl-fg-muted);")
                 ui.button("Open Interoperability Gateway", icon="hub", on_click=lambda: ui.navigate.to("/gateway")).props("color=primary unelevated no-caps")
         elif user.ctx.role is Role.CITIZEN:
             with ui.row().classes("cl-card w-full items-center justify-between gap-3 flex-wrap"):
-                ui.label("Departments can only reuse your records with your permission. See and control every request in My data & consent.").classes("text-sm").style("color: var(--cl-fg-muted);")
+                ui.label(tr(c, "interop.lab_mydata")).classes("text-sm").style("color: var(--cl-fg-muted);")
                 ui.button(tr(c, "nav.my_data"), icon="verified_user", on_click=lambda: ui.navigate.to("/my-data")).props("outline no-caps")
 
         divider()
@@ -2058,7 +2069,7 @@ def register(c: AppContainer) -> None:
         info_banner(tr(c, "interop.fixtures_note"), "blue")
 
         sys_select = ui.select({k: v[0] for k, v in SYSTEMS.items()}, value=next(iter(SYSTEMS)), label=tr(c, "interop.source_system")).props("outlined dense").classes("w-full max-w-lg")
-        corrupt = ui.checkbox("Simulate a malformed record (blank required fields, break the status code)")
+        corrupt = ui.checkbox(tr(c, "interop.simulate"))
         out = ui.row().classes("gap-4 w-full flex-wrap items-start q-mt-sm")
 
         def draw() -> None:
@@ -2076,7 +2087,7 @@ def register(c: AppContainer) -> None:
             tone = {"excellent": "success", "good": "info", "poor": "warning", "unusable": "danger"}[quality.grade]
             with out:
                 with ui.column().classes("cl-card gap-2").style("flex: 1; min-width: 300px;"):
-                    section_title(tr(c, "interop.raw_payload"), "exactly as that system would export it")
+                    section_title(tr(c, "interop.raw_payload"), tr(c, "interop.as_exported"))
                     ui.markdown(f"```json\n{_json.dumps(payload, indent=2, ensure_ascii=False)}\n```").classes("cl-mono text-xs w-full")
                 with ui.column().classes("cl-card gap-2").style("flex: 1; min-width: 300px;"):
                     with ui.row().classes("items-center justify-between w-full"):
@@ -2157,8 +2168,8 @@ def register(c: AppContainer) -> None:
             with ui.column().classes("cl-card gap-3 w-full"):
                 section_title(tr(c, "nav.notifications"))
                 prefs = run_in_uow(c, lambda uow: c.notifications.preferences(user.ctx, uow.notifications))
-                in_app = ui.switch("In-app notifications", value=prefs.in_app).props("color=primary")
-                email = ui.switch("E-mail notifications", value=prefs.email).props("color=primary")
+                in_app = ui.switch(tr(c, "set.in_app"), value=prefs.in_app).props("color=primary")
+                email = ui.switch(tr(c, "set.email_notif"), value=prefs.email).props("color=primary")
                 if c.mailer is None:
                     field_hint(tr(c, "set.email_not_configured"))
 
@@ -2176,7 +2187,7 @@ def register(c: AppContainer) -> None:
                     c.profiles.set_consent(user.ctx, p, bool(e.value))
                     ui.notify(tr(c, "msg.saved"), type="positive")
 
-                plain = CONSENT_LABELS
+                plain = {p: tr(c, f"consent.{p}") for p in CONSENT_LABELS}
                 for purpose, cstate in consents.items():
                     ui.switch(plain.get(purpose, purpose.replace("_", " ").capitalize()), value=cstate["granted"], on_change=lambda e, p=purpose: _on_consent_change(e, p)).props("color=primary")
                 divider()
@@ -2325,6 +2336,21 @@ def register(c: AppContainer) -> None:
                     return look
             return ("notifications", "muted")
 
+        def _words(n: Any) -> tuple[str, str]:
+            """Notifications are stored in English when created; re-say the ones whose wording
+            CivicLens owns in the reader's language. Anything else is shown as stored."""
+            import re as _re
+
+            ref = (n.data or {}).get("reference", "")
+            if n.kind == "complaint.created" and ref:
+                return tr(c, "notif.t_registered"), tr(c, "notif.b_registered", ref=ref)
+            m = _re.search(r"is now (.+?)\.$", n.body or "")
+            if n.kind in ("complaint.status_changed", "complaint.resolved") and ref and m:
+                return tr(c, "notif.t_update"), tr(c, "notif.b_update", ref=ref, status=status_label(c, m.group(1).strip().replace(" ", "_")))
+            if n.kind == "interop.consent_requested":
+                return tr(c, "notif.t_consent"), n.body
+            return n.title, n.body
+
         today = c.clock().date()
         groups: dict[str, list[Any]] = {}
         for n in items:
@@ -2339,9 +2365,10 @@ def register(c: AppContainer) -> None:
                     with card:
                         with ui.element("div").classes("cl-stat-icon").style(f"background: var(--cl-{tone}-soft); color: var(--cl-{tone}); width:36px; height:36px; flex: none;"):
                             ui.icon(icon).classes("text-[18px]")
+                        title, body = _words(n)
                         with ui.column().classes("gap-0 flex-1").style("min-width: 0;"):
-                            ui.label(n.title).classes("text-sm font-semibold").style("color: var(--cl-fg);")
-                            ui.label(n.body).classes("text-sm cl-clip-2").style("color: var(--cl-fg-muted);")
+                            ui.label(title).classes("text-sm font-semibold").style("color: var(--cl-fg);")
+                            ui.label(body).classes("text-sm cl-clip-2").style("color: var(--cl-fg-muted);")
                             ui.label(n.created_at.strftime("%d %b %Y · %H:%M")).classes("text-xs q-mt-xs").style("color: var(--cl-fg-subtle);")
                         with ui.column().classes("items-end gap-1").style("flex: none;"):
                             if not n.read_at:

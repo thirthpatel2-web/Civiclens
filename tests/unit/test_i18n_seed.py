@@ -93,7 +93,14 @@ class EmergencyHubTests(unittest.TestCase):
         hi = {i["code"]: i for i in self.hub.list("hi")["items"]}
         self.assertTrue(hi["emergency"]["translated"])
         self.assertNotEqual(hi["emergency"]["name"], "National Emergency")
-        self.assertEqual((hi["child"]["language"], hi["child"]["name"], hi["child"]["translated"]), ("en", "Childline Emergency", False))
+        self.assertTrue(hi["child"]["translated"])  # every seeded national helpline now ships all UI languages
+        from app.services.ports import EmergencyContactRecord
+
+        with self.env.uow() as u:  # an admin-added contact with no translation falls back to English, and says so
+            u.emergency.save(EmergencyContactRecord("local-water", "1916", "Water board", scope="national"))
+            u.commit()
+        hi = {i["code"]: i for i in self.hub.list("hi")["items"]}
+        self.assertEqual((hi["local-water"]["language"], hi["local-water"]["name"], hi["local-water"]["translated"]), ("en", "Water board", False))
 
     def test_inactive_contacts_are_hidden_and_city_scope_filters(self):
         from app.services.ports import EmergencyContactRecord

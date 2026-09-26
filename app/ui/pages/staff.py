@@ -384,23 +384,41 @@ def register(c: AppContainer) -> None:
     def investigation(c: AppContainer, user: UiUser, inv_id: str) -> None:
         rep = c.investigations.report(user.ctx, inv_id)
         inv = rep["investigation"]
-        page_header(f"Investigation: {inv.subject_type} {inv.subject_id[:8]}", icon="search", actions=lambda: chip(inv.status, color="info"))
+        subject = investigation_subjects(c, [inv])[inv.id]
+        page_header(f"Investigation · {subject}", "Everything CivicLens knows about this case, gathered in one place.", icon="search", actions=lambda: chip(inv.status, color="info" if inv.status == "open" else "muted"))
         if "complaint" in rep:
             cm = rep["complaint"]
+            loc = rep.get("location") or {}
+            where = ", ".join(str(x) for x in (loc.get("address"), loc.get("ward") and f"ward {loc['ward']}", loc.get("city")) if x) if isinstance(loc, dict) else str(loc)
+            if isinstance(loc, dict) and loc.get("lat") is not None and not where:
+                where = f"{loc['lat']:.4f}, {loc['lng']:.4f} (GPS only)"
+            rag, legal = rep["rag_findings"], rep["legal_sources"]
+            findings = [
+                ("place", "Location", where or "No location given"),
+                ("near_me", "Same-category complaints within 500 m (30 days)", str(len(rep["nearby_same_category"]))),
+                ("hub", "Same ward and category", str(len(rep["ward_category_cluster"]))),
+                ("content_copy", "Possible duplicates flagged at intake", ", ".join(x["reference"] for x in rep["duplicates"]) or "None"),
+                ("warning", "Open anomalies", "; ".join(a.explanation for a in rep["anomalies"]) or "None"),
+                ("description", "From the citizen's documents", (rag.get("answer") or "").strip() if rag.get("status") == "answered" else "Nothing relevant found in the documents on file"),
+                ("gavel", "Legal sources", f"{len(legal.get('precedents', []))} verified precedent record(s)" + (" - metadata only" if legal.get("status") == "precedents_only" else "")),
+            ]  # fmt: skip
+            actors = run_in_uow(c, lambda uow: {a: uow.officers.user_label(a) for a in {e.actor_id for e in rep["audit_trail"] if e.actor_id}})
             with ui.row().classes("gap-6 w-full flex-wrap"):
                 with ui.column().classes("gap-3 flex-1").style("min-width: 320px;"):
-                    with ui.column().classes("cl-card gap-2 w-full"):
-                        ui.label(f"{cm.reference}: {cm.title}").classes("text-sm font-semibold").style("color: var(--cl-fg);")
+                    with ui.column().classes("cl-card gap-3 w-full"):
+                        with ui.row().classes("items-center justify-between w-full gap-2"):
+                            ui.label(f"{cm.reference}: {cm.title}").classes("text-sm font-semibold").style("color: var(--cl-fg);")
+                            ui.button("Open complaint", icon="open_in_new", on_click=lambda: ui.navigate.to(f"/officer/complaints/{cm.id}")).props("flat dense no-caps")
                         divider()
-                        ui.label(f"Location: {rep['location']}").classes("text-xs").style("color: var(--cl-fg-muted);")
-                        ui.label(f"Nearby same-category complaints (500 m, 30 d): {len(rep['nearby_same_category'])}").classes("text-xs").style("color: var(--cl-fg-muted);")
-                        ui.label(f"Ward/category cluster: {len(rep['ward_category_cluster'])}").classes("text-xs").style("color: var(--cl-fg-muted);")
-                        ui.label("Duplicates flagged at intake: " + (", ".join(x["reference"] for x in rep["duplicates"]) or "none")).classes("text-xs").style("color: var(--cl-fg-muted);")
-                        ui.label("Open anomalies: " + (", ".join(a.explanation for a in rep["anomalies"]) or "none")).classes("text-xs").style("color: var(--cl-fg-muted);")
-                        ui.label("Document assistant: " + str(rep["rag_findings"].get("status")) + " - " + str(rep["rag_findings"].get("answer") or "")).classes("text-xs").style("color: var(--cl-fg-muted);")
-                        ui.label("Legal sources: " + str(rep["legal_sources"].get("status")) + " (" + str(len(rep["legal_sources"].get("precedents", []))) + " verified records; metadata only)").classes("text-xs").style("color: var(--cl-fg-muted);")
+                        for icon, label, value in findings:
+                            with ui.row().classes("items-start gap-3 w-full no-wrap"):
+                                ui.icon(icon).classes("text-[18px] q-mt-xs").style("color: var(--cl-primary);")
+                                with ui.column().classes("gap-0").style("min-width: 0;"):
+                                    ui.label(label).classes("text-xs").style("color: var(--cl-fg-subtle);")
+                                    ui.label(value).classes("text-sm").style("color: var(--cl-fg);")
                     section_title(tr(c, "of.audit_trail"))
-                    data_table([("at", tr(c, "legal.col_when")), ("action", tr(c, "col.action")), ("actor", tr(c, "col.actor"))], [{"id": str(i), "at": e.occurred_at.strftime("%d %b %H:%M"), "action": e.action, "actor": (e.actor_id or "system")[:8]} for i, e in enumerate(rep["audit_trail"])])
+                    data_table([("at", tr(c, "legal.col_when")), ("action", tr(c, "col.action")), ("actor", tr(c, "col.actor"))],
+                               [{"id": str(i), "at": e.occurred_at.strftime("%d %b %H:%M"), "action": e.action.replace("_", " "), "actor": actors.get(e.actor_id or "") or (e.actor_id or "system")[:8]} for i, e in enumerate(rep["audit_trail"])])  # fmt: skip
                 with ui.column().classes("gap-3").style("min-width: 280px; max-width: 340px; flex: 1;"):
                     section_title(tr(c, "gr.status_timeline"))
                     with ui.column().classes("cl-card w-full"):
@@ -410,7 +428,9 @@ def register(c: AppContainer) -> None:
             if not inv.notes:
                 ui.label(tr(c, "of.no_notes")).classes("text-sm").style("color: var(--cl-fg-subtle);")
             for n in inv.notes:
-                ui.label(f"{n['at'][:16]} - {n['text']}").classes("text-sm").style("color: var(--cl-fg);")
+                with ui.row().classes("items-start gap-3 w-full no-wrap"):
+                    ui.label(str(n["at"])[:16].replace("T", " ")).classes("text-xs cl-mono").style("color: var(--cl-fg-subtle); min-width: 120px;")
+                    ui.label(n["text"]).classes("text-sm").style("color: var(--cl-fg);")
             if inv.status == "open":
                 divider()
                 t = ui.textarea(tr(c, "of.add_note")).props("outlined").classes("w-full")

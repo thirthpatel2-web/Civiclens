@@ -152,7 +152,36 @@
   "number": "1098",
   "name": "Childline Emergency",
   "description": "Care and protection for children",
-  "translations": {},
+  "translations": {
+   "hi": {
+    "name": "चाइल्डलाइन आपातकाल",
+    "desc": "बच्चों की देखभाल और सुरक्षा"
+   },
+   "mr": {
+    "name": "चाइल्डलाइन आपत्कालीन",
+    "desc": "मुलांची काळजी आणि संरक्षण"
+   },
+   "bn": {
+    "name": "চাইল্ডলাইন জরুরি",
+    "desc": "শিশুদের যত্ন ও সুরক্ষা"
+   },
+   "ta": {
+    "name": "சைல்டுலைன் அவசர உதவி",
+    "desc": "குழந்தைகளின் பராமரிப்பு மற்றும் பாதுகாப்பு"
+   },
+   "te": {
+    "name": "చైల్డ్‌లైన్ అత్యవసర",
+    "desc": "పిల్లల సంరక్షణ మరియు రక్షణ"
+   },
+   "kn": {
+    "name": "ಚೈಲ್ಡ್‌ಲೈನ್ ತುರ್ತು",
+    "desc": "ಮಕ್ಕಳ ಆರೈಕೆ ಮತ್ತು ರಕ್ಷಣೆ"
+   },
+   "en": {
+    "name": "Childline Emergency",
+    "desc": "Care and protection for children"
+   }
+  },
   "scope": "national"
  },
  {
@@ -160,7 +189,36 @@
   "number": "1078",
   "name": "National Disaster Helpline",
   "description": "NDMA Flood/Earthquake response",
-  "translations": {},
+  "translations": {
+   "hi": {
+    "name": "राष्ट्रीय आपदा हेल्पलाइन",
+    "desc": "एनडीएमए बाढ़/भूकंप सहायता"
+   },
+   "mr": {
+    "name": "राष्ट्रीय आपत्ती हेल्पलाइन",
+    "desc": "एनडीएमए पूर/भूकंप मदत"
+   },
+   "bn": {
+    "name": "জাতীয় দুর্যোগ হেল্পলাইন",
+    "desc": "এনডিএমএ বন্যা/ভূমিকম্প সহায়তা"
+   },
+   "ta": {
+    "name": "தேசிய பேரிடர் உதவி எண்",
+    "desc": "NDMA வெள்ளம்/நிலநடுக்க உதவி"
+   },
+   "te": {
+    "name": "జాతీయ విపత్తు హెల్ప్‌లైన్",
+    "desc": "NDMA వరద/భూకంప సహాయం"
+   },
+   "kn": {
+    "name": "ರಾಷ್ಟ್ರೀಯ ವಿಪತ್ತು ಸಹಾಯವಾಣಿ",
+    "desc": "NDMA ಪ್ರವಾಹ/ಭೂಕಂಪ ನೆರವು"
+   },
+   "en": {
+    "name": "National Disaster Helpline",
+    "desc": "NDMA Flood/Earthquake response"
+   }
+  },
   "scope": "national"
  }
 ]
