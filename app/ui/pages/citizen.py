@@ -64,6 +64,10 @@ def helpline_cards(c: AppContainer) -> None:
                     chip("English only", color="muted", outline=True)
 
 
+CONSENT_LABELS = {"privacy_policy": "I accept the privacy policy", "ai_processing": "Let AI help classify and route my complaints", "data_sharing_government": "Share my complaints with government grievance platforms",
+                  "document_storage": "Store documents I upload", "notifications_email": "Send me updates by e-mail"}  # fmt: skip
+
+
 def complaint_card(c: AppContainer, x: Any) -> None:
     """One complaint as a tappable card: where it is in the journey (a progress bar over the same
     stages the detail timeline uses), which department holds it, and how urgent it is."""
@@ -2074,17 +2078,38 @@ def register(c: AppContainer) -> None:
         p = c.profiles.get(user.ctx)
         page_header(tr(c, "profileSection") if user.ctx.role is Role.CITIZEN else tr(c, "nav.my_profile"), icon="person")
         with ui.column().classes("cl-card w-full max-w-md gap-3"):
+            ref = run_in_uow(c, lambda uow: {"cities": list(uow.config.cities()), "wards": list(uow.config.wards())})
             name = ui.input(tr(c, "fullName"), value=p.full_name).props("outlined dense").classes("w-full")
-            phone = ui.input(tr(c, "phoneNumber"), value=p.phone or "").props("outlined dense").classes("w-full")
-            city = ui.input(tr(c, "selectCity"), value=p.city or "").props("outlined dense").classes("w-full")
-            ward = ui.input(tr(c, "lbl.ward"), value=p.ward or "").props("outlined dense").classes("w-full")
+            phone = ui.input(tr(c, "phoneNumber"), value=p.phone or "").props("outlined dense inputmode=tel").classes("w-full")
+            if user.ctx.role is Role.CITIZEN:
+                field_hint(tr(c, "profile.phone_hint"))
+            # pick lists instead of free text, so the city/ward match what routing and the map use;
+            # a value saved before this change is kept as an option rather than silently dropped
+            city_opts = {x.name: x.name for x in ref["cities"]}
+            if p.city and p.city not in city_opts:
+                city_opts[p.city] = p.city
+            city = ui.select(city_opts, value=p.city or None, label=tr(c, "selectCity"), with_input=True).props("outlined dense clearable").classes("w-full")
+
+            def ward_options() -> dict[str, str]:
+                code = next((x.code for x in ref["cities"] if x.name == city.value), None)
+                opts = {w.code: w.name for w in ref["wards"] if code is None or w.city_code == code}
+                if p.ward and p.ward not in opts:
+                    opts[p.ward] = p.ward
+                return opts
+
+            ward = ui.select(ward_options(), value=p.ward or None, label=tr(c, "lbl.ward"), with_input=True).props("outlined dense clearable").classes("w-full")
+            def _city_changed(_e: Any) -> None:
+                ward.set_options(ward_options())
+                ward.set_value(None)
+
+            city.on_value_change(_city_changed)
             divider()
             with ui.row().classes("items-center gap-2"):
                 ui.icon("mail").classes("text-[16px]").style("color: var(--cl-fg-subtle);")
                 ui.label(f"{tr(c, 'emailAddress')}: {user.email}").classes("text-sm").style("color: var(--cl-fg-muted);")
 
             def save() -> None:
-                c.profiles.update(user.ctx, full_name=name.value, phone=phone.value or None, city=city.value, ward=ward.value)
+                c.profiles.update(user.ctx, full_name=name.value, phone=phone.value or None, city=city.value or "", ward=ward.value or "")
                 ui.notify(tr(c, "msg.saved"), type="positive")
 
             ui.button(tr(c, "saveProfileBtn"), icon="check", on_click=save).props("color=primary unelevated")
@@ -2115,8 +2140,7 @@ def register(c: AppContainer) -> None:
                     c.profiles.set_consent(user.ctx, p, bool(e.value))
                     ui.notify(tr(c, "msg.saved"), type="positive")
 
-                plain = {"privacy_policy": "I accept the privacy policy", "ai_processing": "Let AI help classify and route my complaints", "data_sharing_government": "Share my complaints with government grievance platforms",
-                         "document_storage": "Store documents I upload", "notifications_email": "Send me updates by e-mail"}  # fmt: skip
+                plain = CONSENT_LABELS
                 for purpose, cstate in consents.items():
                     ui.switch(plain.get(purpose, purpose.replace("_", " ").capitalize()), value=cstate["granted"], on_change=lambda e, p=purpose: _on_consent_change(e, p)).props("color=primary")
                 divider()
@@ -2133,7 +2157,9 @@ def register(c: AppContainer) -> None:
 
             with ui.column().classes("cl-card gap-3 w-full"):
                 section_title(tr(c, "set.appearance_language"))
-                ui.select({k: k.upper() for k in c.ui_text.languages}, value=lang(), label=tr(c, "appLanguage"),
+                from app.i18n.languages import LANGUAGES as _LANGS
+
+                ui.select({k: f"{_LANGS[k].native} ({k})" if k in _LANGS else k.upper() for k in c.ui_text.languages}, value=lang(), label=tr(c, "appLanguage"),
                           on_change=_on_language_change).props("outlined dense").classes("w-56")
                 field_hint(tr(c, "set.theme_hint"))
 
@@ -2290,7 +2316,7 @@ def register(c: AppContainer) -> None:
 
     @page(c, "/documents", "nav.documents")
     def documents(c: AppContainer, user: UiUser) -> None:
-        page_header(tr(c, "nav.documents"), icon="folder")
+        page_header(tr(c, "nav.documents"), tr(c, "doc.help"), icon="folder")
 
         def on_upload(e: Any) -> None:
             if c.ingestor_factory is None:

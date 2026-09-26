@@ -51,7 +51,8 @@ def register(c: AppContainer) -> None:
     @page(c, "/officer", "nav.officer", roles=OFFICER_UP)
     def officer_dashboard(c: AppContainer, user: UiUser) -> None:
         d = c.dashboards.department(user.ctx)
-        page_header(tr(c, "nav.officer"), d["department_code"] or "All departments", icon="space_dashboard")
+        dept_names = run_in_uow(c, lambda uow: {x.code: x.name for x in uow.config.departments()})
+        page_header(tr(c, "nav.officer"), dept_names.get(d["department_code"] or "", d["department_code"]) or "All departments", icon="space_dashboard")
         if not d["has_data"]:
             state_panel(icon="inbox", title=tr(c, "msg.no_data"))
             return
@@ -65,7 +66,38 @@ def register(c: AppContainer) -> None:
         if d["resolution_hours"]:
             with ui.row().classes("cl-card w-full items-center gap-2"):
                 ui.icon("timer").style("color: var(--cl-fg-muted);")
-                ui.label(f"Resolution time: median {d['resolution_hours']['median']} h, mean {d['resolution_hours']['mean']} h over {d['resolution_hours']['count']} resolved.").classes("text-sm").style("color: var(--cl-fg-muted);")
+                def hours(h: float) -> str:
+                    return "under an hour" if h < 1 else f"{h:.0f} h" if h < 48 else f"{h / 24:.1f} days"
+
+                rh = d["resolution_hours"]
+                ui.label(f"Typical resolution time: {hours(rh['median'])} (median), {hours(rh['mean'])} on average, over {rh['count']} resolved.").classes("text-sm").style("color: var(--cl-fg-muted);")
+        if user.ctx.department_id:
+            # the first thing an officer needs: which complaints are about to or already missed their deadline
+            calc = SlaCalculator(run_in_uow(c, lambda uow: list(uow.config.sla_policies())))
+            now = c.clock()
+            urgent = []
+            for x in c.officer.queue(user.ctx, limit=200):
+                st = calc.status(SlaSubject(x.id, x.priority, x.department_code, x.status, x.created_at, x.sla_due_at, x.escalation_level), now)
+                if st.state in ("breached", "at_risk"):
+                    urgent.append((0 if st.state == "breached" else 1, st.remaining.total_seconds() if st.remaining is not None else 0, x, st))
+            urgent.sort(key=lambda t: (t[0], t[1]))
+            with ui.row().classes("items-center justify-between w-full"):
+                section_title("Needs your attention", "Overdue first, then the ones closest to their deadline.")
+                ui.link("Open the full queue", "/officer/queue").classes("text-sm")
+            if not urgent:
+                state_panel(icon="task_alt", title="Nothing overdue or at risk", body="Every open complaint in your department is inside its deadline.", tone="success")
+            with ui.column().classes("gap-2 w-full"):
+                for _rank, _secs, x, st in urgent[:5]:
+                    hrs = (st.remaining.total_seconds() / 3600) if st.remaining is not None else 0
+                    row = ui.row().classes("cl-card cl-card-hover w-full items-center gap-3 no-wrap").style(f"border-left: 4px solid var(--cl-{'danger' if st.state == 'breached' else 'warning'});")
+                    with row:
+                        with ui.column().classes("gap-0 flex-1").style("min-width: 0;"):
+                            ui.label(x.title).classes("text-sm font-semibold cl-clip-1").style("color: var(--cl-fg);")
+                            ui.label(f"{x.reference} · {(x.ward or 'no ward').replace('_', ' ')}").classes("text-xs cl-mono").style("color: var(--cl-fg-subtle);")
+                        chip(x.priority, color=theme.PRIORITY_COLOR.get(x.priority, "muted"))
+                        chip(f"{-hrs:.0f} h overdue" if hrs < 0 else f"{hrs:.0f} h left", color="danger" if st.state == "breached" else "warning", icon="schedule")
+                        ui.icon("chevron_right").style("color: var(--cl-fg-subtle);")
+                    row.on("click", lambda _e, i=x.id: ui.navigate.to(f"/officer/complaints/{i}"))
         with ui.row().classes("gap-4 w-full flex-wrap"):
             with ui.column().classes("cl-card").style("flex: 1; min-width: 320px;"):
                 section_title(tr(c, "of.by_category"))

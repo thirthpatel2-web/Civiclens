@@ -300,7 +300,17 @@ body.body--dark a:not(.q-btn):not(.q-item):not(.q-tab):not(.cl-nav-item) {{ colo
 /* ---- stat tiles ------------------------------------------------------------------------ */
 .cl-stat {{ min-width: 176px; flex: 1 1 176px; }}
 .cl-stat-icon {{ width: 38px; height: 38px; border-radius: var(--cl-radius-md); display: flex; align-items: center; justify-content: center; }}
-@media (max-width: 640px) {{ .cl-stat {{ min-width: 100%; flex-basis: 100%; }} }}
+/* phones: two compact tiles per row instead of four full-width slabs filling the first screen */
+@media (max-width: 640px) {{
+  .cl-stat {{ min-width: 0; flex: 1 1 calc(50% - 8px); max-width: calc(50% - 6px); padding: 12px !important; }}
+  .cl-stat .text-2xl {{ font-size: 1.35rem; }}
+  .cl-stat-icon {{ width: 30px; height: 30px; }}
+}}
+/* long chip labels (example prompts, platform names) shorten with an ellipsis instead of pushing the page sideways */
+.q-chip {{ max-width: 100%; }}
+/* a wrapping row inside a column sizes to its content unless capped - then it never wraps */
+.nicegui-column > .nicegui-row.flex-wrap {{ max-width: 100%; }}
+.q-chip__content {{ min-width: 0; overflow: hidden; text-overflow: ellipsis; }}
 
 /* ---- badges / chips --------------------------------------------------------------------- */
 .cl-badge {{

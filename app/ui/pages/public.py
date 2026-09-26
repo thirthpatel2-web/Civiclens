@@ -381,10 +381,15 @@ def register(c: AppContainer) -> None:
                 ward = ui.input(tr(c, "lbl.ward"), value=prof.ward or "").props("outlined dense").classes("w-full sm:flex-1")
             divider()
             section_title(tr(c, "lbl.language"))
-            language = ui.select({code: code.upper() for code in c.ui_text.languages}, value=prof.language, label=tr(c, "lbl.language")).props("outlined dense").classes("w-48")
+            from app.i18n.languages import LANGUAGES
+
+            language = ui.select({code: f"{LANGUAGES[code].native} ({code})" if code in LANGUAGES else code.upper() for code in c.ui_text.languages}, value=prof.language, label=tr(c, "lbl.language")).props("outlined dense").classes("w-56")
             divider()
             section_title(tr(c, "onb.ai_consent"), tr(c, "onb.ai_consent_sub"))
-            boxes = {p: ui.checkbox(p.replace("_", " ").capitalize(), value=c.profiles.consents(user.ctx)[p]["granted"]) for p in CONSENT_PURPOSES}
+            from app.ui.pages.citizen import CONSENT_LABELS
+
+            current = c.profiles.consents(user.ctx)
+            boxes = {p: ui.checkbox(CONSENT_LABELS.get(p, p.replace("_", " ").capitalize()), value=current[p]["granted"]) for p in CONSENT_PURPOSES}
             field_hint(tr(c, "onb.ai_hint"))
 
             def save() -> None:

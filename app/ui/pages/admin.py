@@ -366,26 +366,39 @@ def register(c: AppContainer) -> None:
         if not d["has_data"]:
             state_panel(icon="insights", title=tr(c, "msg.no_data"))
             return
+        from app.services.analytics_service import InsufficientData, forecast_linear
+
+        axis = {"axisLabel": {"color": "#9aa3b8"}, "axisLine": {"lineStyle": {"color": "#2a3148"}}, "splitLine": {"lineStyle": {"color": "#1f2538"}}}
+        palette = ["#6c7cff", "#22c3a6", "#f5a524", "#ef4f5f", "#a78bfa", "#38bdf8", "#84cc16", "#f472b6"]
+        names = run_in_uow(c, lambda uow: {"dept": {x.code: x.name for x in uow.config.departments()}, "ward": {w.code: w.name for w in uow.config.wards()}})
+
+        def bars(counts: dict[str, int], labels: dict[str, str]) -> dict[str, Any]:
+            items = sorted(counts.items(), key=lambda kv: -kv[1])
+            # horizontal bars: long names stay readable instead of being clipped by a rotated axis
+            return {"tooltip": {}, "grid": {"left": 8, "right": 24, "top": 8, "bottom": 8, "containLabel": True},
+                    "xAxis": {"type": "value", **axis}, "yAxis": {"type": "category", "inverse": True, "data": [labels.get(k, k).replace(" Department", "") for k, _ in items], **axis},
+                    "series": [{"type": "bar", "barMaxWidth": 18, "itemStyle": {"borderRadius": [0, 6, 6, 0]},
+                                "data": [{"value": v, "itemStyle": {"color": palette[i % len(palette)]}} for i, (_, v) in enumerate(items)]}]}  # fmt: skip
+
         with ui.row().classes("gap-4 w-full flex-wrap"):
             with ui.column().classes("cl-card").style("flex: 1; min-width: 320px;"):
                 section_title(tr(c, "ad.by_department"))
-                ui.echart({"grid": {"left": 40, "right": 12, "top": 12, "bottom": 40}, "xAxis": {"type": "category", "data": list(d["by_department"]), "axisLabel": {"rotate": 30}}, "yAxis": {"type": "value"}, "series": [{"type": "bar", "data": list(d["by_department"].values())}]}).classes("w-full h-56")
+                ui.echart(bars(d["by_department"], names["dept"])).classes("w-full h-64")
             with ui.column().classes("cl-card").style("flex: 1; min-width: 320px;"):
                 section_title(tr(c, "ad.by_ward"))
-                ui.echart({"grid": {"left": 40, "right": 12, "top": 12, "bottom": 40}, "xAxis": {"type": "category", "data": list(d["by_ward"]), "axisLabel": {"rotate": 30}}, "yAxis": {"type": "value"}, "series": [{"type": "bar", "data": list(d["by_ward"].values())}]}).classes("w-full h-56")
-            with ui.column().classes("cl-card").style("flex: 1.4; min-width: 380px;"):
-                section_title(tr(c, "ad.trend_30d"))
-                ui.echart({"grid": {"left": 36, "right": 12, "top": 12, "bottom": 24}, "xAxis": {"type": "category", "data": [t["date"][5:] for t in d["trend_daily"]]}, "yAxis": {"type": "value"}, "series": [{"type": "line", "areaStyle": {}, "data": [t["count"] for t in d["trend_daily"]]}]}).classes("w-full h-56")
-        from app.services.analytics_service import InsufficientData, forecast_linear
-
+                ui.echart(bars({k: v for k, v in d["by_ward"].items() if k}, names["ward"])).classes("w-full h-64")
         f = forecast_linear([t["count"] for t in d["trend_daily"]], 7)
-        with ui.row().classes("cl-card w-full items-center gap-2"):
+        with ui.column().classes("cl-card w-full"):
+            section_title(tr(c, "ad.trend_30d"), "Solid: complaints filed per day. Dashed: a 7-day linear projection - an estimate, not a fact.")
+            days = [t["date"][5:] for t in d["trend_daily"]]
+            actual = [t["count"] for t in d["trend_daily"]]
+            series: list[dict[str, Any]] = [{"name": "Filed", "type": "line", "smooth": True, "areaStyle": {"opacity": 0.25}, "color": "#6c7cff", "data": actual + [None] * 7}]
+            if not isinstance(f, InsufficientData):
+                series.append({"name": "Projection", "type": "line", "smooth": True, "color": "#a78bfa", "lineStyle": {"type": "dashed"}, "data": [None] * (len(actual) - 1) + [actual[-1]] + [round(v, 1) for v in f.values]})
+            ui.echart({"tooltip": {"trigger": "axis"}, "legend": {"textStyle": {"color": "#c7cde0"}}, "grid": {"left": 36, "right": 16, "top": 36, "bottom": 28},
+                       "xAxis": {"type": "category", "data": days + [f"+{i}d" for i in range(1, 8)], **axis}, "yAxis": {"type": "value", **axis}, "series": series}).classes("w-full h-64")  # fmt: skip
             if isinstance(f, InsufficientData):
-                ui.icon("hourglass_empty").style("color: var(--cl-fg-muted);")
-                ui.label(f"Forecast: not enough history ({f.have}/{f.needed} days).").classes("text-sm").style("color: var(--cl-fg-muted);")
-            else:
-                ui.icon("query_stats").style("color: var(--cl-info);")
-                ui.label(f"Forecast (estimate, not a fact): next 7 days ~ {list(f.values)} [{f.label}]").classes("text-sm").style("color: var(--cl-info);")
+                ui.label(f"Projection: not enough history yet ({f.have}/{f.needed} days).").classes("text-xs").style("color: var(--cl-fg-subtle);")
         with ui.row().classes("gap-2 flex-wrap"):
             chip(f"Backlog: {d['backlog']}", color="muted", outline=True)
             chip(f"Escalated: {d['escalated']}", color="danger", outline=True)
@@ -397,8 +410,10 @@ def register(c: AppContainer) -> None:
         else:
             xs = [p["taken_at"].strftime("%d %b %H:%M") for p in hist["points"]]
             with ui.column().classes("cl-card w-full"):
-                ui.echart({"legend": {}, "grid": {"left": 40, "right": 12, "top": 32, "bottom": 24}, "xAxis": {"type": "category", "data": xs}, "yAxis": {"type": "value"},
-                           "series": [{"name": k, "type": "line", "data": [p[k] for p in hist["points"]]} for k in ("open", "breached", "at_risk", "backlog")]}).classes("w-full h-64")
+                ui.echart({"tooltip": {"trigger": "axis"}, "legend": {"textStyle": {"color": "#c7cde0"}}, "grid": {"left": 40, "right": 12, "top": 36, "bottom": 28},
+                           "xAxis": {"type": "category", "data": xs, **axis}, "yAxis": {"type": "value", **axis},
+                           "series": [{"name": k.replace("_", " ").capitalize(), "type": "line", "smooth": True, "showSymbol": False, "color": col, "data": [p[k] for p in hist["points"]]}
+                                      for k, col in (("open", "#6c7cff"), ("breached", "#ef4f5f"), ("at_risk", "#f5a524"), ("backlog", "#22c3a6"))]}).classes("w-full h-64")  # fmt: skip
         ui.button(tr(c, "ad.run_anomaly"), icon="troubleshoot", on_click=_act(c, lambda: c.anomaly_job.run(c.clock()))).props("outline")
 
     @page(c, "/admin/anomalies", "nav.anomalies", roles=ADMINS)
