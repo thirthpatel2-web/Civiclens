@@ -242,6 +242,19 @@ window.clStopRec = function () {
 """
 
 
+_ENGINE_LABEL = {"groq_whisper": "Whisper", "whisper": "Whisper", "bhashini": "Bhashini"}
+
+
+def heard_text(c: AppContainer, r: Any) -> str:
+    """'Heard in मराठी (Whisper)': the language by its own name and the engine that heard it."""
+    from app.i18n.languages import LANGUAGES
+
+    code = r.language_detected or ""
+    name = LANGUAGES[code].native if code in LANGUAGES else (code or "?")
+    engine = _ENGINE_LABEL.get(c.voice.capabilities().get("provider") or "", "") if r.detected_by == "provider" else ""
+    return tr(c, "assistant.heard", language=name, how=engine or r.detected_by or "?")
+
+
 def register(c: AppContainer) -> None:
     @page(c, "/assistant", "nav.assistant")
     def assistant_router(c: AppContainer, user: UiUser) -> None:
@@ -258,7 +271,14 @@ def register(c: AppContainer) -> None:
         with ui.column().classes("w-full max-w-3xl gap-3"):
             with ui.element("div").classes("cl-ask w-full"):
                 ui.icon("auto_awesome").classes("text-[20px]").style("color: var(--cl-ai);")
-                box = ui.input(placeholder=tr(c, "assistant.placeholder")).props("borderless debounce=400").classes("flex-1")
+                box = ui.textarea(placeholder=tr(c, "assistant.placeholder")).props("borderless autogrow rows=1 debounce=400").classes("flex-1")
+                # The language the person will speak. Engines that cannot auto-detect (Bhashini) need it,
+                # and naming it helps any engine keep Marathi as Marathi rather than drifting into Hindi.
+                speak_opts = ({"auto": tr(c, "assistant.lang_auto")} if caps["auto_detect"] else {}) | {x["code"]: x["native"] for x in caps["languages"]}
+                speak_lang = None
+                if speak_opts:
+                    speak_lang = ui.select(speak_opts, value="auto" if "auto" in speak_opts else (lang() if lang() in speak_opts else next(iter(speak_opts)))).props(
+                        'outlined dense options-dense aria-label="Language you will speak"').classes("w-40")
                 mic = ui.button(icon="mic").props('round unelevated aria-label="Speak instead of typing"').style("background: var(--cl-ai); color: #fff;")
                 mic.tooltip(tr(c, "assistant.mic_tip") if caps["state"] == "CONFIGURED" else tr(c, "assistant.mic_off"))
                 mic.set_enabled(caps["state"] == "CONFIGURED")
@@ -346,7 +366,7 @@ def register(c: AppContainer) -> None:
                 ui.notify(tr(c, "assistant.mic_failed"), type="negative")
                 return
             try:
-                r = c.voice.transcribe(user.ctx, raw, e.args.get("mime") or "audio/webm", "auto" if caps["auto_detect"] else caps["languages"][0]["code"])
+                r = c.voice.transcribe(user.ctx, raw, e.args.get("mime") or "audio/webm", (speak_lang.value if speak_lang is not None else None) or "auto")
             except CivicLensError as exc:
                 ui.notify(exc.message, type="negative")
                 return
@@ -356,7 +376,7 @@ def register(c: AppContainer) -> None:
             state["voice_id"] = r.id
             box.value = r.transcript  # kept in the spoken language and script - nothing is translated
             state["text"] = r.transcript
-            hint.set_text(tr(c, "assistant.heard", lang=r.language_detected or "?", how=r.detected_by))
+            hint.set_text(heard_text(c, r))
             render()
 
         def on_audio_error(e: Any) -> None:
@@ -727,7 +747,7 @@ def register(c: AppContainer) -> None:
             target["field"].value = ((target["field"].value or "") + " " + r.transcript).strip()  # same language, native script - never translated
             if r.language_detected and r.language_detected in target["lang"].options:
                 target["lang"].value = r.language_detected
-            target["hint"].set_text(tr(c, "assistant.heard", lang=r.language_detected or "?", how=r.detected_by))
+            target["hint"].set_text(heard_text(c, r))
 
         def on_audio_error(e: Any) -> None:
             target = _active_mic["target"]
@@ -1312,7 +1332,7 @@ def register(c: AppContainer) -> None:
                     subject.value = ((subject.value or "") + " " + r.transcript).strip()
                     if r.language_detected and r.language_detected in r_language.options:
                         r_language.value = r.language_detected
-                    r_voice_hint.set_text(tr(c, "assistant.heard", lang=r.language_detected or "?", how=r.detected_by))
+                    r_voice_hint.set_text(heard_text(c, r))
 
                 def on_audio_error(e: Any) -> None:
                     rec_state["recording"] = False
@@ -1685,7 +1705,7 @@ def register(c: AppContainer) -> None:
                 ui.notify(tr(c, "assistant.mic_failed"), type="negative")
                 return
             try:
-                r = c.voice.transcribe(user.ctx, raw, e.args.get("mime") or "audio/webm", "auto" if caps["auto_detect"] else caps["languages"][0]["code"])
+                r = c.voice.transcribe(user.ctx, raw, e.args.get("mime") or "audio/webm", "auto" if caps["auto_detect"] else (lang() if lang() in {x["code"] for x in caps["languages"]} else caps["languages"][0]["code"]))
             except CivicLensError as exc:
                 ui.notify(exc.message, type="negative")
                 return
@@ -1693,7 +1713,7 @@ def register(c: AppContainer) -> None:
                 ui.notify(r.error or r.status, type="warning")
                 return
             problem.value = ((problem.value or "") + " " + r.transcript).strip()  # spoken language/script kept, never translated
-            voice_hint.set_text(tr(c, "assistant.heard", lang=r.language_detected or "?", how=r.detected_by))
+            voice_hint.set_text(heard_text(c, r))
 
         def on_audio_error(e: Any) -> None:
             state["recording"] = False

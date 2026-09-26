@@ -125,3 +125,21 @@ class EmergencyHubTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class UiTextPlaceholderTests(unittest.TestCase):
+    def test_heard_message_names_language_and_engine(self):
+        from app.i18n.ui_text import UiText
+
+        ui = UiText.load()
+        self.assertEqual(ui.t("assistant.heard", "en", language="मराठी", how="Whisper"), "Heard in मराठी (Whisper)")
+        self.assertIn("मराठी", ui.t("assistant.heard", "mr", language="मराठी", how="Whisper"))
+
+    def test_no_ui_call_passes_a_lang_placeholder(self):
+        # tr(c, key, lang=...) collides with UiText.t's own ``lang`` argument and raises at runtime
+        import pathlib
+        import re
+
+        bad = [f"{p.name}:{i}" for p in pathlib.Path("app/ui").rglob("*.py") for i, line in enumerate(p.read_text(encoding="utf-8").splitlines(), 1)
+               if re.search(r"\btr\(c, [^)]*\blang=", line)]  # fmt: skip
+        self.assertEqual(bad, [])

@@ -25,7 +25,7 @@ CATEGORIES = ("roads", "water", "electricity", "sanitation", "drainage", "encroa
 SEVERITIES = ("low", "medium", "high", "critical")
 
 CATEGORY_KEYWORDS: dict[str, tuple[str, ...]] = {
-    "roads": ("ರಸ್ತೆ", "ಗುಂಡಿ", "ರಸ್ತೆಗುಂಡಿ", "சாலை", "குழி", "రోడ్డు", "గుంత", "रस्ता", "खड्डा", "রাস্তা", "গর্ত", "റോഡ്", "കുഴി", "રસ્તો", "ખાડો", "ਸੜਕ", "ਟੋਆ", "pothole", "potholes", "road", "roads", "footpath", "pavement", "speed breaker", "traffic signal", "bridge", "गड्ढा", "गड्ढे", "सड़क", "सडक", "रास्ता", "फुटपाथ", "पुल"),
+    "roads": ("ರಸ್ತೆ", "ಗುಂಡಿ", "ರಸ್ತೆಗುಂಡಿ", "சாலை", "குழி", "రోడ్డు", "గుంత", "रस्ता", "खड्डा", "রাস্তা", "গর্ত", "റോഡ്", "കുഴി", "રસ્તો", "ખાડો", "ਸੜਕ", "ਟੋਆ", "pothole", "potholes", "road", "roads", "footpath", "pavement", "speed breaker", "traffic signal", "bridge", "गड्ढा", "गड्ढे", "सड़क", "सडक", "रास्ता", "फुटपाथ", "पुल", "रोड", "रस्त्य", "खड्ड", "खडड"),
     "water": ("ನೀರು", "ನೀರಿನ", "தண்ணீர்", "குடிநீர்", "నీరు", "నీటి", "पाणी", "জল", "পানি", "വെള്ളം", "પાણી", "ਪਾਣੀ", "water supply", "no water", "tap", "tap water", "drinking water", "water pressure", "low pressure", "tanker", "brown water", "muddy water", "pipeline", "pipe burst", "leak", "leakage", "borewell", "contaminated water", "dirty water", "पानी", "जल आपूर्ति", "नल", "पाइपलाइन", "रिसाव"),
     "electricity": ("ವಿದ್ಯುತ್", "மின்சாரம்", "మின", "విద్యుత్", "वीज", "বিদ্যুৎ", "വൈദ്യുതി", "વીજળી", "ਬਿਜਲੀ", "electricity", "power cut", "power outage", "transformer", "electric pole", "streetlight", "street light", "street-light", "lamp post", "light pole", "स्ट्रीट लाइट", "पथदीप", "exposed wire", "live wire", "sparking", "voltage", "बिजली", "ट्रांसफार्मर", "खंभा", "तार"),
     "sanitation": ("ಕಸ", "குப்பை", "చెత్త", "कचरा", "আবর্জনা", "മാലിന്യം", "કચરો", "ਕੂੜਾ", "garbage", "waste", "trash", "dustbin", "litter", "toilet", "sweeping", "dumping", "कचरा", "गंदगी", "शौचालय", "सफाई", "कूड़ा"),
@@ -33,10 +33,10 @@ CATEGORY_KEYWORDS: dict[str, tuple[str, ...]] = {
     "encroachment": ("encroachment", "illegal construction", "unauthorized construction", "hawker", "vendors blocking", "occupied the footpath", "squatter", "अतिक्रमण", "अवैध निर्माण"),
     "police": ("theft", "robbery", "harassment", "eve teasing", "drunk", "gambling", "loud music", "चोरी", "छेड़छाड़", "शराब", "जुआ"),
 }  # fmt: skip
-CRITICAL_TERMS = ("exposed wire", "live wire", "sparking", "collapsed", "collapse", "gas leak", "fire", "open manhole", "electrocut", "drowning", "आग", "खुला मैनहोल", "करंट")
-HIGH_TERMS = ("accident", "injur", "sewage overflow", "contaminated", "no water", "outbreak", "burst", "flood", "waterlogging", "stomach", "diarrh", "vomit", "fell ill", "dangerous", "unsafe", "leaning", "sagging", "दुर्घटना", "घायल", "जलभराव", "खतरनाक", "बीमार")
-SAFETY_TERMS = ("accident", "injur", "fire", "electrocut", "collapse", "exposed wire", "live wire", "manhole", "sparking", "dangerous", "leaning", "sagging", "दुर्घटना", "घायल", "आग", "करंट")
-SENSITIVE_SITE_TERMS = ("school", "hospital", "clinic", "college", "anganwadi", "स्कूल", "अस्पताल", "कॉलेज")
+CRITICAL_TERMS = ("exposed wire", "live wire", "sparking", "collapsed", "collapse", "gas leak", "fire", "open manhole", "electrocut", "drowning", "आग", "खुला मैनहोल", "करंट", "विजेचा धक्का", "उघडे मॅनहोल")
+HIGH_TERMS = ("accident", "injur", "sewage overflow", "contaminated", "no water", "outbreak", "burst", "flood", "waterlogging", "stomach", "diarrh", "vomit", "fell ill", "dangerous", "unsafe", "leaning", "sagging", "दुर्घटना", "घायल", "जलभराव", "खतरनाक", "बीमार", "अपघात", "जखमी", "जख्मी", "धोकादायक", "आजारी")
+SAFETY_TERMS = ("accident", "injur", "fire", "electrocut", "collapse", "exposed wire", "live wire", "manhole", "sparking", "dangerous", "leaning", "sagging", "दुर्घटना", "घायल", "आग", "करंट", "अपघात", "जखमी", "धोकादायक", "विजेचा धक्का")
+SENSITIVE_SITE_TERMS = ("school", "hospital", "clinic", "college", "anganwadi", "स्कूल", "अस्पताल", "कॉलेज", "शाळा", "शाळे", "रुग्णालय", "दवाखाना", "महाविद्यालय")
 
 
 @dataclass

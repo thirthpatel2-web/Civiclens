@@ -187,6 +187,12 @@ class ClassificationTests(unittest.TestCase):
             self.assertEqual(RuleClassifier().classify(text).category, dept, text)
         self.assertEqual(RuleClassifier().classify("Brown tap water, several children have stomach problems").severity, "high")
 
+    def test_marathi_danger_words_raise_severity_and_flag_safety(self):
+        # a spoken Marathi report of an accident at a pothole is as urgent as the English one
+        r = RuleClassifier().classify("सिंहगड रोडवर मोठा खड्डा आहे, काल एक दुचाकीस्वार त्यात पडून जखमी झाला")
+        self.assertEqual((r.category, r.severity, r.affects_safety), ("roads", "high", True))
+        self.assertTrue(RuleClassifier().classify("शाळेजवळ रस्त्यावर खड्डा").near_sensitive_site)
+
     def test_no_match_is_other_low_confidence_ambiguous(self):
         r = RuleClassifier().classify("Something strange happened yesterday")
         self.assertEqual((r.category, r.confidence, r.ambiguous), ("other", 0.0, True))
