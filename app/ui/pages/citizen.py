@@ -269,9 +269,9 @@ def register(c: AppContainer) -> None:
         caps = c.voice.capabilities()
 
         with ui.column().classes("w-full max-w-3xl gap-3"):
-            with ui.element("div").classes("cl-ask w-full"):
+            with ui.element("div").classes("cl-ask w-full flex-wrap"):  # on a phone the language picker and mic wrap under the text
                 ui.icon("auto_awesome").classes("text-[20px]").style("color: var(--cl-ai);")
-                box = ui.textarea(placeholder=tr(c, "assistant.placeholder")).props("borderless autogrow rows=1 debounce=400").classes("flex-1")
+                box = ui.textarea(placeholder=tr(c, "assistant.placeholder")).props("borderless autogrow rows=1 debounce=400").classes("flex-1").style("min-width: 200px;")
                 # The language the person will speak. Engines that cannot auto-detect (Bhashini) need it,
                 # and naming it helps any engine keep Marathi as Marathi rather than drifting into Hindi.
                 speak_opts = ({"auto": tr(c, "assistant.lang_auto")} if caps["auto_detect"] else {}) | {x["code"]: x["native"] for x in caps["languages"]}
