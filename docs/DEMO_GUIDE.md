@@ -4,6 +4,42 @@ This is a copy-pasteable walkthrough of the SIH26129 demo over plain HTTP — th
 Interop Gateway screen in classic-app makes. Every step below was run against a live local
 instance of this backend while writing it; the responses shown are real, not illustrative.
 
+## Click-through demo (web app, about 6 minutes)
+
+Everything below happens in the browser at `http://localhost:8080` after `python run.py`. Every
+demo account uses the password `CivicLens#Demo2026`.
+
+| Account | Role | Door |
+|---|---|---|
+| demo.integration@example.com | Integration admin | `/admin/login` |
+| demo.priya@example.com | Citizen (Priya Deshmukh, Pune) | `/login` |
+| demo.officer@example.com | Roads officer (Ravi Kumar) | `/officer/login` |
+| demo.admin@example.com | Administrator | `/admin/login` |
+| demo.auditor@example.com | Auditor (read-only) | `/admin/login` |
+| demo.water@, demo.sanitation@, demo.electricity@, demo.drainage@, demo.encroachment@example.com | Department officers | `/officer/login` |
+
+1. **No re-upload, citizen in control.** As the integration admin, open **Interop Gateway**, press
+   **Reset demo**, pick `APP-MH-2026-5501` and press **Request certificate**. The run stops at
+   *Citizen consent*. In a second browser, log in as Priya: her dashboard says a department is
+   asking for her document. **Review now → Allow**. Back on the gateway, press **Check again**: all
+   nine steps turn green and the certificate is delivered. Priya's **My data sharing** now lists
+   exactly which fields moved, from where to where, and when.
+2. **A human decides identity.** On the gateway, pick `APP-MH-2026-5503` (Sunita Joshi). Her name
+   matches a Revenue record but her mobile number differs by one digit, so nothing is linked. Instead
+   **Identity review** shows both records side by side with the mismatched field flagged.
+3. **Complaint to resolution.** As Priya, open **Report an Issue** and type a problem: the
+   "Likely goes to..." preview shows the department before she submits. Her complaint's card shows
+   each step of its progress.
+4. **Officer desk.** As the roads officer, **Needs your attention** lists overdue complaints first.
+   Open one: one-click next steps sit at the top, and **Transfer** hands a misrouted complaint to
+   another department.
+5. **Accountability.** Open a resolved complaint as Priya: rate it with stars, or press **It's not
+   fixed** to reopen it. On an overdue complaint, **Draft an RTI** opens a pre-filled RTI application.
+6. **Oversight.** The auditor sees the whole gateway read-only. The admin overview shows system
+   health, the citizen rating KPI and the audit trail with names.
+
+The rest of this guide shows the same exchange call by call against the REST API.
+
 ## Prerequisites
 
 - The backend running locally (`python run.py`) against a migrated PostgreSQL database

@@ -7,7 +7,7 @@
 **An interoperability gateway that lets Indian government departments securely reuse each other's verified data —<br/>plus the citizen app that sits on top of it: complaints, RTI, legal help and voice, in Indian languages.**
 
 [![CI](https://github.com/thirthpatel2-web/Civiclens/actions/workflows/ci.yml/badge.svg)](https://github.com/thirthpatel2-web/Civiclens/actions/workflows/ci.yml)
-![Tests](https://img.shields.io/badge/tests-727%20passing-2ea44f?logo=pytest&logoColor=white)
+![Tests](https://img.shields.io/badge/tests-761%20passing-2ea44f?logo=pytest&logoColor=white)
 ![Spec coverage](https://img.shields.io/badge/SIH26129%20spec-31%2F34%20done-1f6feb)
 ![Live E2E](https://img.shields.io/badge/live%20end--to--end-31%2F31%20checks-2ea44f)
 ![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)
@@ -98,7 +98,7 @@ flowchart LR
 
     subgraph A["🏛️ CivicLens platform"]
         UI[NiceGUI web app<br/>48 screens]
-        API[FastAPI<br/>152 REST routes + WebSocket]
+        API[FastAPI<br/>186 REST operations + WebSocket]
         AI[AI layer<br/>rules-first routing · Groq / Ollama LLM<br/>hybrid RAG + citation check]
     end
 
@@ -177,7 +177,10 @@ When something fails, it fails **loudly and honestly**: a **20-code exception ta
 | | |
 |---|---|
 | 🛡️ **Consent-first, not consent-after** | Consent is checked **before** any connector is called, per field and per purpose, in line with the DPDP Act 2023. Asking for more than was consented is refused with the exact denied field names. |
-| 🧬 **Never a silent merge** | Ambiguous identity matches always go to a human, and a rejected match creates a separate identity attributed to that officer. |
+| 🧬 **Never a silent merge** | Ambiguous identity matches always go to a human, shown **side by side** with the fields that disagree flagged. The same name with a **different mobile number never auto-links**: two people can share a name. A rejected match creates a separate identity attributed to that officer. |
+| ✅ **"Resolved" means resolved** | When a department marks a complaint resolved, the citizen confirms it with a star rating, or taps **"It's not fixed"** to send it straight back to the officer (within 30 days). The average rating is a KPI on every officer and admin dashboard. |
+| 🧾 **Silence has a consequence** | SLA policies escalate overdue complaints automatically, and an overdue complaint offers **"Draft an RTI"**: an RTI Act 2005 application asking for the action taken, pre-filled from the complaint. |
+| 🔀 **Misrouted? Handed over, not bounced** | Routing ignores street names like "Karve Road", and sends streetlights to Electricity and hawkers to Encroachment. If a complaint still lands at the wrong desk, the officer **transfers** it: audited, SLA recomputed, the new desk notified, and the correction logged so routing learns. |
 | 🔌 **Add a department in hours, not months** | A new system is **one connector class + one registry line + its field mappings**. The gateway code doesn't change. The connector interface is transport-agnostic, so a real department API replaces a demo one by swapping only its query functions. |
 | ⚖️ **AI that won't make up law** | Every case the AI cites is checked against **38,238 real Supreme Court citation records**. If a citation can't be verified, the AI explanation is **withheld**, not shown. Where the full text of a judgment is available (292 judgments, 9,869 searchable passages), answers quote it. |
 | 🗣️ **Voice-first, native-script** | A Kannada speaker gets Kannada text back. Nothing is silently translated to English, and translation, when used, is a separate, clearly labelled field. |
@@ -195,7 +198,7 @@ When something fails, it fails **loudly and honestly**: a **20-code exception ta
 | **AI / NLP** | Groq-hosted LLM or local Ollama · hybrid RAG (BM25 + vectors + reciprocal-rank fusion + rerank) · rules-first complaint classifier |
 | **Voice & documents** | Groq Whisper / faster-whisper / Bhashini speech-to-text · Tesseract OCR · ReportLab PDF generation |
 | **Interop & security** | OAuth2 (RFC 6749) federated IdP · Argon2 password hashing · RBAC with 6 roles · CSRF protection · audit log · Sentry |
-| **Quality** | pytest (727 tests) · ruff · mypy · GitHub Actions CI · Docker Compose |
+| **Quality** | pytest (761 tests) · ruff · mypy · GitHub Actions CI · Docker Compose |
 
 ---
 
@@ -239,7 +242,7 @@ This brings up Postgres + pgvector, Redis, Ollama, a one-shot migration service,
 <summary><b>🧪 Verify it yourself</b></summary>
 
 ```bash
-python -m pytest -q                      # 727 tests: unit, API, live-database integration, end-to-end
+python -m pytest -q                      # 761 tests: unit, API, live-database integration, end-to-end
 ruff check app scripts tests             # lint
 mypy app                                 # static types
 python scripts/audit_ui_links.py         # every navigation target exists
@@ -255,9 +258,9 @@ The same checks run on every push in [GitHub Actions](https://github.com/thirthp
 
 <div align="center">
 
-| 727 | 31 / 34 | 31 / 31 | 38,238 | 10 | 48 | 152 |
+| 761 | 31 / 34 | 31 / 31 | 38,238 | 10 | 50 | 186 |
 |:-:|:-:|:-:|:-:|:-:|:-:|:-:|
-| automated tests passing | SIH26129 spec capabilities done | live end-to-end checks passed | Supreme Court judgment records | languages for voice & complaints | web screens | REST API routes |
+| automated tests passing | SIH26129 spec capabilities done | live end-to-end checks passed | Supreme Court judgment records | languages for voice & complaints | web screens | REST API operations |
 
 </div>
 
@@ -326,7 +329,7 @@ app/
 ├── db/               models, repositories, unit of work
 └── workers/          background jobs and scheduler
 alembic/              database migrations
-tests/                727 tests: unit, API, integration (live DB), end-to-end
+tests/                761 tests: unit, API, integration (live DB), end-to-end
 docs/                 everything in the table above
 classic-app/          earlier React Native (Expo) client of the same API, kept for reference
 ```
