@@ -780,7 +780,8 @@
   "fb.reopen_why": "What is still wrong? The officer will see this.",
   "fb.reopen_btn": "Reopen",
   "fb.reopened": "Reopened - the officer has been notified.",
-  "fb.your_rating": "Your rating"
+  "fb.your_rating": "Your rating",
+  "gr.ack_download": "Download acknowledgement"
  },
  "hi": {
   "act.cancel": "रद्द करें",
@@ -1563,7 +1564,8 @@
   "fb.reopen_why": "अभी भी क्या गलत है? अधिकारी इसे देखेंगे।",
   "fb.reopen_btn": "फिर से खोलें",
   "fb.reopened": "फिर से खोली गई - अधिकारी को सूचित कर दिया गया है।",
-  "fb.your_rating": "आपकी रेटिंग"
+  "fb.your_rating": "आपकी रेटिंग",
+  "gr.ack_download": "पावती डाउनलोड करें"
  },
  "mr": {
   "theme.light": "फिकट",
@@ -2346,7 +2348,8 @@
   "fb.reopen_why": "अजून काय चुकीचे आहे? अधिकारी हे पाहतील.",
   "fb.reopen_btn": "पुन्हा उघडा",
   "fb.reopened": "पुन्हा उघडली - अधिकाऱ्याला कळवले आहे.",
-  "fb.your_rating": "तुमचे रेटिंग"
+  "fb.your_rating": "तुमचे रेटिंग",
+  "gr.ack_download": "पोचपावती डाउनलोड करा"
  },
  "bn": {
   "theme.light": "হালকা",
@@ -3129,7 +3132,8 @@
   "fb.reopen_why": "এখনও কী সমস্যা? আধিকারিক এটি দেখবেন।",
   "fb.reopen_btn": "আবার খুলুন",
   "fb.reopened": "আবার খোলা হয়েছে - আধিকারিককে জানানো হয়েছে।",
-  "fb.your_rating": "আপনার রেটিং"
+  "fb.your_rating": "আপনার রেটিং",
+  "gr.ack_download": "প্রাপ্তিস্বীকার ডাউনলোড করুন"
  },
  "ta": {
   "theme.light": "வெளிர்",
@@ -3912,7 +3916,8 @@
   "fb.reopen_why": "இன்னும் என்ன தவறு? அலுவலர் இதைப் பார்ப்பார்.",
   "fb.reopen_btn": "மீண்டும் திற",
   "fb.reopened": "மீண்டும் திறக்கப்பட்டது - அலுவலருக்குத் தெரிவிக்கப்பட்டது.",
-  "fb.your_rating": "உங்கள் மதிப்பீடு"
+  "fb.your_rating": "உங்கள் மதிப்பீடு",
+  "gr.ack_download": "ஒப்புகைச் சீட்டைப் பதிவிறக்கு"
  },
  "te": {
   "theme.light": "తేలికైన",
@@ -4695,7 +4700,8 @@
   "fb.reopen_why": "ఇంకా ఏమి తప్పుగా ఉంది? అధికారి దీన్ని చూస్తారు.",
   "fb.reopen_btn": "మళ్లీ తెరవండి",
   "fb.reopened": "మళ్లీ తెరవబడింది - అధికారికి తెలియజేయబడింది.",
-  "fb.your_rating": "మీ రేటింగ్"
+  "fb.your_rating": "మీ రేటింగ్",
+  "gr.ack_download": "రసీదు డౌన్‌లోడ్ చేయండి"
  },
  "kn": {
   "theme.light": "ತಿಳಿ",
@@ -5478,6 +5484,7 @@
   "fb.reopen_why": "ಇನ್ನೂ ಏನು ತಪ್ಪಾಗಿದೆ? ಅಧಿಕಾರಿ ಇದನ್ನು ನೋಡುತ್ತಾರೆ.",
   "fb.reopen_btn": "ಮತ್ತೆ ತೆರೆಯಿರಿ",
   "fb.reopened": "ಮತ್ತೆ ತೆರೆಯಲಾಗಿದೆ - ಅಧಿಕಾರಿಗೆ ತಿಳಿಸಲಾಗಿದೆ.",
-  "fb.your_rating": "ನಿಮ್ಮ ರೇಟಿಂಗ್"
+  "fb.your_rating": "ನಿಮ್ಮ ರೇಟಿಂಗ್",
+  "gr.ack_download": "ಸ್ವೀಕೃತಿ ಪತ್ರ ಡೌನ್‌ಲೋಡ್ ಮಾಡಿ"
  }
 }

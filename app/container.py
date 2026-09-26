@@ -373,7 +373,8 @@ def build_container(settings: Settings) -> AppContainer:
 def _env(name: str) -> str:
     import os
 
-    return os.environ.get(name, "").strip()
+    value = os.environ.get(name, "").strip()
+    return "" if value.startswith("#") else value  # an inline .env comment is "not set" (see Settings.load)
 
 
 def _attach_documents(c: AppContainer, sf: Any, embedder: Any, settings: Settings, chunk_store_cls: Any) -> None:

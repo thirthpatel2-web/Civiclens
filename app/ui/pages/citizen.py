@@ -76,6 +76,17 @@ CONSENT_LABELS = {"privacy_policy": "I accept the privacy policy", "ai_processin
                   "document_storage": "Store documents I upload", "notifications_email": "Send me updates by e-mail"}  # fmt: skip
 
 
+def download_acknowledgement(c: AppContainer, ctx: Any, complaint_id: str, reference: str) -> None:
+    try:
+        req = ui.context.client.request
+        base = c.public_base_url or (str(req.base_url) if req else "")  # the address this browser actually used, so the QR opens on a phone
+        data = c.complaints.acknowledgement(ctx, complaint_id, public_base_url=base, qr_renderer=c.qr_renderer, font_path=c.settings.rti_pdf_font or None)
+    except CivicLensError as exc:
+        ui.notify(exc.message, type="negative")
+        return
+    ui.download(data, f"acknowledgement-{reference}.pdf")
+
+
 def complaint_card(c: AppContainer, x: Any) -> None:
     """One complaint as a tappable card: where it is in the journey (a progress bar over the same
     stages the detail timeline uses), which department holds it, and how urgent it is."""
@@ -268,6 +279,11 @@ def register(c: AppContainer) -> None:
             if len(text) < 4:
                 with out:
                     state_panel(icon="lightbulb", title=tr(c, "assistant.idle_title"), body=tr(c, "assistant.idle_body"))
+                    # real sentences in the scripts people actually type in - tap one to see the routing work
+                    with ui.row().classes("gap-2 flex-wrap justify-center w-full"):
+                        for sample in ("सड़क पर बहुत बड़ा गड्ढा है, कल एक बाइक गिर गई", "Our street has had no water supply for three days", "ನಮ್ಮ ಬೀದಿಯ ದೀಪಗಳು ವಾರದಿಂದ ಆರಿವೆ",
+                                       "குப்பை ஐந்து நாட்களாக அள்ளப்படவில்லை", "I want to know how the ward road budget was spent", "माझ्या RTI अर्जाला 30 दिवसांत उत्तर मिळाले नाही"):  # fmt: skip
+                            ui.chip(sample, icon="touch_app", on_click=lambda t=sample: box.set_value(t)).props("outline dense")
                 return
             intent = c.intent_router.route(text)
             dest = intent.destination
@@ -465,6 +481,7 @@ def register(c: AppContainer) -> None:
                     section_title(tr(c, "report.similar"))
                     for x in cm.duplicates:
                         ui.label(f"{x['reference']} - {x['explanation']}").classes("text-xs").style("color: var(--cl-fg-muted);")
+                ui.button(tr(c, "gr.ack_download"), icon="receipt_long", on_click=lambda: download_acknowledgement(c, user.ctx, cm.id, cm.reference)).props("outline no-caps").classes("w-full")
                 ui.button(tr(c, "nav.grievances"), icon="arrow_forward", on_click=lambda: ui.navigate.to(f"/grievances/{cm.id}")).props("color=primary unelevated").classes("w-full")
             dlg.open()
 
@@ -1038,6 +1055,7 @@ def register(c: AppContainer) -> None:
                     chip(status_label(c, cm.status), color=theme.STATUS_COLOR.get(str(cm.status), "muted"))
                     if cm.escalation_level:
                         chip(f"Escalated L{cm.escalation_level}", color="danger")
+            ui.button(tr(c, "gr.ack_download"), icon="receipt_long", on_click=lambda: download_acknowledgement(c, user.ctx, cm.id, cm.reference)).props("outline no-caps")
         with ui.row().classes("gap-6 w-full flex-wrap"):
             with ui.column().classes("gap-4 flex-1").style("min-width: 320px;"):
                 with ui.column().classes("cl-card gap-2 w-full"):
@@ -2059,8 +2077,15 @@ def register(c: AppContainer) -> None:
             draw()
 
         ref = c.gis.locator(user.ctx)
+        try:  # open on the citizen's own city when their profile has one - not all of India
+            home = (c.profiles.get(user.ctx).city or "").strip().lower()
+        except CivicLensError:
+            home = ""
+        home_code = next((x["code"] for x in ref["cities"] if home and home in (x["code"], str(x["name"]).lower())), "")
+        if home_code:
+            state["city"] = home_code
         with controls:
-            city = ui.select({"": tr(c, "filter.all"), **{x["code"]: x["name"] for x in ref["cities"]}}, value="", label=tr(c, "col.city")).props("outlined dense").classes("w-56")
+            city = ui.select({"": tr(c, "filter.all"), **{x["code"]: x["name"] for x in ref["cities"]}}, value=home_code, label=tr(c, "col.city")).props("outlined dense").classes("w-56")
             dept = ui.select({"": tr(c, "filter.all"), **{d["code"]: d["name"] for d in ref["departments"]}}, value="", label=tr(c, "lbl.department")).props("outlined dense").classes("w-56")
             city.on_value_change(_on_city_change)
             dept.on_value_change(_on_dept_change)

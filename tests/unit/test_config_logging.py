@@ -11,6 +11,11 @@ GOOD = "x" * 40
 
 
 class ConfigTests(unittest.TestCase):
+    def test_an_inline_env_comment_is_treated_as_not_set(self):
+        # python-dotenv reads `RTI_PDF_FONT=   # path to a .ttf` as the value "# path to a .ttf"
+        s = Settings.load({"RTI_PDF_FONT": "# path to a Unicode .ttf, required to export non-Latin RTI text as PDF", "APP_ENV": "development"})
+        self.assertEqual(s.rti_pdf_font, "")
+
     def test_defaults_in_development(self):
         s = Settings.load({})
         self.assertEqual(s.app_env, "development")

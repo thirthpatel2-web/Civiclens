@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, File, Response, UploadFile
+from fastapi import APIRouter, Depends, File, Request, Response, UploadFile
 
 from app.api.serialize import complaint_json, to_jsonable
 from app.container import AppContainer
@@ -101,6 +101,13 @@ def detail(complaint_id: str, ctx: AuthContext = CITIZEN, c: AppContainer = Depe
 @router.post("/{complaint_id}/feedback", status_code=201)
 def feedback(complaint_id: str, body: FeedbackBody, ctx: AuthContext = Depends(guard(Permission.COMPLAINT_FEEDBACK)), c: AppContainer = Depends(get_container)) -> dict:
     return to_jsonable(c.complaints.add_feedback(ctx, complaint_id, body.rating, body.comment))
+
+
+@router.get("/{complaint_id}/acknowledgement.pdf")
+def acknowledgement(complaint_id: str, request: Request, ctx: AuthContext = Depends(guard(Permission.COMPLAINT_READ_OWN)), c: AppContainer = Depends(get_container)) -> Response:
+    """Proof-of-filing slip with a QR code to the complaint's tracking page."""
+    pdf = c.complaints.acknowledgement(ctx, complaint_id, public_base_url=c.public_base_url or str(request.base_url), qr_renderer=c.qr_renderer, font_path=c.settings.rti_pdf_font or None)
+    return Response(pdf, media_type="application/pdf", headers={"Content-Disposition": f'attachment; filename="acknowledgement-{complaint_id[:8]}.pdf"'})
 
 
 @router.post("/{complaint_id}/reopen")

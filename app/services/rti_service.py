@@ -644,7 +644,9 @@ def render_pdf(text: str, *, title: str, font_path: str | None = None) -> bytes:
 
     font = "Helvetica"
     if not text.isascii() and not all(ord(c) < 256 for c in text):
-        if not font_path:
+        import os
+
+        if not font_path or not os.path.isfile(font_path):
             raise NotConfigured("This RTI contains non-Latin text; configure a Unicode font (RTI_PDF_FONT) to export it as PDF.")
         pdfmetrics.registerFont(TTFont("CivicLensUnicode", font_path))
         font = "CivicLensUnicode"

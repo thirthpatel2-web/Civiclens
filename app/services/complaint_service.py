@@ -351,6 +351,25 @@ class ComplaintService:
         self._fx.flush(out)
         return fb
 
+    def acknowledgement(self, ctx: AuthContext, complaint_id: str, *, public_base_url: str, qr_renderer: Any = None, font_path: str | None = None) -> bytes:
+        """The citizen's proof-of-filing slip as PDF. Owner-only, like every other citizen read."""
+        from app.services.receipt import acknowledgement_pdf
+
+        require(ctx, Permission.COMPLAINT_READ_OWN)
+        with self._uow() as uow:
+            c = uow.complaints.get(complaint_id)
+            if c is None or c.citizen_id != ctx.user_id:
+                raise NotFound("Complaint not found.")
+            dept = next((d.name for d in uow.config.departments() if d.code == c.department_code), None)
+        url = f"{public_base_url.rstrip('/')}/grievances/{c.id}"
+        qr = None
+        if qr_renderer is not None:
+            try:
+                qr = qr_renderer(url)
+            except Exception:  # a missing QR library must not block the slip itself
+                qr = None
+        return acknowledgement_pdf(c, department_name=dept, tracking_url=url, generated_at=self._fx.clock(), qr_png=qr, font_path=font_path)
+
     REOPEN_WINDOW_DAYS = 30
 
     def reopen_by_citizen(self, ctx: AuthContext, complaint_id: str, reason: str) -> ComplaintRecord:

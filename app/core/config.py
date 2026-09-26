@@ -130,7 +130,10 @@ class Settings:
     def load(cls, env: Mapping[str, str] | None = None) -> Settings:
         if env is None:
             _load_dotenv()  # tests pass an explicit `env` dict and must stay isolated from .env
-        e: Mapping[str, str] = os.environ if env is None else env
+        raw: Mapping[str, str] = os.environ if env is None else env
+        # `KEY=   # explanation` in .env is read by python-dotenv as the value "# explanation"; a value
+        # that is only a comment means "not set", never a literal setting (it once became a font path)
+        e: Mapping[str, str] = {k: ("" if v.strip().startswith("#") else v) for k, v in raw.items()}
         app_env = e.get("APP_ENV", "development").strip().lower() or "development"
         if app_env not in ENVIRONMENTS:
             raise ConfigError(f"APP_ENV must be one of {ENVIRONMENTS}, got {app_env!r}")
