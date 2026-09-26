@@ -24,6 +24,7 @@ from app.schemas.api import (
     RemarkBody,
     ResolveBody,
     StatusBody,
+    TransferBody,
     TriageBody,
     WorkOrderBody,
 )
@@ -118,6 +119,12 @@ def escalate(cid: str, body: EscalateBody, ctx: AuthContext = STATUS, c: AppCont
 def correct_category(cid: str, body: CorrectCategoryBody, ctx: AuthContext = Depends(guard(Permission.COMPLAINT_REMARK)), c: AppContainer = Depends(get_container)) -> dict:
     """Transparent correction: captured to the learning log, then applied for real (see OfficerService.correct_category)."""
     return to_jsonable(c.officer.correct_category(ctx, cid, body.category))
+
+
+@router.post("/complaints/{cid}/transfer")
+def transfer(cid: str, body: TransferBody, ctx: AuthContext = STATUS, c: AppContainer = Depends(get_container)) -> dict:
+    """Hand a misrouted complaint to the department that owns it (see OfficerService.transfer)."""
+    return to_jsonable(c.officer.transfer(ctx, cid, body.department, body.reason))
 
 
 # ---- investigation mode

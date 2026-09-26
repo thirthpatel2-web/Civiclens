@@ -25,17 +25,17 @@ CATEGORIES = ("roads", "water", "electricity", "sanitation", "drainage", "encroa
 SEVERITIES = ("low", "medium", "high", "critical")
 
 CATEGORY_KEYWORDS: dict[str, tuple[str, ...]] = {
-    "roads": ("ರಸ್ತೆ", "ಗುಂಡಿ", "ರಸ್ತೆಗುಂಡಿ", "சாலை", "குழி", "రోడ్డు", "గుంత", "रस्ता", "खड्डा", "রাস্তা", "গর্ত", "റോഡ്", "കുഴി", "રસ્તો", "ખાડો", "ਸੜਕ", "ਟੋਆ", "pothole", "potholes", "road", "roads", "footpath", "pavement", "speed breaker", "streetlight", "street light", "traffic signal", "bridge", "गड्ढा", "गड्ढे", "सड़क", "सडक", "रास्ता", "फुटपाथ", "पुल"),
-    "water": ("ನೀರು", "ನೀರಿನ", "தண்ணீர்", "குடிநீர்", "నీరు", "నీటి", "पाणी", "জল", "পানি", "വെള്ളം", "પાણી", "ਪਾਣੀ", "water supply", "no water", "tap", "pipeline", "pipe burst", "leak", "leakage", "borewell", "contaminated water", "dirty water", "पानी", "जल आपूर्ति", "नल", "पाइपलाइन", "रिसाव"),
-    "electricity": ("ವಿದ್ಯುತ್", "மின்சாரம்", "మின", "విద్యుత్", "वीज", "বিদ্যুৎ", "വൈദ്യുതി", "વીજળી", "ਬਿਜਲੀ", "electricity", "power cut", "power outage", "transformer", "electric pole", "exposed wire", "live wire", "sparking", "voltage", "बिजली", "ट्रांसफार्मर", "खंभा", "तार"),
+    "roads": ("ರಸ್ತೆ", "ಗುಂಡಿ", "ರಸ್ತೆಗುಂಡಿ", "சாலை", "குழி", "రోడ్డు", "గుంత", "रस्ता", "खड्डा", "রাস্তা", "গর্ত", "റോഡ്", "കുഴി", "રસ્તો", "ખાડો", "ਸੜਕ", "ਟੋਆ", "pothole", "potholes", "road", "roads", "footpath", "pavement", "speed breaker", "traffic signal", "bridge", "गड्ढा", "गड्ढे", "सड़क", "सडक", "रास्ता", "फुटपाथ", "पुल"),
+    "water": ("ನೀರು", "ನೀರಿನ", "தண்ணீர்", "குடிநீர்", "నీరు", "నీటి", "पाणी", "জল", "পানি", "വെള്ളം", "પાણી", "ਪਾਣੀ", "water supply", "no water", "tap", "tap water", "drinking water", "water pressure", "low pressure", "tanker", "brown water", "muddy water", "pipeline", "pipe burst", "leak", "leakage", "borewell", "contaminated water", "dirty water", "पानी", "जल आपूर्ति", "नल", "पाइपलाइन", "रिसाव"),
+    "electricity": ("ವಿದ್ಯುತ್", "மின்சாரம்", "మின", "విద్యుత్", "वीज", "বিদ্যুৎ", "വൈദ്യുതി", "વીજળી", "ਬਿਜਲੀ", "electricity", "power cut", "power outage", "transformer", "electric pole", "streetlight", "street light", "street-light", "lamp post", "light pole", "स्ट्रीट लाइट", "पथदीप", "exposed wire", "live wire", "sparking", "voltage", "बिजली", "ट्रांसफार्मर", "खंभा", "तार"),
     "sanitation": ("ಕಸ", "குப்பை", "చెత్త", "कचरा", "আবর্জনা", "മാലിന്യം", "કચરો", "ਕੂੜਾ", "garbage", "waste", "trash", "dustbin", "litter", "toilet", "sweeping", "dumping", "कचरा", "गंदगी", "शौचालय", "सफाई", "कूड़ा"),
     "drainage": ("ಚರಂಡಿ", "சாக்கடை", "కాలువ", "డ్రైనేజీ", "गटार", "নর্দমা", "ഓട", "ગટર", "ਨਾਲੀ", "drain", "drainage", "sewage", "sewer", "manhole", "waterlogging", "flooding", "overflow", "नाली", "सीवर", "मैनहोल", "जलभराव", "नाला"),
-    "encroachment": ("encroachment", "illegal construction", "unauthorized construction", "hawker", "squatter", "अतिक्रमण", "अवैध निर्माण"),
+    "encroachment": ("encroachment", "illegal construction", "unauthorized construction", "hawker", "vendors blocking", "occupied the footpath", "squatter", "अतिक्रमण", "अवैध निर्माण"),
     "police": ("theft", "robbery", "harassment", "eve teasing", "drunk", "gambling", "loud music", "चोरी", "छेड़छाड़", "शराब", "जुआ"),
 }  # fmt: skip
 CRITICAL_TERMS = ("exposed wire", "live wire", "sparking", "collapsed", "collapse", "gas leak", "fire", "open manhole", "electrocut", "drowning", "आग", "खुला मैनहोल", "करंट")
-HIGH_TERMS = ("accident", "injur", "sewage overflow", "contaminated", "no water", "outbreak", "burst", "flood", "waterlogging", "दुर्घटना", "घायल", "जलभराव")
-SAFETY_TERMS = ("accident", "injur", "fire", "electrocut", "collapse", "exposed wire", "live wire", "manhole", "sparking", "दुर्घटना", "घायल", "आग", "करंट")
+HIGH_TERMS = ("accident", "injur", "sewage overflow", "contaminated", "no water", "outbreak", "burst", "flood", "waterlogging", "stomach", "diarrh", "vomit", "fell ill", "dangerous", "unsafe", "leaning", "sagging", "दुर्घटना", "घायल", "जलभराव", "खतरनाक", "बीमार")
+SAFETY_TERMS = ("accident", "injur", "fire", "electrocut", "collapse", "exposed wire", "live wire", "manhole", "sparking", "dangerous", "leaning", "sagging", "दुर्घटना", "घायल", "आग", "करंट")
 SENSITIVE_SITE_TERMS = ("school", "hospital", "clinic", "college", "anganwadi", "स्कूल", "अस्पताल", "कॉलेज")
 
 
@@ -53,8 +53,21 @@ class ClassificationResult:
     ai_status: str = "not_needed"  # not_needed | ok | not_configured | unavailable | rejected_output
 
 
+# Generic words that also appear in addresses ("Karve Road", "FC Road") or in passing: they count,
+# but half as much as a real problem word, so a street name alone never decides the department.
+WEAK_TERMS = frozenset({"road", "roads", "tap", "leak", "waste", "footpath"})
+# Terms that on their own identify a department regardless of where the problem sits.
+STRONG_TERMS = frozenset({"hawker", "encroachment", "illegal construction", "unauthorized construction", "squatter", "streetlight", "street light", "tap water", "open manhole"})
+
+
 def _contains(text_l: str, term: str) -> bool:
+    if term.isascii():  # match at a word start, so "tap" never fires inside "stop" and "road" never inside "abroad"
+        return re.search(r"\b" + re.escape(term), text_l) is not None
     return term in text_l
+
+
+def _weight(term: str) -> float:
+    return 0.5 if term in WEAK_TERMS else 2.0 if term in STRONG_TERMS else 1.0
 
 
 class RuleClassifier:
@@ -74,11 +87,12 @@ class RuleClassifier:
         near_site = any(t in text_l for t in SENSITIVE_SITE_TERMS)
         if not scores:
             return ClassificationResult("other", severity, 0.0, "rules", [], affects_safety, near_site, True, "No category keywords matched.")
-        ranked = sorted(scores.items(), key=lambda kv: (-len(kv[1]), kv[0]))
+        weight = {cat: sum(_weight(k) for k in kws) for cat, kws in scores.items()}
+        ranked = sorted(scores.items(), key=lambda kv: (-weight[kv[0]], kv[0]))
         top_cat, top_kw = ranked[0]
-        runner = len(ranked[1][1]) if len(ranked) > 1 else 0
-        ambiguous = runner == len(top_kw)
-        confidence = 0.0 if ambiguous else min(0.95, 0.5 + 0.15 * len(top_kw) - 0.1 * runner)
+        runner = weight[ranked[1][0]] if len(ranked) > 1 else 0.0
+        ambiguous = runner == weight[top_cat]
+        confidence = 0.0 if ambiguous else min(0.95, 0.5 + 0.15 * weight[top_cat] - 0.1 * runner)
         expl = f"Matched {', '.join(top_kw)} -> {top_cat}." + (" Tied with another category." if ambiguous else "")
         return ClassificationResult(top_cat, severity, round(max(confidence, 0.0), 2), "rules", top_kw, affects_safety, near_site, ambiguous, expl)
 

@@ -39,7 +39,7 @@ from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from typing import Any, overload
 
-from sqlalchemy import inspect, select
+from sqlalchemy import delete, inspect, select
 
 from app.core.authorization import AuthContext, Permission, require
 from app.core.exceptions import NotFound, PermissionDenied, ValidationFailed
@@ -51,6 +51,7 @@ from app.db.models.interop_platform import (
     InteropException,
     InteropTransaction,
     MasterEntity,
+    MasterIdentifier,
     MockDeptBApplication,
     MockDeptBBeneficiary,
     UnifiedApplication,
@@ -259,6 +260,12 @@ class InteropGatewayService:
                     g.status, g.revoked_at, g.revocation_reason = "revoked", now, "Demo scenario reset"
                     s.add(g)
                     withdrawn += 1
+            # the ambiguous-identity case must be decidable again, so its link / review decision is cleared
+            from app.interop.mock_systems import AMBIGUOUS_BENEFICIARY, AMBIGUOUS_RESIDENT
+
+            for value in (AMBIGUOUS_BENEFICIARY, AMBIGUOUS_RESIDENT):  # the review item can sit on either side of the pair
+                s.execute(delete(IdentityMatchCandidate).where(IdentityMatchCandidate.identifier_value == value))
+                s.execute(delete(MasterIdentifier).where(MasterIdentifier.identifier_value == value))
             AuditService(uow.audit, self._clock).record("interop.demo_reset", actor_id=ctx.user_id, resource_type="interop_demo", resource_id="dept_b_applications", metadata={"applications": [a.application_no for a in apps], "consents_withdrawn": withdrawn})
             uow.commit()
             return {"applications_reopened": len(apps), "consents_withdrawn": withdrawn}
@@ -459,6 +466,26 @@ class InteropGatewayService:
                 q = q.where(InteropConsentGrant.status == status)
             return [_row(r) for r in s.execute(q).scalars().all()]
 
+    def public_stats(self) -> dict[str, int]:
+        """Aggregate counts for the public landing page - numbers only, never a name, ID or field
+        value, so it needs no permission. Every figure is read live from the gateway's own tables."""
+        from sqlalchemy import func
+
+        from app.db.models.interop_platform import ConnectorRegistration
+
+        with self._uow() as uow:
+            s = uow.session
+
+            def count(q: Any) -> int:
+                return int(s.execute(q).scalar() or 0)
+
+            return {
+                "systems": count(select(func.count()).select_from(ConnectorRegistration).where(ConnectorRegistration.enabled.is_(True))),
+                "exchanges": count(select(func.count()).select_from(InteropTransaction).where(InteropTransaction.status == "success")),
+                "blocked": count(select(func.count()).select_from(InteropTransaction).where(InteropTransaction.status != "success")),
+                "consents": count(select(func.count()).select_from(InteropConsentGrant).where(InteropConsentGrant.status.in_(("granted", "revoked", "expired")))),
+            }
+
     def my_data_access_log(self, ctx: AuthContext, *, limit: int = 50) -> list[dict]:
         """Every exchange that actually moved this citizen's data under one of their own consents -
         who read it, who received it, which fields, and when. Consent says what *may* happen; this
@@ -479,6 +506,35 @@ class InteropGatewayService:
     # -----------------------------------------------------------------------------------------
     # Manual identity review - the required path for anything the resolver would not auto-link.
     # -----------------------------------------------------------------------------------------
+
+    def identity_candidate_evidence(self, ctx: AuthContext, *, candidate_id: str) -> dict:
+        """What a reviewer needs to decide "same person or not": the new record and every record
+        already linked to the proposed identity, side by side. Mobiles are masked to the last four
+        digits - enough to see that they differ, not enough to leak a number to a screen."""
+        from app.db.models.interop_platform import MockDeptAResident
+
+        require(ctx, Permission.INTEROP_READ)
+
+        def mask(m: str | None) -> str:
+            digits = re.sub(r"\D", "", m or "")[-10:]
+            return f"••••••{digits[-4:]}" if len(digits) >= 4 else "—"
+
+        def describe(s: Any, system: str, value: str) -> dict:
+            if system == "dept_a":
+                r = s.get(MockDeptAResident, value)
+                return {"system": system, "id": value, "name": r.full_name if r else "?", "mobile": mask(r.mobile if r else None), "mobile_last4": re.sub(r"\D", "", r.mobile)[-4:] if r else "", "city": r.city if r else "—"}
+            if system == "dept_b":
+                b = s.get(MockDeptBBeneficiary, value)
+                return {"system": system, "id": value, "name": b.full_name if b else "?", "mobile": mask(b.mobile_number if b else None), "mobile_last4": re.sub(r"\D", "", b.mobile_number)[-4:] if b else "", "city": "—"}
+            return {"system": system, "id": value, "name": "?", "mobile": "—", "mobile_last4": "", "city": "—"}
+
+        with self._uow() as uow:
+            s = uow.session
+            cand = s.get(IdentityMatchCandidate, candidate_id)
+            if cand is None:
+                raise NotFound("Identity candidate not found.")
+            linked = s.execute(select(MasterIdentifier).where(MasterIdentifier.master_id == cand.master_id)).scalars().all()
+            return {"incoming": describe(s, cand.system, cand.identifier_value), "existing": [describe(s, x.system, x.identifier_value) for x in linked if x.identifier_value != cand.identifier_value]}
 
     def list_identity_candidates(self, ctx: AuthContext, *, status: str = "pending") -> list[dict]:
         require(ctx, Permission.INTEROP_READ)

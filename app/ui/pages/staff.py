@@ -34,6 +34,19 @@ def _act(fn: Any, success: str = "Saved.") -> Any:
     return run
 
 
+def investigation_subjects(c: AppContainer, items: list[Any]) -> dict[str, str]:
+    """A readable subject per investigation: the complaint's reference and title instead of a UUID prefix."""
+
+    def label(uow: Any, i: Any) -> str:
+        if i.subject_type == "complaint":
+            cm = uow.complaints.get(i.subject_id)
+            if cm is not None:
+                return f"{cm.reference} · {cm.title[:60]}"
+        return f"{i.subject_type.replace('_', ' ').capitalize()} {i.subject_id[:8]}"
+
+    return run_in_uow(c, lambda uow: {i.id: label(uow, i) for i in items})
+
+
 def register(c: AppContainer) -> None:
     @page(c, "/officer", "nav.officer", roles=OFFICER_UP)
     def officer_dashboard(c: AppContainer, user: UiUser) -> None:
@@ -163,61 +176,55 @@ def register(c: AppContainer) -> None:
                             dlg.open()
 
                         ui.button(tr(c, "act.correct"), icon="edit", on_click=correct_category_dialog).props("flat dense")
+                        if cm.status in (ComplaintStatus.AI_ROUTED, ComplaintStatus.ASSIGNED) and user.ctx.role is Role.OFFICER:
+
+                            def transfer_dialog() -> None:
+                                depts = [x.code for x in run_in_uow(c, lambda uow: list(uow.config.departments())) if x.active and x.code != cm.department_code]
+                                with ui.dialog() as dlg, ui.column().classes("cl-card gap-3 w-full max-w-sm"):
+                                    ui.label("Transfer to another department").classes("text-base font-semibold").style("color: var(--cl-fg);")
+                                    ui.label("Use this when the complaint is not your department's work. It moves to the other desk with its SLA recomputed, their officers are notified, and the citizen sees the hand-over.").classes("text-xs").style("color: var(--cl-fg-subtle);")
+                                    to = ui.select(depts, label=tr(c, "lbl.department"), value=cm.category if cm.category in depts else None).props("outlined dense").classes("w-full")
+                                    why = ui.input("Reason (the citizen sees this)", value="").props("outlined dense").classes("w-full")
+
+                                    def do_transfer() -> None:
+                                        try:
+                                            c.officer.transfer(user.ctx, cid, to.value or "", why.value or "")
+                                        except CivicLensError as exc:
+                                            ui.notify(exc.message, type="negative")
+                                            return
+                                        ui.notify(f"Transferred to {to.value}.", type="positive")
+                                        ui.navigate.to("/officer/queue")  # it is no longer this desk's complaint
+
+                                    ui.button("Transfer", icon="swap_horiz", on_click=do_transfer).props("color=primary unelevated")
+                                dlg.open()
+
+                            ui.button("Transfer", icon="swap_horiz", on_click=transfer_dialog).props("flat dense")
                     ui.label(f"Routing: {cm.routing.get('source')} - {cm.routing.get('explanation')}").classes("text-xs").style("color: var(--cl-fg-muted);")
                     if cm.routing.get("ai_disagreement"):
                         ui.label(f"AI disagreed with the rule: {cm.routing['ai_disagreement']}").classes("text-xs").style("color: var(--cl-warning);")
                     ui.label("Priority factors: " + "; ".join(cm.priority_factors)).classes("text-xs").style("color: var(--cl-fg-muted);")
                     if sla.remaining is not None:
-                        ui.label(f"SLA due {sla.due_at:%d %b %H:%M} ({sla.remaining.total_seconds() / 3600:.1f} h remaining)").classes("text-xs").style("color: var(--cl-fg-muted);")
-
-                if cm.lat is not None:
-                    section_title(tr(c, "lbl.location"))
-                    m = ui.leaflet(center=(cm.lat, cm.lng), zoom=15).classes("w-full h-56").style("border-radius: var(--cl-radius-md); overflow: hidden;")
-                    m.marker(latlng=(cm.lat, cm.lng))
-
-                if cm.duplicates:
-                    section_title(tr(c, "of.duplicates"), tr(c, "of.duplicates_sub"))
-                    with ui.column().classes("gap-2 w-full"):
-                        for x in c.duplicate_reviews.candidates(user.ctx, cid):
-                            with ui.column().classes("cl-card gap-2 w-full"):
-                                with ui.row().classes("items-center justify-between flex-wrap gap-2"):
-                                    ui.label(x["reference"]).classes("text-sm font-medium cl-mono").style("color: var(--cl-fg);")
-                                    chip(f"{x['verdict'].replace('_', ' ')} ({x['score']})", color="warning")
-                                ui.label(x["explanation"]).classes("text-xs").style("color: var(--cl-fg-muted);")
-                                if x["review"]:
-                                    ui.label(f"Reviewed: {x['review']['decision'].replace('_', ' ')} at {x['review']['at']:%d %b %H:%M}" + (f" - {x['review']['note']}" if x["review"]["note"] else "")).classes("text-xs").style("color: var(--cl-success);")
-                                with ui.row().classes("gap-2 items-end flex-wrap"):
-                                    decision = ui.select(["confirmed_duplicate", "related", "not_duplicate"], value="related", label=tr(c, "col.decision")).props("outlined dense").classes("w-56")
-                                    note = ui.input(tr(c, "col.note")).props("outlined dense").classes("w-56")
-                                    ui.button(tr(c, "of.save_decision"), on_click=_act(lambda o=x["complaint_id"], d=decision, n=note: c.duplicate_reviews.decide(user.ctx, cid, o, d.value, n.value))).props("outline dense")
-
-                section_title(tr(c, "lbl.evidence"))
-                if not d["evidence"]:
-                    state_panel(icon="attach_file", title=tr(c, "gr.no_evidence"))
-                else:
-                    with ui.row().classes("gap-3 flex-wrap"):
-                        for ev in d["evidence"]:
-                            with ui.column().classes("cl-card gap-2").style("width: 220px;"):
-                                if ev.mime.startswith("image/") and ev.size <= 2_000_000:
-                                    _rec, data = c.complaints.read_evidence(user.ctx, ev.id)  # authorised + audited
-                                    ui.image(f"data:{ev.mime};base64,{base64.b64encode(data).decode()}").style("border-radius: var(--cl-radius-sm);")
-                                ui.label(ev.name).classes("text-xs font-medium cl-clip-1").style("color: var(--cl-fg);")
-                                chip(ev.analysis_status, color="info", outline=True)
-                                if ev.analysis_result:
-                                    ui.label(str(ev.analysis_result.get("summary"))).classes("text-xs cl-clip-2").style("color: var(--cl-fg-muted);")
-                                if ev.analysis_error:
-                                    ui.label(ev.analysis_error).classes("text-xs").style("color: var(--cl-danger);")
-                                if ev.mime.startswith("image/"):
-                                    ui.button(tr(c, "of.rerun"), on_click=_act(lambda i=ev.id: c.complaints.request_analysis(user.ctx, i), "Analysis queued.")).props("flat dense")
-
-                government_panel(c, user.ctx, cid)
+                        hrs = sla.remaining.total_seconds() / 3600
+                        ui.label(f"SLA due {sla.due_at:%d %b %H:%M} · " + (f"{-hrs:.0f} h overdue" if hrs < 0 else f"{hrs:.0f} h left")).classes("text-xs font-medium").style(f"color: var(--cl-{'danger' if hrs < 0 else 'fg-muted'});")
 
                 section_title(tr(c, "col.actions"))
-                allowed = sorted(s.value for s in TRANSITIONS[cm.status])
-                with ui.row().classes("cl-card gap-3 items-end w-full flex-wrap"):
-                    target = ui.select(allowed, label=tr(c, "of.move_to"), value=allowed[0] if allowed else None).props("outlined dense").classes("w-48")
-                    remarks = ui.input(tr(c, "lbl.remarks")).props("outlined dense").classes("w-64 flex-1")
-                    ui.button(tr(c, "of.update_status"), on_click=_act(lambda: c.officer.update_status(user.ctx, cid, ComplaintStatus(target.value), remarks.value))).props("color=primary unelevated").set_enabled(bool(allowed))
+                allowed = [st for st in TRANSITIONS[cm.status] if st not in (ComplaintStatus.RESOLVED, ComplaintStatus.AI_ROUTED)]  # resolve has its own form; re-route is Transfer
+                # the obvious next move for this status, one click away (remarks optional)
+                next_steps = {ComplaintStatus.ASSIGNED: [(ComplaintStatus.UNDER_REVIEW, "Start review", "play_arrow")],
+                              ComplaintStatus.UNDER_REVIEW: [(ComplaintStatus.IN_PROGRESS, "Start work", "construction")],
+                              ComplaintStatus.INSPECTION_SCHEDULED: [(ComplaintStatus.IN_PROGRESS, "Start work", "construction")],
+                              ComplaintStatus.RESOLVED: [(ComplaintStatus.CLOSED, "Close complaint", "lock")]}.get(cm.status, [])  # fmt: skip
+                with ui.column().classes("cl-card gap-3 w-full").style("border-color: var(--cl-primary);"):
+                    remarks = ui.input(tr(c, "lbl.remarks") + " (optional, the citizen sees status remarks)").props("outlined dense").classes("w-full")
+                    with ui.row().classes("gap-2 items-center w-full flex-wrap"):
+                        for st, label, icon in next_steps:
+                            ui.button(label, icon=icon, on_click=_act(lambda t=st: c.officer.update_status(user.ctx, cid, t, remarks.value or None))).props("color=primary unelevated no-caps")
+                        others = [st for st in allowed if st not in {x[0] for x in next_steps}]
+                        if others:
+                            target = ui.select({st.value: st.value.replace("_", " ").capitalize() for st in others}, label=tr(c, "of.move_to")).props("outlined dense").classes("w-56")
+                            ui.button(tr(c, "of.update_status"), on_click=lambda: _act(lambda: c.officer.update_status(user.ctx, cid, ComplaintStatus(target.value), remarks.value or None))() if target.value else ui.notify("Pick a status first.", type="warning")).props("outline no-caps")
+                        if not next_steps and not others and cm.status not in (ComplaintStatus.IN_PROGRESS,):
+                            ui.label("No status change available from here.").classes("text-xs").style("color: var(--cl-fg-subtle);")
                 with ui.row().classes("gap-2 flex-wrap"):
                     def dialog_button(label: str, icon: str, build: Any, *, tone: str = "outline") -> None:
                         with ui.dialog() as dlg, ui.column().classes("cl-card gap-3 w-full max-w-sm"):
@@ -263,8 +270,8 @@ def register(c: AppContainer) -> None:
                     def assign_form(dlg: Any) -> None:
                         from app.core.transactions import run_in_uow
 
-                        ids = run_in_uow(c, lambda uow: uow.officers.officer_ids_for_department(cm.department_code) if cm.department_code else [])
-                        sel = ui.select(ids, label=tr(c, "role.officer"), value=cm.assigned_officer_id).props("outlined dense").classes("w-full")
+                        people = run_in_uow(c, lambda uow: {i: uow.officers.user_label(i) or i[:8] for i in uow.officers.officer_ids_for_department(cm.department_code)} if cm.department_code else {})
+                        sel = ui.select(people, label=tr(c, "role.officer"), value=cm.assigned_officer_id if cm.assigned_officer_id in people else None).props("outlined dense").classes("w-full")
                         ui.button(tr(c, "act.save"), on_click=_act(lambda: c.officer.assign(user.ctx, cid, sel.value))).props("color=primary unelevated")
 
                     def escalate_form(dlg: Any) -> None:
@@ -283,6 +290,49 @@ def register(c: AppContainer) -> None:
                         dialog_button(label, icon, form)
                     ui.button(tr(c, "of.open_investigation"), icon="search", on_click=_act(lambda: c.investigations.open(user.ctx, "complaint", cid), "Investigation opened.")).props("outline dense")
 
+                if cm.lat is not None:
+                    section_title(tr(c, "lbl.location"))
+                    m = ui.leaflet(center=(cm.lat, cm.lng), zoom=15).classes("w-full h-56").style("border-radius: var(--cl-radius-md); overflow: hidden;")
+                    m.marker(latlng=(cm.lat, cm.lng))
+
+                if cm.duplicates:
+                    section_title(tr(c, "of.duplicates"), tr(c, "of.duplicates_sub"))
+                    with ui.column().classes("gap-2 w-full"):
+                        for x in c.duplicate_reviews.candidates(user.ctx, cid):
+                            with ui.column().classes("cl-card gap-2 w-full"):
+                                with ui.row().classes("items-center justify-between flex-wrap gap-2"):
+                                    ui.label(x["reference"]).classes("text-sm font-medium cl-mono").style("color: var(--cl-fg);")
+                                    chip(f"{x['verdict'].replace('_', ' ')} ({x['score']})", color="warning")
+                                ui.label(x["explanation"]).classes("text-xs").style("color: var(--cl-fg-muted);")
+                                if x["review"]:
+                                    ui.label(f"Reviewed: {x['review']['decision'].replace('_', ' ')} at {x['review']['at']:%d %b %H:%M}" + (f" - {x['review']['note']}" if x["review"]["note"] else "")).classes("text-xs").style("color: var(--cl-success);")
+                                with ui.row().classes("gap-2 items-end flex-wrap"):
+                                    decision = ui.select(["confirmed_duplicate", "related", "not_duplicate"], value="related", label=tr(c, "col.decision")).props("outlined dense").classes("w-56")
+                                    note = ui.input(tr(c, "col.note")).props("outlined dense").classes("w-56")
+                                    ui.button(tr(c, "of.save_decision"), on_click=_act(lambda o=x["complaint_id"], d=decision, n=note: c.duplicate_reviews.decide(user.ctx, cid, o, d.value, n.value))).props("outline dense")
+
+                section_title(tr(c, "lbl.evidence"))
+                if not d["evidence"]:
+                    state_panel(icon="attach_file", title=tr(c, "gr.no_evidence"))
+                else:
+                    with ui.row().classes("gap-3 flex-wrap"):
+                        for ev in d["evidence"]:
+                            with ui.column().classes("cl-card gap-2").style("width: 220px;"):
+                                if ev.mime.startswith("image/") and ev.size <= 2_000_000:
+                                    _rec, data = c.complaints.read_evidence(user.ctx, ev.id)  # authorised + audited
+                                    ui.image(f"data:{ev.mime};base64,{base64.b64encode(data).decode()}").style("border-radius: var(--cl-radius-sm);")
+                                ui.label(ev.name).classes("text-xs font-medium cl-clip-1").style("color: var(--cl-fg);")
+                                chip(ev.analysis_status, color="info", outline=True)
+                                if ev.analysis_result:
+                                    ui.label(str(ev.analysis_result.get("summary"))).classes("text-xs cl-clip-2").style("color: var(--cl-fg-muted);")
+                                if ev.analysis_error:
+                                    ui.label(ev.analysis_error).classes("text-xs").style("color: var(--cl-danger);")
+                                if ev.mime.startswith("image/"):
+                                    ui.button(tr(c, "of.rerun"), on_click=_act(lambda i=ev.id: c.complaints.request_analysis(user.ctx, i), "Analysis queued.")).props("flat dense")
+
+                government_panel(c, user.ctx, cid)
+
+
             with ui.column().classes("gap-4").style("min-width: 280px; max-width: 340px; flex: 1;"):
                 section_title(tr(c, "gr.status_timeline"))
                 with ui.column().classes("cl-card w-full"):
@@ -294,7 +344,8 @@ def register(c: AppContainer) -> None:
     def investigations(c: AppContainer, user: UiUser) -> None:
         page_header(tr(c, "nav.investigations"), icon="search")
         items = c.investigations.list(user.ctx)
-        data_table([("subject", tr(c, "col.subject")), ("status", tr(c, "lbl.status")), ("created", tr(c, "lbl.created"))], [{"id": i.id, "subject": f"{i.subject_type} {i.subject_id[:8]}", "status": i.status, "created": i.created_at.strftime("%d %b %Y")} for i in items],
+        subjects = investigation_subjects(c, items)
+        data_table([("subject", tr(c, "col.subject")), ("status", tr(c, "lbl.status")), ("created", tr(c, "lbl.created"))], [{"id": i.id, "subject": subjects[i.id], "status": i.status, "created": i.created_at.strftime("%d %b %Y")} for i in items],
                    on_row=lambda r: ui.navigate.to(f"/officer/investigations/{r['id']}"), empty=tr(c, "of.no_investigations"))
 
     @page(c, "/officer/investigations/{inv_id}", "nav.investigations", roles=OFFICER_UP)

@@ -88,14 +88,22 @@ class IdentityResolutionService:
             name_score = lexical_similarity(candidate_name, entity.display_name)
             reasons = [f"name similarity {name_score:.2f}"]
             mobile_score = 0.0
+            mobiles_conflict = False
             if candidate_mobile:
                 other_mobile = _mobile_for(session, row.system, row.identifier_type, row.identifier_value)
                 if other_mobile and _normalize_mobile(other_mobile) == _normalize_mobile(candidate_mobile):
                     mobile_score = 1.0
                     reasons.append("exact mobile number match")
+                elif other_mobile:
+                    mobiles_conflict = True
+                    reasons.append("mobile numbers differ")
             # Mobile match alone is strong evidence even with an imperfect name match (nicknames,
             # transliteration, a missing middle initial); name match alone is weaker on its own.
             score = max(name_score, 0.6 * mobile_score + 0.4 * name_score) if mobile_score else name_score
+            if mobiles_conflict:
+                # two people can share a name; when both systems hold a mobile and they disagree, the
+                # name alone must never auto-link - cap just under the line so a person decides
+                score = min(score, CONFIRM_THRESHOLD - 0.05)
             if best is None or score > best[1]:
                 best = (row.master_id, round(score, 3), "; ".join(reasons))
         return best
@@ -106,6 +114,12 @@ class IdentityResolutionService:
         return link
 
     def queue_candidate(self, session: Session, *, master_id: str, system: str, identifier_type: str, identifier_value: str, score: float, explanation: str) -> IdentityMatchCandidate:
+        existing = session.execute(
+            select(IdentityMatchCandidate).where(IdentityMatchCandidate.master_id == master_id, IdentityMatchCandidate.system == system,
+                                                 IdentityMatchCandidate.identifier_value == identifier_value, IdentityMatchCandidate.status == "pending")  # fmt: skip
+        ).scalar_one_or_none()
+        if existing is not None:  # asking again must not stack a second copy of the same open question
+            return existing
         cand = IdentityMatchCandidate(id=str(uuid.uuid4()), master_id=master_id, system=system, identifier_type=identifier_type, identifier_value=identifier_value, score=score, explanation=explanation, status="pending", created_at=self._clock())
         session.add(cand)
         return cand

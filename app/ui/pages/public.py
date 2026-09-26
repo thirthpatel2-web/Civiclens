@@ -147,6 +147,43 @@ def _tile(icon: str, title: str, body: str, *, route: str | None = None) -> None
         col.on("click", lambda r=route: ui.navigate.to(r))
 
 
+def _interop_showcase(c: AppContainer) -> None:
+    """The problem statement in one glance: a record one department holds reaches another only
+    through the gateway's consent, identity and quality checks. Figures are live counts."""
+    try:
+        stats = c.interop_gateway.public_stats()
+    except Exception:  # the landing page must render even if the gateway tables are unavailable
+        logger.warning("interop public stats unavailable")
+        stats = None
+    with ui.column().classes("cl-page q-py-lg gap-4 items-center"):
+        with ui.element("div").classes("cl-eyebrow"):
+            ui.icon("hub").classes("text-[15px]")
+            ui.label(tr(c, "land.interop_eyebrow"))
+        _landing_heading(tr(c, "land.interop_title"), tr(c, "land.interop_sub"))
+        with ui.row().classes("cl-io-flow w-full justify-center items-center no-wrap q-mt-md"):
+            for i, (icon, name, role, hub) in enumerate((("account_balance", "Revenue Records", tr(c, "land.io_holds"), False),
+                                                           ("hub", "CivicLens", tr(c, "land.io_gateway"), True),
+                                                           ("storefront", "Seva Setu", tr(c, "land.io_needs"), False))):  # fmt: skip
+                if i:
+                    ui.element("div").classes("cl-io-link")
+                with ui.column().classes("cl-glass cl-io-node items-center gap-2" + (" cl-io-hub" if hub else "")):
+                    with ui.element("div").classes("cl-brand-chip").style("width:46px; height:46px;"):
+                        ui.icon(icon).classes("text-[22px]")
+                    ui.label(name).classes("text-sm font-semibold text-center").style("color: var(--cl-fg);")
+                    ui.label(role).classes("text-xs text-center").style("color: var(--cl-fg-muted);")
+        with ui.row().classes("gap-2 justify-center flex-wrap q-mt-sm").style("max-width: 760px;"):
+            for icon, key in (("fact_check", "land.io_p1"), ("fingerprint", "land.io_p2"), ("undo", "land.io_p3"), ("timeline", "land.io_p4")):
+                with ui.row().classes("cl-io-pill items-center gap-2 no-wrap"):
+                    ui.icon(icon).classes("text-[16px]").style("color: var(--cl-success);")
+                    ui.label(tr(c, key)).classes("text-xs")
+        if stats:
+            with ui.element("div").classes("cl-hero-strip q-mt-md"):
+                for value, key in ((stats["systems"], "land.stat_systems"), (stats["exchanges"], "land.stat_exchanges"), (stats["consents"], "land.stat_consents")):
+                    with ui.column().classes("items-center gap-0"):
+                        ui.label(f"{value:,}").classes("cl-hero-stat-n")
+                        ui.label(tr(c, key)).classes("cl-hero-stat-l text-center").style("max-width: 18ch;")
+
+
 def register(c: AppContainer) -> None:
     @page(c, "/", "brand", public=True, shell_on=False)
     def landing(c: AppContainer, user: UiUser | None) -> None:
@@ -169,6 +206,8 @@ def register(c: AppContainer) -> None:
                     with ui.column().classes("items-center gap-0"):
                         ui.label(value).classes("cl-hero-stat-n")
                         ui.label(tr(c, label_key)).classes("cl-hero-stat-l")
+
+        _interop_showcase(c)
 
         with ui.column().classes("cl-page q-py-lg gap-4 items-center"):
             _landing_heading(tr(c, "land.how"))
@@ -193,14 +232,14 @@ def register(c: AppContainer) -> None:
                 _tile("gavel", tr(c, "nav.rti"), tr(c, "land.t_rti"), route="/login")
                 _tile("balance", tr(c, "nav.legal"), tr(c, "land.t_legal"), route="/login")
                 _tile("map", tr(c, "nav.gis"), tr(c, "land.t_gis"), route="/login")
-                _tile("hub", tr(c, "nav.interop"), tr(c, "land.t_interop"), route="/login")
+                _tile("how_to_reg", tr(c, "nav.my_data"), tr(c, "land.t_mydata"), route="/login")
 
         with ui.column().classes("cl-page q-py-lg gap-4 items-center q-mb-lg"):
             _landing_heading(tr(c, "land.for_officials"), tr(c, "land.for_officials_sub"))
             with ui.row().classes("gap-4 justify-center flex-wrap items-stretch").style("max-width: 720px;"):
                 _tile("inbox", tr(c, "nav.officer_queue"), tr(c, "land.t_queue"))
                 _tile("timer", tr(c, "nav.sla"), tr(c, "land.t_sla"))
-                _tile("search", tr(c, "nav.investigations"), tr(c, "land.t_investigations"))
+                _tile("hub", tr(c, "nav.interop_gateway"), tr(c, "land.t_gateway"))
             ui.button(tr(c, "portal.official_cta"), icon="account_balance", on_click=lambda: ui.navigate.to("/officer/login")).props("outline size=lg").classes("q-mt-sm").style("color: var(--cl-warning);")
 
     @page(c, "/login", "act.sign_in", public=True, shell_on=False)

@@ -436,6 +436,41 @@ body.body--dark .cl-blob { filter: blur(80px); opacity: .55; }
   66% { transform: translate(-2.5vw, 2vw) scale(.94); }
 }
 
+.cl-route-preview { padding: 10px 14px; border-radius: var(--cl-radius-md); background: var(--cl-ai-soft, rgba(139,92,246,.12)); border: 1px solid var(--cl-glass-border); animation: cl-fade-in .25s ease; }
+@keyframes cl-fade-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+
+.cl-notif-unread { border-color: var(--cl-primary) !important; background: linear-gradient(90deg, var(--cl-info-soft), transparent 60%) !important; }
+.cl-unread-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--cl-primary); box-shadow: 0 0 10px var(--cl-glow-primary); }
+
+.cl-id-compare { display: grid; grid-template-columns: 70px 1fr 1fr; gap: 6px 14px; padding: 12px; border-radius: var(--cl-radius-md); background: var(--cl-surface-alt); align-items: center; }
+.cl-id-h { padding-bottom: 6px; border-bottom: 1px solid var(--cl-border); }
+
+/* ---- complaint cards ------------------------------------------------------------------------ */
+.cl-card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; }
+.cl-complaint-card { min-width: 0; }
+
+/* ---- interoperability flow (landing) ---------------------------------------------------------- */
+.cl-io-flow { gap: 0; }
+.cl-io-node { width: 200px; min-height: 150px; padding: 20px 16px; justify-content: center; }
+.cl-io-hub { box-shadow: var(--cl-shadow-lift), 0 0 70px -10px var(--cl-glow-primary); border-color: var(--cl-primary); transform: scale(1.06); }
+.cl-io-link {
+  flex: 0 1 90px; min-width: 36px; height: 3px; border-radius: 3px;
+  background: linear-gradient(90deg, transparent 0%, var(--cl-primary) 30%, var(--cl-ai) 50%, var(--cl-primary) 70%, transparent 100%);
+  background-size: 200% 100%; animation: cl-io-pulse 2.4s linear infinite;
+}
+@keyframes cl-io-pulse { from { background-position: 200% 0; } to { background-position: 0 0; } }
+.cl-io-pill { padding: 6px 12px; border-radius: 999px; border: 1px solid var(--cl-glass-border); background: var(--cl-glass-bg); color: var(--cl-fg); }
+@media (max-width: 640px) {
+  .cl-io-flow { flex-direction: column !important; }
+  .cl-io-link { width: 3px; height: 28px; flex: 0 0 28px; min-width: 3px; background-size: 100% 200%;
+    background-image: linear-gradient(180deg, transparent, var(--cl-primary), var(--cl-ai), var(--cl-primary), transparent); }
+  .cl-io-node { width: 100%; max-width: 320px; min-height: 0; }
+  .cl-io-hub { transform: none; }
+}
+.cl-helpline { min-height: 150px; color: inherit; }
+.cl-helpline:hover .cl-helpline-call { animation: cl-ring .6s ease-in-out 2; }
+@keyframes cl-ring { 0%,100% { transform: rotate(0); } 25% { transform: rotate(-14deg); } 75% { transform: rotate(14deg); } }
+
 /* ---- glassmorphism surface --------------------------------------------------------------------- */
 .cl-glass {
   background: var(--cl-glass-bg);

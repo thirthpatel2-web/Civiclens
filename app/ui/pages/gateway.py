@@ -41,7 +41,12 @@ PIPELINE: list[tuple[str, str, str]] = [
     ("notify", "Notify citizen", "notifications_active"),
 ]
 SYSTEM_NAMES = {"dept_a": "Revenue Records (Dept A)", "dept_b": "Seva Setu (Dept B)", "dept_c": "Nagrik Grievance (Dept C)", "civiclens": "CivicLens gateway"}
-FIELD_LABELS = {"reference": "Certificate reference", "status": "Verification status", "issued_on": "Issue date"}
+FIELD_LABELS = {"reference": "Certificate reference", "status": "Verification status", "issued_on": "Issue date", "document_reference": "Certificate reference",
+                "document_status": "Verification status", "full_name": "Full name", "document_type": "Document type", "reference_no": "Reference no."}
+
+
+def _fields(names: Any) -> str:
+    return ", ".join(FIELD_LABELS.get(f, str(f).replace("_", " ")) for f in (names or []))
 HEALTH_TONE = {"healthy": "success", "degraded": "warning", "down": "danger", "unknown": "muted"}
 STATUS_TONE = {"success": "success", "granted": "success", "completed": "success", "processing": "info", "pending": "warning", "pending_document": "warning",
                "running": "info", "waiting_approval": "warning", "failed": "danger", "denied": "danger", "revoked": "muted", "dead": "danger", "open": "warning", "resolved": "success"}  # fmt: skip
@@ -117,12 +122,12 @@ def register(c: AppContainer) -> None:
 
         with ui.tabs().classes("w-full").props("align=left inline-label no-caps active-color=primary indicator-color=primary") as tabs:
             t_live = ui.tab("live", "Live exchange", icon="bolt")
-            t_conn = ui.tab("conn", "Connectors & SLA", icon="lan")
+            t_conn = ui.tab("conn", "Connectors", icon="lan")
             t_cons = ui.tab("cons", "Consents", icon="how_to_reg")
             t_id = ui.tab("id", "Identity review", icon="fingerprint")
-            t_exc = ui.tab("exc", "Exceptions & alerts", icon="report_problem")
-            t_trace = ui.tab("trace", "Trace explorer", icon="travel_explore")
-            t_cat = ui.tab("cat", "Catalog & workflows", icon="menu_book")
+            t_exc = ui.tab("exc", "Exceptions", icon="report_problem")
+            t_trace = ui.tab("trace", "Trace", icon="travel_explore")
+            t_cat = ui.tab("cat", "Catalog", icon="menu_book")
 
         with ui.tab_panels(tabs, value=t_live).classes("w-full").style("background: transparent;").props("animated"):
             # ------------------------------------------------------------------ live exchange
@@ -272,7 +277,7 @@ def register(c: AppContainer) -> None:
                     rows = g.list_consents(user.ctx)
                     section_title("Consent ledger", "Purpose-bound, field-level, 30-day expiry, revocable by the citizen at any time.")
                     data_table([("purpose", "Purpose"), ("status", "Status"), ("fields", "Fields"), ("created", "Requested"), ("expires", "Expires")],
-                               [{"id": r["consent_id"], "purpose": r["purpose"], "status": r["status"], "fields": ", ".join(r["fields"]), "created": _when(r["created_at"]), "expires": _when(r["expires_at"])} for r in rows],
+                               [{"id": r["consent_id"], "purpose": r["purpose"], "status": r["status"], "fields": _fields(r["fields"]), "created": _when(r["created_at"]), "expires": _when(r["expires_at"])} for r in rows],
                                empty="No consent requests yet.")  # fmt: skip
 
                 consents_view()
@@ -294,6 +299,30 @@ def register(c: AppContainer) -> None:
                                 chip(f"{round(conf * 100)}% match", color="warning")
                             ui.linear_progress(value=conf, show_value=False).props("rounded color=warning").classes("q-my-xs")
                             ui.label(f"Why: {cd.get('explanation')}").classes("text-xs").style("color: var(--cl-fg-muted);")
+                            try:
+                                ev = g.identity_candidate_evidence(user.ctx, candidate_id=cd["id"])
+                            except CivicLensError:
+                                ev = None
+                            if ev and ev["existing"]:
+                                # side by side, with the fields that disagree flagged, so the reviewer
+                                # decides on evidence rather than on a percentage
+                                other = ev["existing"][0]
+                                with ui.element("div").classes("cl-id-compare w-full q-my-sm"):
+                                    ui.label("").classes("cl-id-h")
+                                    for side in (other, ev["incoming"]):
+                                        with ui.column().classes("cl-id-h gap-0"):
+                                            ui.label(SYSTEM_NAMES.get(side["system"], side["system"])).classes("text-xs font-semibold")
+                                            ui.label(side["id"]).classes("text-[11px] cl-mono").style("color: var(--cl-fg-subtle);")
+                                    for label, key in (("Name", "name"), ("Mobile", "mobile"), ("City", "city")):
+                                        same_key = "mobile_last4" if key == "mobile" else key
+                                        differs = other[same_key] != ev["incoming"][same_key] and "—" not in (other[key], ev["incoming"][key])
+                                        ui.label(label).classes("text-xs").style("color: var(--cl-fg-subtle);")
+                                        for side in (other, ev["incoming"]):
+                                            with ui.row().classes("items-center gap-1 no-wrap"):
+                                                ui.label(side[key]).classes("text-sm" + (" cl-mono" if key == "mobile" else "")).style(f"color: var(--cl-{'danger' if differs else 'fg'});")
+                                                if differs:
+                                                    ui.icon("error_outline").classes("text-[15px]").style("color: var(--cl-danger);")
+                                ui.label("Linking tells every department these two records are the same citizen. If unsure, keep them separate - it can be linked later, but a wrong link leaks one person's documents to another.").classes("text-[11px]").style("color: var(--cl-fg-subtle);")
                             if can_manage:
                                 with ui.row().classes("gap-2"):
                                     ui.button("Same person - link", icon="link", on_click=lambda _e, i=cd["id"]: act(g.resolve_identity_candidate, "Identities linked.", candidate_id=i, approve=True)).props("unelevated dense no-caps color=positive")
@@ -349,7 +378,7 @@ def register(c: AppContainer) -> None:
                     section_title("Recent exchanges")
                     data_table([("when", "When"), ("route", "Route"), ("status", "Status"), ("fields", "Fields exchanged"), ("cid", "Correlation")],
                                [{"id": t["transaction_id"], "when": _when(t["created_at"]), "route": f"{SYSTEM_NAMES.get(t['source_system'], t['source_system'])} → {SYSTEM_NAMES.get(t['target_system'], t['target_system'])}",
-                                 "status": t["status"], "fields": ", ".join(t.get("fields_exchanged") or []) or "—", "cid": t["correlation_id"]} for t in txns],
+                                 "status": t["status"], "fields": _fields(t.get("fields_exchanged")) or "—", "cid": t["correlation_id"]} for t in txns],
                                on_row=lambda row: trace_later(row["cid"]), empty="No exchanges yet.")  # fmt: skip
 
                 trace_list()
@@ -446,7 +475,7 @@ def register(c: AppContainer) -> None:
                         with ui.row().classes("gap-2 flex-wrap items-center"):
                             chip(tx["status"], color=STATUS_TONE.get(tx["status"], "muted"))
                             ui.label(f"{SYSTEM_NAMES.get(tx['source_system'], tx['source_system'])} → {SYSTEM_NAMES.get(tx['target_system'], tx['target_system'])} · {_when(tx['created_at'])}").classes("text-sm")
-                        ui.label("Fields exchanged: " + (", ".join(tx.get("fields_exchanged") or []) or "none")).classes("text-xs").style("color: var(--cl-fg-muted);")
+                        ui.label("Fields exchanged: " + (_fields(tx.get("fields_exchanged")) or "none")).classes("text-xs").style("color: var(--cl-fg-muted);")
                     with ui.column().classes("cl-timeline w-full gap-0 q-mt-sm"):
                         for ev in t.get("events", []):
                             with ui.column().classes("cl-timeline-step gap-0"):

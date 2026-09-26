@@ -119,5 +119,37 @@ class CorrectCategoryTests(unittest.TestCase):
         self.assertEqual(corrections, [])
 
 
+class TransferTests(unittest.TestCase):
+    """A misrouted complaint moves to the department that owns it - never silently, never mid-work."""
+
+    def setUp(self):
+        self.env = Env()
+        self.c = self.env.create()  # roads, assigned to off-roads-1
+
+    def test_the_holding_department_can_hand_it_over_and_the_new_desk_takes_it(self):
+        moved = self.env.officer.transfer(OFF_R1, self.c.id, "water", "Leaking pipeline under the road - water supply's job")
+        self.assertEqual((moved.department_code, moved.category, moved.assigned_officer_id, str(moved.status)), ("water", "water", None, "ai_routed"))
+        self.assertEqual(moved.routing["source"], "officer_transfer")
+        self.assertIn("complaint.transferred", self.env.actions())
+        corrections = self.env.uow().classification_corrections.list_recent()
+        self.assertEqual((corrections[0].previous_category, corrections[0].corrected_category), ("roads", "water"))
+        self.assertEqual([x.id for x in self.env.officer.queue(OFF_W1)], [self.c.id])  # the water desk sees it now
+        with self.assertRaises(NotFound):
+            self.env.officer.detail(OFF_R1, self.c.id)  # ...and the roads desk no longer does
+
+    def test_another_department_cannot_take_it_and_a_reason_is_required(self):
+        with self.assertRaises(NotFound):
+            self.env.officer.transfer(OFF_W1, self.c.id, "water", "mine now")
+        with self.assertRaises(ValidationFailed):
+            self.env.officer.transfer(OFF_R1, self.c.id, "water", "  ")
+
+    def test_work_in_progress_cannot_be_transferred(self):
+        from app.services.complaint_status import ComplaintStatus
+
+        self.env.officer.update_status(OFF_R1, self.c.id, ComplaintStatus.UNDER_REVIEW, "checking")
+        with self.assertRaises(ValidationFailed):
+            self.env.officer.transfer(OFF_R1, self.c.id, "water", "not ours")
+
+
 if __name__ == "__main__":
     unittest.main()

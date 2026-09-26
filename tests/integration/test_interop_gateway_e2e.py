@@ -194,6 +194,41 @@ class DocumentExchangeEndToEndTests(unittest.TestCase):
         self.assertGreaterEqual(connectors["dept_a"]["total_calls"], 1)
         self.assertEqual(connectors["dept_a"]["health_state"], "healthy")
 
+    def test_same_name_with_a_different_mobile_is_never_auto_linked(self) -> None:
+        """Two people can share a name. When both systems hold a mobile number and the numbers differ,
+        even an exact name match must go to a person, never straight to a link."""
+        from app.interop.identity_resolution import CONFIRM_THRESHOLD
+
+        with self.uow_factory() as uow:
+            s = uow.session
+            resolver = IdentityResolutionService()
+            resident = mock_systems.dept_a_get_resident(s, self.resident_id)
+            a_result = resolver.resolve_person(s, system="dept_a", identifier_type="resident_id", identifier_value=resident.resident_id, name=resident.full_name, mobile=resident.mobile)
+            self._created_master_ids.add(a_result.master_id)
+            name = resident.full_name
+            uow.commit()
+        twin = f"TEST-TWIN-{self._suffix}"
+        with self.uow_factory() as uow:
+            uow.session.add(MockDeptBBeneficiary(beneficiary_code=twin, full_name=name, mobile_number="9000000001", created_at=datetime.now(UTC)))
+            uow.commit()
+        try:
+            with self.uow_factory() as uow:
+                b_result = IdentityResolutionService().resolve_person(uow.session, system="dept_b", identifier_type="beneficiary_code", identifier_value=twin, name=name, mobile="9000000001")
+                uow.commit()
+            self.assertIsNotNone(b_result.candidate_id)  # queued for a person...
+            candidate = next(c for c in self.gateway.list_identity_candidates(self.admin, status="pending") if c["id"] == b_result.candidate_id)
+            self.assertLess(candidate["score"], CONFIRM_THRESHOLD)  # ...because it scored under the auto-link line
+            self.assertIn("mobile numbers differ", candidate["explanation"])
+        finally:
+            with self.uow_factory() as uow:
+                s = uow.session
+                s.execute(delete(IdentityMatchCandidate).where(IdentityMatchCandidate.identifier_value == twin))
+                for link in s.query(MasterIdentifier).filter(MasterIdentifier.identifier_value == twin).all():
+                    self._created_master_ids.add(link.master_id)
+                s.execute(delete(MasterIdentifier).where(MasterIdentifier.identifier_value == twin))
+                s.execute(delete(MockDeptBBeneficiary).where(MockDeptBBeneficiary.beneficiary_code == twin))
+                uow.commit()
+
     def test_ambiguous_identity_match_requires_manual_review_before_anything_proceeds(self) -> None:
         """A name/mobile pair that only weakly resembles a linked identity must NOT auto-link -
         the resolver has to queue it and the exchange has to stop until an officer decides."""

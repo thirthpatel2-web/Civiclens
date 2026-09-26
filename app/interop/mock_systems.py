@@ -58,6 +58,29 @@ DEPT_C_NAME = "Nagrik Grievance Cell (demo)"
 # ---------------------------------------------------------------------------------------------
 
 
+# The third demo case, added after the first two shipped: the same name as a Revenue resident but a
+# mobile number one digit off - exactly the situation identity resolution must NOT auto-link. It is
+# inserted by ``ensure_demo_additions`` on every start (only if missing), so existing databases get it too.
+AMBIGUOUS_BENEFICIARY = "BEN-MH-90013"
+AMBIGUOUS_APPLICATION = "APP-MH-2026-5503"
+AMBIGUOUS_RESIDENT = "RES-MH-00103"  # the Revenue record she shares a name with
+
+
+def ensure_demo_additions(session: Session) -> bool:
+    """Idempotent: add the ambiguous-identity demo beneficiary + application when absent."""
+    if session.get(MockDeptBBeneficiary, AMBIGUOUS_BENEFICIARY) is not None:
+        return False
+    if session.execute(select(MockDeptAResident).limit(1)).first() is None:
+        return False  # the base demo data is not there yet; seed_if_empty runs first
+    now = datetime.now(UTC)
+    session.add(MockDeptBBeneficiary(beneficiary_code=AMBIGUOUS_BENEFICIARY, full_name="Sunita Joshi", mobile_number="9765432190", created_at=now))
+    session.flush()
+    session.add(MockDeptBApplication(application_no=AMBIGUOUS_APPLICATION, beneficiary_code=AMBIGUOUS_BENEFICIARY, service_type="Street Vendor Licence", status="pending_document",
+                                     required_document_type="residence_certificate", document_status="missing", created_at=now, updated_at=now))  # fmt: skip
+    session.flush()
+    return True
+
+
 def seed_if_empty(session: Session) -> bool:
     """Idempotent: only inserts if Department A's demo resident table is empty. Safe to call on
     every app start. Returns True if it actually seeded anything."""

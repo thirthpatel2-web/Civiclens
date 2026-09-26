@@ -172,6 +172,21 @@ class ClassificationTests(unittest.TestCase):
         r = RuleClassifier().classify("Exposed wire sparking near the transformer")
         self.assertEqual((r.category, r.severity, r.affects_safety), ("electricity", "critical", True))
 
+    def test_real_world_wording_reaches_the_right_department(self):
+        # street names ("Karve Road") must not drag a complaint to Roads, streetlights belong to the
+        # electrical department, and a hawker complaint is encroachment even though it mentions a footpath
+        cases = {
+            "Streetlights off on Karve Road for a week. The stretch is dark at night.": "electricity",
+            "Hawkers have occupied the entire footpath on Baner Road; people walk on the main road.": "encroachment",
+            "The tap water in our lane is brown and smells of sewage; children have stomach problems.": "water",
+            "Society gets municipal water for 30 minutes at very low pressure; we buy tanker water.": "water",
+            "Garbage bins at the market not emptied for five days, waste spilling onto the road.": "sanitation",
+            "Storm drain on FC Road overflows every time it rains.": "drainage",
+        }
+        for text, dept in cases.items():
+            self.assertEqual(RuleClassifier().classify(text).category, dept, text)
+        self.assertEqual(RuleClassifier().classify("Brown tap water, several children have stomach problems").severity, "high")
+
     def test_no_match_is_other_low_confidence_ambiguous(self):
         r = RuleClassifier().classify("Something strange happened yesterday")
         self.assertEqual((r.category, r.confidence, r.ambiguous), ("other", 0.0, True))

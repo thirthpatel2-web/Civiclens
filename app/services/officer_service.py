@@ -192,6 +192,49 @@ class OfficerService:
             uow.commit()
         return c
 
+    def transfer(self, ctx: AuthContext, cid: str, department_code: str, reason: str) -> ComplaintRecord:
+        """Hand a misrouted complaint to the department that actually owns it. Only the department
+        currently holding it can do this, only before work starts, and always with a reason: the
+        complaint goes back to "routed" in the new department, its SLA is recomputed, that
+        department's officers are notified, and - when the new department implies a different
+        category - the correction is captured for the learning log like ``correct_category``."""
+        from app.services.classification_service import CATEGORIES
+        from app.services.ports import ClassificationCorrectionRecord
+
+        require(ctx, Permission.COMPLAINT_UPDATE_STATUS)
+        if not (reason or "").strip():
+            raise ValidationFailed("Say why it belongs to the other department.", details={"field": "reason"})
+        out = Outbox()
+        with self._uow() as uow:
+            c = self._load(uow, ctx, cid, write=True)
+            if department_code not in {d.code for d in uow.config.departments() if d.active}:
+                raise ValidationFailed("Unknown department.", details={"field": "department"})
+            if department_code == c.department_code:
+                raise ValidationFailed("The complaint is already with that department.")
+            if c.status not in (S.AI_ROUTED, S.ASSIGNED):
+                raise ValidationFailed("Only a complaint that is routed or assigned (work not started) can be transferred.")
+            previous_dept, previous_cat = c.department_code, c.category
+            now = self._fx.clock()
+            if department_code in CATEGORIES and department_code != c.category:
+                uow.classification_corrections.add(ClassificationCorrectionRecord(str(uuid.uuid4()), c.id, f"{c.title}. {c.description}"[:2000], c.category, department_code, ctx.user_id, now))
+                c.category = department_code
+            c.department_code, c.assigned_officer_id = department_code, None
+            c.routing = {**c.routing, "source": "officer_transfer", "explanation": f"Transferred from {previous_dept} to {department_code} by the {previous_dept} desk: {reason.strip()[:200]}"}
+            c.sla_due_at = SlaCalculator(list(uow.config.sla_policies())).due_at(c.created_at, c.priority, department_code)
+            details = {"from_department": previous_dept, "to_department": department_code, "from_category": previous_cat, "to_category": c.category}
+            if c.status is S.ASSIGNED:
+                self._transition(uow, out, ctx, c, S.AI_ROUTED, reason.strip(), kind="transferred", details=details)
+            else:
+                self._fx.event(uow, c, "transferred", ctx, remarks=reason.strip(), details=details)
+                c.updated_at = now
+                uow.complaints.update(c)
+                self._fx.audit(uow).record("complaint.transferred", actor_id=ctx.user_id, resource_type="complaint", resource_id=c.id, metadata=details)
+            for officer_id in uow.officers.officer_ids_for_department(department_code):
+                self._fx.notify(uow, out, officer_id, "complaint.transferred_in", "Complaint transferred to your department", f"{c.reference}: {c.title}", c, dedupe_key=f"transfer:{c.id}:{department_code}:{officer_id}")
+            uow.commit()
+        self._fx.flush(out)
+        return c
+
     def field_visit(self, ctx: AuthContext, cid: str, scheduled_for: datetime, notes: str | None = None) -> ComplaintRecord:
         return self._typed_event(ctx, cid, Permission.COMPLAINT_FIELD_ACTION, "field_visit", {"scheduled_for": scheduled_for.isoformat()}, notes, move_to=S.INSPECTION_SCHEDULED)
 

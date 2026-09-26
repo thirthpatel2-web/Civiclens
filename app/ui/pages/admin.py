@@ -417,7 +417,10 @@ def register(c: AppContainer) -> None:
     def admin_investigations(c: AppContainer, user: UiUser) -> None:
         page_header(tr(c, "nav.investigations"), icon="policy")
         items = c.investigations.list(user.ctx)
-        data_table([("subject", tr(c, "col.subject")), ("status", tr(c, "lbl.status")), ("dept", tr(c, "lbl.department"))], [{"id": i.id, "subject": f"{i.subject_type} {i.subject_id[:8]}", "status": i.status, "dept": i.department_code or "-"} for i in items],
+        from app.ui.pages.staff import investigation_subjects
+
+        subjects = investigation_subjects(c, items)
+        data_table([("subject", tr(c, "col.subject")), ("status", tr(c, "lbl.status")), ("dept", tr(c, "lbl.department"))], [{"id": i.id, "subject": subjects[i.id], "status": i.status, "dept": i.department_code or "-"} for i in items],
                    on_row=lambda r: ui.navigate.to(f"/officer/investigations/{r['id']}"), empty=tr(c, "of.no_investigations"))
 
     @page(c, "/admin/triage", "nav.triage", roles=ADMINS)

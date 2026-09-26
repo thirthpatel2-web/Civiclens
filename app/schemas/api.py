@@ -169,6 +169,11 @@ class CorrectCategoryBody(Strict):
     category: str
 
 
+class TransferBody(Strict):
+    department: str = Field(min_length=1, max_length=40)
+    reason: str = Field(min_length=1, max_length=500)
+
+
 class RemarkBody(Strict):
     text: str = Field(min_length=1, max_length=2000)
     internal: bool = True

@@ -207,7 +207,7 @@ def public_topbar(c: AppContainer, *, home: bool = False) -> None:
 
 def _role_label(c: AppContainer, role: Role) -> str:
     key = {Role.CITIZEN: "role.citizen", Role.OFFICER: "role.officer", Role.ADMIN: "role.admin", Role.SUPER_ADMIN: "role.super_admin"}.get(role)
-    return tr(c, key) if key else role.value.title()
+    return tr(c, key) if key else role.value.replace("_", " ").title()
 
 
 def shell(c: AppContainer, user: UiUser, route: str, title_key: str) -> None:
@@ -229,6 +229,8 @@ def shell(c: AppContainer, user: UiUser, route: str, title_key: str) -> None:
                 ui.icon("account_balance").classes("text-[17px]")
             ui.label(tr(c, "brand")).classes("text-base font-bold text-white")
         with ui.column().classes("w-full gap-0 q-pb-md").style("overflow-y: auto;"):
+            if route.startswith("/officer/complaints/"):  # a complaint opened from the queue belongs to the queue, not the desk dashboard
+                route = "/officer/queue"
             for group in navigation.visible(user.ctx.role):
                 if group.key:
                     ui.label(tr(c, group.key)).classes("cl-nav-group")

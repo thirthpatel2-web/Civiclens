@@ -34,6 +34,7 @@ def _seed_interop_demo_data(container: AppContainer) -> None:
 
         with container.uow_factory() as uow:
             mock_systems.seed_if_empty(uow.session)
+            mock_systems.ensure_demo_additions(uow.session)
             connector_registry.seed_if_empty(uow.session)
             idp.seed_if_empty(uow.session)
             register_default_workflows(uow.session)
