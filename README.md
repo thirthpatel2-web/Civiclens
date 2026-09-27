@@ -7,7 +7,7 @@
 **An interoperability gateway that lets Indian government departments securely reuse each other's verified data —<br/>plus the citizen app that sits on top of it: complaints, RTI, legal help and voice, in Indian languages.**
 
 [![CI](https://github.com/thirthpatel2-web/Civiclens/actions/workflows/ci.yml/badge.svg)](https://github.com/thirthpatel2-web/Civiclens/actions/workflows/ci.yml)
-![Tests](https://img.shields.io/badge/tests-765%20passing-2ea44f?logo=pytest&logoColor=white)
+![Tests](https://img.shields.io/badge/tests-768%20passing-2ea44f?logo=pytest&logoColor=white)
 ![Spec coverage](https://img.shields.io/badge/SIH26129%20spec-31%2F34%20done-1f6feb)
 ![Live E2E](https://img.shields.io/badge/live%20end--to--end-31%2F31%20checks-2ea44f)
 ![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)
@@ -198,7 +198,7 @@ When something fails, it fails **loudly and honestly**: a **20-code exception ta
 | **AI / NLP** | Groq-hosted LLM or local Ollama · hybrid RAG (BM25 + vectors + reciprocal-rank fusion + rerank) · rules-first complaint classifier |
 | **Voice & documents** | Groq Whisper / faster-whisper / Bhashini speech-to-text · Tesseract OCR · ReportLab PDF generation |
 | **Interop & security** | OAuth2 (RFC 6749) federated IdP · Argon2 password hashing · RBAC with 6 roles · CSRF protection · audit log · Sentry |
-| **Quality** | pytest (765 tests) · ruff · mypy · GitHub Actions CI · Docker Compose |
+| **Quality** | pytest (768 tests) · ruff · mypy · GitHub Actions CI · Docker Compose |
 
 ---
 
@@ -242,7 +242,7 @@ This brings up Postgres + pgvector, Redis, Ollama, a one-shot migration service,
 <summary><b>🧪 Verify it yourself</b></summary>
 
 ```bash
-python -m pytest -q                      # 765 tests: unit, API, live-database integration, end-to-end
+python -m pytest -q                      # 768 tests: unit, API, live-database integration, end-to-end
 ruff check app scripts tests             # lint
 mypy app                                 # static types
 python scripts/audit_ui_links.py         # every navigation target exists
@@ -258,7 +258,7 @@ The same checks run on every push in [GitHub Actions](https://github.com/thirthp
 
 <div align="center">
 
-| 765 | 31 / 34 | 31 / 31 | 38,238 | 10 | 50 | 187 |
+| 768 | 31 / 34 | 31 / 31 | 38,238 | 10 | 50 | 187 |
 |:-:|:-:|:-:|:-:|:-:|:-:|:-:|
 | automated tests passing | SIH26129 spec capabilities done | live end-to-end checks passed | Supreme Court judgment records | languages for voice & complaints | web screens | REST API operations |
 
@@ -329,7 +329,7 @@ app/
 ├── db/               models, repositories, unit of work
 └── workers/          background jobs and scheduler
 alembic/              database migrations
-tests/                765 tests: unit, API, integration (live DB), end-to-end
+tests/                768 tests: unit, API, integration (live DB), end-to-end
 docs/                 everything in the table above
 classic-app/          earlier React Native (Expo) client of the same API, kept for reference
 ```
