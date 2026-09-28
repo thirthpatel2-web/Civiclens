@@ -14,8 +14,11 @@
 ![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?logo=postgresql&logoColor=white)
 ![License](https://img.shields.io/badge/license-MIT-lightgrey)
+[![Demo video](https://img.shields.io/badge/demo%20video-6%3A46-FF0000?logo=youtube&logoColor=white)](https://youtu.be/tzFOb6MYcbs)
 
 **Smart India Hackathon 2026 · Problem Statement SIH26129 · Theme: Miscellaneous · Team CODEXXA (Team ID 159997)**
+
+▶️ **[Watch the demo video (6:46)](https://youtu.be/tzFOb6MYcbs)**
 
 [The problem](#-the-problem) · [The idea](#-the-idea-in-30-seconds) · [See it](#-see-it) · [How it works](#%EF%B8%8F-how-it-works) · [Run it](#-run-it-locally) · [What's real](#-whats-real-and-whats-a-demo) · [Docs](#-documentation-map)
 
