@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import base64
 import uuid
+from datetime import datetime
 from types import SimpleNamespace
 from typing import Any
 
@@ -177,6 +179,37 @@ EVENT_LOOK: dict[str, tuple[str, str]] = {
 }  # fmt: skip
 
 
+_EVIDENCE_STATUS = {"PENDING": "Photo check queued", "OK": "Photo checked", "FAILED": "Photo check failed"}
+
+
+def evidence_status_label(status: str | None) -> str | None:
+    """Evidence analysis state in words - never a raw code like IMAGE_ANALYSIS_UNAVAILABLE; states that
+    say nothing useful to a person (no photo checker configured, not a photo) show no label at all."""
+    return _EVIDENCE_STATUS.get(status or "")
+
+
+def _event_detail(e: Any) -> str | None:
+    """What a field action actually recorded - findings, work order, visit time, progress - which lives in
+    ``details``, not ``remarks``, so without this the card showed only its title."""
+    d = e.details or {}
+    if e.kind == "inspection" and d.get("findings"):
+        return str(d["findings"])
+    if e.kind == "work_order" and d.get("order_ref"):
+        return f"Work order {d['order_ref']}" + (f" · team: {d['team']}" if d.get("team") else "")
+    if e.kind == "field_visit" and d.get("scheduled_for"):
+        try:
+            return "Scheduled for " + datetime.fromisoformat(str(d["scheduled_for"])).strftime("%d %b %Y, %H:%M")
+        except ValueError:
+            return f"Scheduled for {d['scheduled_for']}"
+    if e.kind == "coordination" and d.get("with"):
+        return f"With: {d['with']}"
+    if e.kind == "progress" and d.get("percent") is not None:
+        return f"{d['percent']}% done"
+    if e.kind == "escalated" and d.get("to_level") is not None:
+        return f"Escalation level {d.get('from_level', 0)} → {d['to_level']}"
+    return None
+
+
 def _events(events: list[Any]) -> None:
     with ui.column().classes("gap-2 w-full"):
         for e in reversed(events):
@@ -190,6 +223,9 @@ def _events(events: list[Any]) -> None:
                         if e.to_status:
                             chip(str(e.to_status).replace("_", " "), color=theme.STATUS_COLOR.get(str(e.to_status), "muted"))
                     ui.label(f"{e.actor_label or 'System'} · {e.at.strftime('%d %b %H:%M')}").classes("text-xs").style("color: var(--cl-fg-subtle);")
+                    detail = _event_detail(e)
+                    if detail:
+                        ui.label(detail).classes("text-sm").style("color: var(--cl-fg);")
                     if e.remarks:
                         ui.label(e.remarks).classes("text-sm").style("color: var(--cl-fg-muted);")
 
@@ -374,6 +410,8 @@ def register(c: AppContainer) -> None:
                 ui.notify(r.error or r.status, type="warning")
                 return
             state["voice_id"] = r.id
+            for w in r.warnings:  # e.g. "not written in the expected script" - the citizen should check it
+                ui.notify(w, type="warning")
             box.value = r.transcript  # kept in the spoken language and script - nothing is translated
             state["text"] = r.transcript
             hint.set_text(heard_text(c, r))
@@ -725,9 +763,15 @@ def register(c: AppContainer) -> None:
             mic_btn.tooltip(tr(c, "assistant.mic_tip") if voice_caps["state"] == "CONFIGURED" else tr(c, "assistant.mic_off"))
 
             async def toggle() -> None:
-                if _active_mic["target"] is not None:
-                    mic_btn.props("icon=mic").classes(remove="cl-mic-live")
-                    _active_mic["target"] = None
+                active = _active_mic["target"]
+                if active is not None:
+                    if active.get("stopping"):
+                        return  # already stopped - waiting for the browser to hand the recording back
+                    # keep the target until on_audio receives the clip: clearing it here made the
+                    # recording arrive with nothing to route it to, and the citizen's words were dropped
+                    active["stopping"] = True
+                    active["btn"].props("icon=mic").classes(remove="cl-mic-live")
+                    active["hint"].set_text(tr(c, "saathi.transcribing"))
                     ui.run_javascript("window.clStopRec()")
                     return
                 _active_mic["target"] = {"field": target_field, "lang": lang_select, "hint": hint_label, "voice": voice_state, "btn": mic_btn}
@@ -759,6 +803,8 @@ def register(c: AppContainer) -> None:
                 ui.notify(r.error or r.status, type="warning")
                 return
             target["voice"]["id"] = r.id
+            for w in r.warnings:
+                ui.notify(w, type="warning")
             target["field"].value = ((target["field"].value or "") + " " + r.transcript).strip()  # same language, native script - never translated
             if r.language_detected and r.language_detected in target["lang"].options:
                 target["lang"].value = r.language_detected
@@ -808,8 +854,11 @@ def register(c: AppContainer) -> None:
             if result is not None and (result.area or result.city or result.display_name):
                 pretty = ", ".join(p for p in (result.area, result.city, result.state, result.pincode) if p) or result.display_name
                 target["coords"].set_text(pretty or "")
+                previous = target["geo"].get("address")
                 target["geo"]["address"], target["geo"]["city"] = pretty or result.display_name, result.city
-                if target["where"] is not None:
+                # replace an empty or earlier auto-filled address (never a stale one), but keep a landmark the
+                # citizen typed themselves - the looked-up address still shows on the pin chip above
+                if target["where"] is not None and (not (target["where"].value or "").strip() or target["where"].value == previous):
                     target["where"].value = pretty or result.display_name or ""
             else:  # geocoding failed or returned nothing - the raw coordinates are still real and useful, never fabricated
                 target["coords"].set_text(f"{tr(c, 'report.q_pinned')} {lat_v:.5f}, {lng_v:.5f}")
@@ -925,7 +974,7 @@ def register(c: AppContainer) -> None:
                     m.on("map-click", on_click)
                     lat.on("blur", apply_manual_coords)
                     lng.on("blur", apply_manual_coords)
-                    # a geocoded street address always overwrites `d2_address` (never `ward` - a distinct
+                    # a geocoded street address fills `d2_address` unless the citizen typed their own (never `ward` - a distinct
                     # municipal administrative unit the reverse-geocoder cannot determine): whichever pin
                     # was set last - GPS, a map click, or typed coordinates - is the one the address must
                     # match, so a stale address from an earlier pick is never left showing.
@@ -1186,9 +1235,19 @@ def register(c: AppContainer) -> None:
                 if not d["evidence"]:
                     state_panel(icon="attach_file", title=tr(c, "gr.no_evidence"))
                 else:
-                    with ui.row().classes("gap-2 flex-wrap"):
+                    with ui.row().classes("gap-3 flex-wrap"):
                         for ev in d["evidence"]:
-                            chip(f"{ev.name} · {ev.analysis_status}", color="info", outline=True)
+                            with ui.column().classes("cl-card gap-1").style("width: 200px;"):
+                                if ev.mime.startswith("image/") and ev.size <= 2_000_000:  # the citizen sees their own photo
+                                    try:
+                                        _rec, data = c.complaints.read_evidence(user.ctx, ev.id)
+                                        ui.image(f"data:{ev.mime};base64,{base64.b64encode(data).decode()}").style("border-radius: var(--cl-radius-sm);")
+                                    except CivicLensError:
+                                        pass
+                                ui.label(ev.name).classes("text-xs font-medium cl-clip-1").style("color: var(--cl-fg);")
+                                status = evidence_status_label(ev.analysis_status)
+                                if status:
+                                    chip(status, color="info", outline=True)
                 if cm.status not in FINISHED:
                     def add_more(e: Any) -> None:
                         try:
@@ -1247,6 +1306,7 @@ def register(c: AppContainer) -> None:
                             subject.value = t
                             cat_select.value = k
                             draw_records()
+                            suggest_department()  # a tapped example gets the same department suggestion as typed text
 
                         ui.chip(ex_text, icon="edit_note", on_click=use_rti_example).props("outline dense")
 
@@ -1347,6 +1407,8 @@ def register(c: AppContainer) -> None:
                     if r.status != "OK" or not r.transcript:
                         ui.notify(r.error or r.status, type="warning")
                         return
+                    for w in r.warnings:
+                        ui.notify(w, type="warning")
                     subject.value = ((subject.value or "") + " " + r.transcript).strip()
                     if r.language_detected and r.language_detected in r_language.options:
                         r_language.value = r.language_detected
@@ -1506,9 +1568,14 @@ def register(c: AppContainer) -> None:
         state: dict[str, Any] = {"recording": False}
         caps = c.voice.capabilities()
 
-        with ui.element("div").classes("cl-ask w-full max-w-3xl"):
+        with ui.element("div").classes("cl-ask w-full max-w-3xl flex-wrap"):  # on a phone the language picker and mic wrap under the text
             ui.icon("balance").classes("text-[20px]").style("color: var(--cl-ai);")
-            problem = ui.textarea(tr(c, "caseInputLabel"), value=(_qp.get("text") or "")[:2000]).props("borderless autogrow").classes("flex-1")
+            problem = ui.textarea(tr(c, "caseInputLabel"), value=(_qp.get("text") or "")[:2000]).props("borderless autogrow").classes("flex-1").style("min-width: 200px;")
+            # the spoken language, as on every other mic: auto-detect alone heard Gujarati as Hindi
+            legal_speak_opts = ({"auto": "🌐 " + tr(c, "report.auto_detect")} if caps.get("auto_detect") else {}) | {lg["code"]: lg["native"] for lg in caps.get("languages", [])}
+            legal_speak = ui.select(legal_speak_opts, value=lang() if lang() in legal_speak_opts and lang() != "en" else next(iter(legal_speak_opts), None),
+                                    label=tr(c, "lbl.language")).props('dense outlined options-dense aria-label="Language you will speak"').classes("w-40")
+            legal_speak.set_visibility(bool(legal_speak_opts))
             mic = ui.button(icon="mic").props('round unelevated aria-label="Speak instead of typing"').style("background: var(--cl-ai); color: #fff;")
             mic.tooltip(tr(c, "assistant.mic_tip") if caps["state"] == "CONFIGURED" else tr(c, "assistant.mic_off"))
             mic.set_enabled(caps["state"] == "CONFIGURED")
@@ -1736,13 +1803,15 @@ def register(c: AppContainer) -> None:
                 ui.notify(tr(c, "assistant.mic_failed"), type="negative")
                 return
             try:
-                r = c.voice.transcribe(user.ctx, raw, e.args.get("mime") or "audio/webm", "auto" if caps["auto_detect"] else (lang() if lang() in {x["code"] for x in caps["languages"]} else caps["languages"][0]["code"]))
+                r = c.voice.transcribe(user.ctx, raw, e.args.get("mime") or "audio/webm", legal_speak.value or "auto")
             except CivicLensError as exc:
                 ui.notify(exc.message, type="negative")
                 return
             if r.status != "OK" or not r.transcript:
                 ui.notify(r.error or r.status, type="warning")
                 return
+            for w in r.warnings:
+                ui.notify(w, type="warning")
             problem.value = ((problem.value or "") + " " + r.transcript).strip()  # spoken language/script kept, never translated
             voice_hint.set_text(heard_text(c, r))
 

@@ -21,7 +21,13 @@ import uuid
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
-from app.core.exceptions import DependencyUnavailable, NotConfigured, ValidationFailed
+from app.core.exceptions import (
+    CivicLensError,
+    DependencyUnavailable,
+    NotConfigured,
+    ValidationFailed,
+)
+from app.i18n.languages import script_matches
 
 
 @dataclass(frozen=True)
@@ -108,6 +114,14 @@ _GROQ_LANGUAGE_NAME_TO_CODE = {
 }
 
 
+# A few everyday civic words in each script - enough to tell Whisper which alphabet to write in.
+_SCRIPT_PRIMERS = {
+    "hi": "सड़क, पानी, कचरा, शिकायत।", "mr": "रस्ता, पाणी, कचरा, तक्रार.", "bn": "রাস্তা, জল, আবর্জনা, অভিযোগ।",
+    "gu": "રસ્તો, પાણી, કચરો, ફરિયાદ.", "pa": "ਸੜਕ, ਪਾਣੀ, ਕੂੜਾ, ਸ਼ਿਕਾਇਤ।", "ta": "சாலை, தண்ணீர், குப்பை, புகார்.",
+    "te": "రోడ్డు, నీరు, చెత్త, ఫిర్యాదు.", "kn": "ರಸ್ತೆ, ನೀರು, ಕಸ, ದೂರು.", "ml": "റോഡ്, വെള്ളം, മാലിന്യം, പരാതി.",
+}  # fmt: skip
+
+
 class GroqWhisperProvider:
     """Whisper large-v3 (or the -turbo variant), hosted on Groq's LPUs - same transcription
     contract as WhisperProvider (never translates) but cloud-hosted, so it doesn't compete with
@@ -128,11 +142,27 @@ class GroqWhisperProvider:
     def transcribe(self, audio: bytes, mime: str, language: str | None) -> Transcript:
         if language is not None and language not in WHISPER_LANGUAGES:
             raise ValidationFailed("Unsupported language for this speech engine.", details={"supported": sorted(WHISPER_LANGUAGES)})
+        first = self._transcribe_once(audio, mime, language, None)
+        # Whisper now and then writes a language in a neighbouring script (Malayalam came back in Gurmukhi);
+        # one retry primed with a phrase in the right script steers it back - the better of the two is kept
+        primer = _SCRIPT_PRIMERS.get(language or "")
+        if language and primer and not script_matches(language, first.text):
+            try:
+                second = self._transcribe_once(audio, mime, language, primer)
+            except CivicLensError:
+                return first
+            if script_matches(language, second.text):
+                return second
+        return first
+
+    def _transcribe_once(self, audio: bytes, mime: str, language: str | None, prompt: str | None) -> Transcript:
         boundary = uuid.uuid4().hex
         ext = (mime.rsplit("/", 1)[-1] or "m4a").split(";")[0]
         fields: list[tuple[str, str]] = [("model", self._model), ("response_format", "verbose_json")]
         if language:
             fields.append(("language", language))
+        if prompt:
+            fields.append(("prompt", prompt))
         parts: list[bytes] = []
         for k, v in fields:
             parts.append(f"--{boundary}\r\nContent-Disposition: form-data; name=\"{k}\"\r\n\r\n{v}\r\n".encode())

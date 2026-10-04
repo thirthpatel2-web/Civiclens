@@ -80,6 +80,15 @@ from app.services.notification_service import NotificationService
 from app.services.uow import UowFactory
 
 CONSENT_VALIDITY = timedelta(days=30)
+_UNREACHABLE = ("CONNECTOR_UNAVAILABLE", "AUTHENTICATION_FAILURE", "CONNECTOR_TIMEOUT")
+
+
+class _ConnectorDown(Exception):
+    def __init__(self, connector_id: str, result: Any) -> None:
+        super().__init__(connector_id)
+        self.connector_id, self.result = connector_id, result
+
+
 _quality_engine = DataQualityEngine()  # stateless - one instance evaluates any record against any rule set
 
 # Canonical field names (app.interop.canonical.v1.models.Document) this exchange needs to read
@@ -148,6 +157,8 @@ class InteropGatewayService:
                 s = uow.session
                 assert s is not None
                 app_result = connector_runtime.call(s, "dept_b", "get_entity", "application", application_no)
+                if not app_result.ok and app_result.error_code in _UNREACHABLE:
+                    return self._connector_down(uow, "dept_b", app_result, correlation_id)
                 app_row = app_result.data if app_result.ok else None
                 if app_row is None:
                     raise NotFound(f"No application {application_no!r} in {mock_systems.DEPT_B_NAME}.")
@@ -171,7 +182,10 @@ class InteropGatewayService:
                     return {"status": "identity_ambiguous", "side": "dept_b", "candidate_id": b_result.candidate_id, "confidence": b_result.confidence, "explanation": b_result.matched_on}
                 master_id = b_result.master_id
 
-                resident = self._find_matching_dept_a_resident(s, beneficiary=beneficiary)
+                try:
+                    resident = self._find_matching_dept_a_resident(s, beneficiary=beneficiary)
+                except _ConnectorDown as down:  # Revenue switched off is not "no such resident"
+                    return self._connector_down(uow, down.connector_id, down.result, correlation_id)
                 if resident is None:
                     exception_center.log_exception(s, error_code=classify_exception("source_record_not_found"), message=f"No matching resident found in {mock_systems.DEPT_A_NAME}.", source_system="dept_a", target_system="civiclens", correlation_id=correlation_id, clock=self._clock)
                     uow.commit()
@@ -211,7 +225,10 @@ class InteropGatewayService:
                                 data={"consent_id": pending.consent_id, "route": "/my-data"}, dedupe_key=f"consent:{pending.consent_id}")
                     uow.commit()
                     self._publish(InteropEvent(event_type="ConsentRequested", source_system="dept_b", destination="dept_a", entity_id=pending.consent_id, correlation_id=correlation_id, payload={"master_id": master_id, "application_no": application_no, "data_category": document_type}))
-                    return {"status": "consent_required", "consent_id": pending.consent_id, "master_id": master_id, "citizen_linked": pending.citizen_user_id != ctx.user_id}
+                    # the integration admin is told when the citizen already said no, instead of a refusal looking like silence
+                    refused = self._find_consent(s, master_id=master_id, data_category=document_type, status="denied")
+                    return {"status": "consent_required", "consent_id": pending.consent_id, "master_id": master_id, "citizen_linked": pending.citizen_user_id != ctx.user_id,
+                            "previously_refused_at": refused.decided_at.isoformat() if refused is not None and refused.decided_at is not None else None}
 
                 result, events = self._execute_exchange(uow, ctx, master_id=master_id, consent=consent, application_no=application_no, document_type=document_type, resident=resident, correlation_id=correlation_id)
                 uow.commit()
@@ -270,8 +287,19 @@ class InteropGatewayService:
             uow.commit()
             return {"applications_reopened": len(apps), "consents_withdrawn": withdrawn}
 
+    def _connector_down(self, uow, connector_id: str, result: Any, correlation_id: str) -> dict:
+        """A department system that is switched off or unreachable is reported as exactly that - never as a
+        missing application or resident - and logged as a retryable CONNECTOR_UNAVAILABLE exception."""
+        name = {"dept_a": mock_systems.DEPT_A_NAME, "dept_b": mock_systems.DEPT_B_NAME}.get(connector_id, connector_id)
+        detail = f"{name} is switched off or not reachable right now ({result.error_message or result.error_code}). Nothing was requested or shared - re-enable the connector or try again."
+        exception_center.log_exception(uow.session, error_code="CONNECTOR_UNAVAILABLE", message=detail, source_system=connector_id, target_system="civiclens", correlation_id=correlation_id, clock=self._clock)
+        uow.commit()
+        return {"status": "connector_unavailable", "reason": "connector_unavailable", "connector": connector_id, "detail": detail}
+
     def _find_matching_dept_a_resident(self, session, *, beneficiary):
         result = connector_runtime.call(session, "dept_a", "query", "resident", mobile=beneficiary.mobile_number)
+        if not result.ok and result.error_code in _UNREACHABLE:
+            raise _ConnectorDown("dept_a", result)
         candidates = result.data if result.ok else []
         if not candidates:
             result = connector_runtime.call(session, "dept_a", "query", "resident", name_contains=beneficiary.full_name)

@@ -75,6 +75,8 @@ def _states_for(result: dict[str, Any] | None) -> tuple[list[str], str, str]:
     if status in ("identity_ambiguous", "identity_conflict", "source_record_not_found"):
         return ["failed"] + ["upcoming"] * (n - 1), {"identity_ambiguous": "Identity match needs an officer's review.", "identity_conflict": "The two systems disagree on who this is - manual review needed.",
                                                       "source_record_not_found": "No matching resident in Revenue Records."}[str(status)], "danger"  # fmt: skip
+    if status == "connector_unavailable":
+        return ["done"] + ["failed"] + ["upcoming"] * (n - 2), "A department system is switched off - nothing was shared.", "danger"
     reason = result.get("reason")
     fail_at = {"data_field_not_consented": 1, "document_not_found": 2, "data_quality_failed": 3}.get(str(reason), 2)
     return ["done"] * fail_at + ["failed"] + ["upcoming"] * (n - fail_at - 1), f"Stopped safely: {str(reason).replace('_', ' ')}.", "danger"
@@ -190,6 +192,8 @@ def register(c: AppContainer) -> None:
                     status = r.get("status")
                     if status == "consent_required":
                         who = "the citizen's own CivicLens app (linked by verified mobile) - they have been notified" if r.get("citizen_linked") else "the consent queue (no citizen account is linked to this record yet)"
+                        if r.get("previously_refused_at"):
+                            ui.label(f"The citizen refused the last request ({_when(r['previously_refused_at'])}). A new request has been sent; they can refuse it again, and nothing is read unless they allow it.").classes("text-sm").style("color: var(--cl-warning);")
                         ui.label(f"A consent request was sent to {who}. Only 3 fields will be shared: certificate reference, verification status and issue date.").classes("text-sm")
                         with ui.row().classes("gap-2 q-mt-xs"):
                             ui.button("Check again", icon="refresh", on_click=lambda: run_exchange()).props("outline no-caps")

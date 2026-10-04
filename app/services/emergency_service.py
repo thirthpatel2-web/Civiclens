@@ -20,8 +20,9 @@ def validate_contact(c: EmergencyContactRecord) -> EmergencyContactRecord:
     errors: dict[str, str] = {}
     if not re.fullmatch(r"[a-z0-9_-]{2,60}", c.id or ""):
         errors["id"] = "Use 2-60 lowercase letters, digits, '-' or '_'."
-    if not _NUMBER.match(c.number or ""):
-        errors["number"] = "A phone number/short code (digits, +, *, #)."
+    # toll-free numbers are written with separators ("1800-11-4000"); the digits are what must be valid
+    if not re.fullmatch(r"[0-9*#+ -]+", c.number or "") or not _NUMBER.match(re.sub(r"[ -]", "", c.number or "")):
+        errors["number"] = "A phone number/short code (digits, +, *, #; spaces and hyphens allowed)."
     if not 2 <= len((c.name or "").strip()) <= 120:
         errors["name"] = "Name is required."
     if c.scope not in ("national", "city") or (c.scope == "city" and not c.city_code):
@@ -46,7 +47,7 @@ class EmergencyHubService:
         items = []
         for h in contacts:
             loc = h.translations.get(code)
-            items.append({"code": h.id, "number": h.number, "tel_uri": f"tel:{h.number}", "name": loc["name"] if loc and loc.get("name") else h.name,
+            items.append({"code": h.id, "number": h.number, "tel_uri": "tel:" + re.sub(r"[ -]", "", h.number), "name": loc["name"] if loc and loc.get("name") else h.name,
                           "description": loc.get("desc") if loc and loc.get("desc") else h.description, "language": code if loc else "en", "translated": bool(loc) or code == "en", "scope": h.scope})  # fmt: skip
         return {"configured": bool(items), "items": items, "notice": self._tr.t("emergencyHelplines", lang)}
 

@@ -189,8 +189,20 @@ def create_app(container: AppContainer | None = None, *, with_ui: bool = True) -
     if with_ui:
         from app.ui import mount_ui
 
+        logging.getLogger("nicegui").addFilter(_BrowserGoneFilter())
         mount_ui(app, container if container is not None else _LazyContainer(app), settings)
     return app
+
+
+class _BrowserGoneFilter(logging.Filter):
+    """NiceGUI asks a just-opened page small questions (is the sidebar open? is the socket up?) with a
+    1-3 s limit. When the person has already clicked away, the answer never comes and NiceGUI prints a
+    full traceback for it - harmless, but it reads like a crash in the console. Only those are dropped."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        exc = record.exc_info[1] if record.exc_info else None
+        text = f"{record.getMessage()} {exc or ''}"
+        return not (("JavaScript did not respond" in text or "No connection after" in text) and (exc is None or isinstance(exc, TimeoutError)))
 
 
 class _LazyContainer:

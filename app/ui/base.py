@@ -10,6 +10,7 @@ import logging
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
+from urllib.parse import quote
 
 from fastapi import Request
 from nicegui import app, ui
@@ -259,7 +260,8 @@ def shell(c: AppContainer, user: UiUser, route: str, title_key: str) -> None:
         ui.space()
         with ui.row().classes("items-center gt-sm").style("max-width: 320px;"):
             q = ui.input(placeholder=tr(c, "act.search")).props("dense outlined rounded clearable").classes("w-56")
-            q.on("keydown.enter", lambda: ui.navigate.to(f"/copilot?q={q.value}" if user.ctx.role is Role.CITIZEN else f"/officer/queue?q={q.value}"))
+            # officers search their queue; every other role asks Civic Saathi (the officer queue would bounce an admin)
+            q.on("keydown.enter", lambda: ui.navigate.to(f"/officer/queue?q={quote(q.value or '')}" if user.ctx.role is Role.OFFICER else f"/copilot?q={quote(q.value or '')}"))
         live = ui.element("div").classes("cl-badge cl-badge-muted gt-xs")
         with live:
             ui.element("span").classes("cl-dot cl-dot-muted")

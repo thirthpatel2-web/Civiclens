@@ -186,7 +186,7 @@ def register(c: AppContainer) -> None:
                     ui.button(tr(c, "act.submit"), icon="person_add", on_click=_act(c, lambda: c.admin.create_staff(user.ctx, email.value or "", pw.value or "", name.value or "", Role(role.value), dept.value))).props("color=primary unelevated").classes("w-full")
                 with ui.column().classes("cl-card gap-2 w-full"):
                     section_title(tr(c, "ad.change_role_deactivate"))
-                    uid = ui.select({u.id: f"{u.email} ({u.role.value})" for u in items}, label=tr(c, "col.user")).props("outlined dense").classes("w-full")
+                    uid = ui.select({u.id: f"{u.email} ({u.role.value})" for u in items}, label=tr(c, "col.user"), with_input=True).props("outlined dense").classes("w-full")  # type to find one of many users
                     new_role, new_dept = ui.select([r.value for r in Role], label=tr(c, "ad.new_role")).props("outlined dense").classes("w-full"), ui.select(depts, label=tr(c, "lbl.department")).props("outlined dense").classes("w-full")
                     with ui.row().classes("gap-2 flex-wrap"):
                         ui.button(tr(c, "ad.change_role"), on_click=_act(c, lambda: c.admin.change_role(user.ctx, uid.value, Role(new_role.value), new_dept.value))).props("outline dense")

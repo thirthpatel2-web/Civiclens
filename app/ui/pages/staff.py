@@ -6,7 +6,7 @@ import base64
 from datetime import datetime
 from typing import Any
 
-from nicegui import ui
+from nicegui import run, ui
 
 from app.container import AppContainer
 from app.core.authorization import Role
@@ -18,7 +18,7 @@ from app.ui import theme
 from app.ui.base import UiUser, data_table, error_text, info_banner, page, tr
 from app.ui.components import chip, divider, page_header, section_title, stat_tile, state_panel
 from app.ui.navigation import OFFICER_UP, STAFF
-from app.ui.pages.citizen import _events, _timeline, government_panel
+from app.ui.pages.citizen import _events, _timeline, evidence_status_label, government_panel
 
 
 def _act(fn: Any, success: str = "Saved.") -> Any:
@@ -122,7 +122,8 @@ def register(c: AppContainer) -> None:
     def queue(c: AppContainer, user: UiUser) -> None:
         page_header(tr(c, "nav.officer_queue"), "Most urgent first: overdue, then at risk, then by priority. Click a row to act on it.", icon="inbox")
         with ui.row().classes("gap-3 items-center w-full flex-wrap"):
-            search = ui.input(placeholder="Search reference or title").props("outlined dense clearable").classes("w-72")
+            q0 = (ui.context.client.request.query_params.get("q") if ui.context.client.request else None) or ""  # from the header search
+            search = ui.input(placeholder="Search reference or title", value=q0[:100]).props("outlined dense clearable").classes("w-72")
             with search.add_slot("prepend"):
                 ui.icon("search")
             mine = ui.switch("Only mine").props("color=primary")
@@ -147,6 +148,8 @@ def register(c: AppContainer) -> None:
 
             def due_text(x: Any) -> str:
                 s = st[x.id]
+                if s.state == "finished":  # no countdown on finished work, and "resolved" is not "closed"
+                    return "Resolved" if str(x.status) == "resolved" else "Closed"
                 if s.due_at is None:
                     return label[s.state]
                 hours = (s.due_at - now).total_seconds() / 3600
@@ -355,7 +358,8 @@ def register(c: AppContainer) -> None:
                                     _rec, data = c.complaints.read_evidence(user.ctx, ev.id)  # authorised + audited
                                     ui.image(f"data:{ev.mime};base64,{base64.b64encode(data).decode()}").style("border-radius: var(--cl-radius-sm);")
                                 ui.label(ev.name).classes("text-xs font-medium cl-clip-1").style("color: var(--cl-fg);")
-                                chip(ev.analysis_status, color="info", outline=True)
+                                if evidence_status_label(ev.analysis_status):
+                                    chip(evidence_status_label(ev.analysis_status) or "", color="info", outline=True)
                                 if ev.analysis_result:
                                     ui.label(str(ev.analysis_result.get("summary"))).classes("text-xs cl-clip-2").style("color: var(--cl-fg-muted);")
                                 if ev.analysis_error:
@@ -382,8 +386,21 @@ def register(c: AppContainer) -> None:
                    on_row=lambda r: ui.navigate.to(f"/officer/investigations/{r['id']}"), empty=tr(c, "of.no_investigations"))
 
     @page(c, "/officer/investigations/{inv_id}", "nav.investigations", roles=OFFICER_UP)
-    def investigation(c: AppContainer, user: UiUser, inv_id: str) -> None:
-        rep = c.investigations.report(user.ctx, inv_id)
+    async def investigation(c: AppContainer, user: UiUser, inv_id: str) -> None:
+        # the report runs document and legal look-ups that take seconds - show the page at once with a
+        # spinner instead of leaving the clicked row looking dead until it is ready
+        loading = ui.row().classes("items-center gap-3 q-pa-md")
+        with loading:
+            ui.spinner(size="lg", color="primary")
+            ui.label("Gathering everything CivicLens knows about this case: documents, legal sources and nearby complaints...").classes("text-sm").style("color: var(--cl-fg-muted);")
+        try:
+            await ui.context.client.connected(timeout=15)
+        except TimeoutError:
+            pass
+        try:
+            rep = await run.io_bound(c.investigations.report, user.ctx, inv_id)
+        finally:
+            loading.delete()
         inv = rep["investigation"]
         subject = investigation_subjects(c, [inv])[inv.id]
         page_header(f"Investigation · {subject}", "Everything CivicLens knows about this case, gathered in one place.", icon="search", actions=lambda: chip(inv.status, color="info" if inv.status == "open" else "muted"))

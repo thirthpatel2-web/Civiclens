@@ -80,6 +80,17 @@ def _login_form(c: AppContainer, *, privileged: bool, allowed: tuple[Role, ...] 
                         auth.logout(res.session_token)
                         uow.commit()
                         raise AuthenticationFailed("Invalid e-mail, password or verification code.")
+                    # someone who switched two-factor on for their account is asked for the code here - the
+                    # Two-factor Security screen promises a code at every sign-in, so web sign-in keeps it
+                    mfa = c.mfa_for(uow)
+                    if mfa.is_enabled(res.context.user_id):
+                        code = (otp.value or "").strip()
+                        if not code or not mfa.verify_login(res.context.user_id, code):
+                            auth.logout(res.session_token)
+                            uow.commit()
+                            if not code:
+                                raise MfaRequired("Enter the 6-digit code from your authenticator app.")
+                            raise AuthenticationFailed("Invalid e-mail, password or verification code.")
                     return res
 
                 try:
