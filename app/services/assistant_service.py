@@ -176,7 +176,10 @@ class AssistantService:
         if not plan.needs_db and not plan.smalltalk:
             plan = self._llm_route(q) or plan
         resp: RagResponse = self._rag.ask(q, ctx, language=language_name(language), plan=plan)
-        if resp.status in ("insufficient_evidence", "ungrounded") and not scan_for_injection(q):
+        # an "ungrounded" reply that found the citizen's own document keeps its excerpts - swapping in general
+        # guidance there would tell them "I can't see your document" about a document it just found
+        found_docs = resp.status == "ungrounded" and bool(resp.citations)
+        if resp.status in ("insufficient_evidence", "ungrounded") and not found_docs and not scan_for_injection(q):
             guidance = self._general_guidance(q, language)
             if guidance:
                 resp.status, resp.answer, resp.citations, resp.database_facts = "general_guidance", guidance, [], None

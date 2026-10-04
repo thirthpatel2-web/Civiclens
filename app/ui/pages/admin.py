@@ -14,7 +14,7 @@ from app.core.transactions import run_in_uow
 from app.services.classification_service import CATEGORIES, SEVERITIES
 from app.services.workflow_service import ACTIONS as WF_ACTIONS
 from app.services.workflow_service import TRIGGERS as WF_TRIGGERS
-from app.ui.base import UiUser, data_table, info_banner, page, tr
+from app.ui.base import UiUser, data_table, error_text, info_banner, page, tr
 from app.ui.components import (
     chip,
     confirm_dialog,
@@ -35,7 +35,7 @@ def _act(c: AppContainer, fn: Any) -> Any:
             # rather than a direct attribute access - looked up once and reused, so mypy is never
             # asked to accept `exc.details` unconditionally on the union type.
             details = getattr(exc, "details", None)
-            ui.notify(getattr(exc, "message", str(exc)) + (f" {details}" if details else ""), type="negative")
+            ui.notify(error_text(getattr(exc, "message", str(exc)), details), type="negative")
             return
         ui.notify(tr(c, "msg.saved"), type="positive")
         ui.navigate.reload()
@@ -141,7 +141,11 @@ def register(c: AppContainer) -> None:
         if d["resolution_hours"]:
             with ui.row().classes("cl-card w-full items-center gap-2"):
                 ui.icon("timer").style("color: var(--cl-fg-muted);")
-                ui.label(f"Resolution time: median {d['resolution_hours']['median']} h over {d['resolution_hours']['count']} resolved complaints.").classes("text-sm").style("color: var(--cl-fg-muted);")
+                def hours(h: float) -> str:  # same wording as the officer desk - never a bare "0.0 h"
+                    return "under an hour" if h < 1 else f"{h:.0f} h" if h < 48 else f"{h / 24:.1f} days"
+
+                rh = d["resolution_hours"]
+                ui.label(f"Typical resolution time: {hours(rh['median'])} (median), {hours(rh['mean'])} on average, over {rh['count']} resolved complaints.").classes("text-sm").style("color: var(--cl-fg-muted);")
         with ui.row().classes("gap-4 w-full flex-wrap"):
             with ui.column().classes("cl-card gap-2").style("flex: 1; min-width: 300px;"):
                 section_title(tr(c, "ad.routing_accuracy"), tr(c, "ad.routing_accuracy_sub"))

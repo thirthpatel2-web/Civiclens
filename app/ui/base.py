@@ -82,6 +82,17 @@ def tr(c: AppContainer, key: str, **kw: Any) -> str:
 _TONE_ICON = {"red": ("danger", "error"), "orange": ("warning", "warning"), "blue": ("info", "info"), "green": ("success", "task_alt"), "grey": ("muted", "info")}
 
 
+def error_text(message: str, details: Any = None) -> str:
+    """An error as readable sentences - never a raw Python dict like {'subject': '...'} in front of a citizen."""
+    if isinstance(details, dict):
+        parts = [str(v) for v in details.values() if v]
+    elif isinstance(details, list | tuple):
+        parts = [str(v) for v in details if v]
+    else:
+        parts = [str(details)] if details else []
+    return " ".join([message, *parts]).strip()
+
+
 def error_banner(message: str) -> None:
     with ui.row().classes("cl-card w-full items-start gap-3").style("background: var(--cl-danger-soft); border-color: transparent;"):
         ui.icon("error").style("color: var(--cl-danger);")

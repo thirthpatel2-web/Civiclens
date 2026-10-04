@@ -77,6 +77,8 @@ class HybridRetriever:
         sim_by_id = {h.chunk_id: h.similarity for h in vector_hits}
         pool: list[RetrievedChunk] = []
         for f in fused[: cfg.rerank_top_k]:
+            if f.item_id not in self._chunks:  # a database vector hit this process has not loaded yet - next index refresh adds it
+                continue
             pool.append(
                 RetrievedChunk(
                     chunk=self._chunks[f.item_id],

@@ -631,11 +631,22 @@ def generate_text(d: RtiDraft, reference: str, on: date, rules: RtiRules, *, fee
     return "\n".join(parts)
 
 
+# Typographic punctuation (often added by the question-writing model) that has a plain Latin-1 equivalent -
+# an English RTI with a curly apostrophe or a non-breaking hyphen is still Latin text and must export.
+_PUNCTUATION = str.maketrans({
+    "‘": "'", "’": "'", "‚": ",", "‛": "'", "“": '"', "”": '"', "„": '"',
+    "‐": "-", "‑": "-", "‒": "-", "–": "-", "—": "-", "―": "-", "−": "-",
+    "…": "...", "•": "-", "′": "'", "″": '"', " ": " ", " ": " ", " ": " ",
+    " ": " ", " ": " ", " ": " ", "​": "",
+})  # fmt: skip
+
+
 def render_pdf(text: str, *, title: str, font_path: str | None = None) -> bytes:
     """Render draft text to PDF with reportlab.
 
     Non-Latin text requires a Unicode TrueType font (``font_path``); without one this
-    raises ``NotConfigured`` instead of emitting garbled glyphs.
+    raises ``NotConfigured`` instead of emitting garbled glyphs. Typographic punctuation
+    (curly quotes, dashes) is not "non-Latin" and is written as its plain equivalent.
     """
     from reportlab.lib.pagesizes import A4
     from reportlab.pdfbase import pdfmetrics
@@ -643,6 +654,8 @@ def render_pdf(text: str, *, title: str, font_path: str | None = None) -> bytes:
     from reportlab.pdfgen import canvas
 
     font = "Helvetica"
+    if not all(ord(c) < 256 for c in text) and all(ord(c) < 256 for c in text.translate(_PUNCTUATION)):
+        text = text.translate(_PUNCTUATION)
     if not text.isascii() and not all(ord(c) < 256 for c in text):
         import os
 

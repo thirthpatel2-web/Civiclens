@@ -99,7 +99,7 @@ _INTEGRATION_ADMIN = frozenset(
 )  # fmt: skip - scoped to the interop platform, not admin.users/departments/routing_rules/workflow_rules/audit/config
 _AUDITOR = frozenset(
     {
-        P.INTEROP_READ, P.ADMIN_AUDIT, P.ANALYTICS_VIEW,
+        P.INTEROP_READ, P.ADMIN_AUDIT, P.ANALYTICS_VIEW, P.GIS_VIEW,
         P.ASSISTANT_USE, P.PROFILE_MANAGE, P.NOTIFICATION_READ_OWN,
     }
 )  # fmt: skip - read-only: no INTEROP_MANAGE, no ADMIN_USERS/DEPARTMENTS/*_RULES/CONFIG

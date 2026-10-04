@@ -8,6 +8,7 @@ so the logic is testable without a database.
 
 from __future__ import annotations
 
+import threading
 from datetime import datetime
 from typing import Protocol
 
@@ -24,8 +25,13 @@ class IndexSynchronizer:
     def __init__(self, source: ChunkSource, index: RagIndex) -> None:
         self._source, self._index = source, index
         self._seen: dict[str, datetime] = {}
+        self._lock = threading.Lock()  # the web sweeper and an on-demand search may both refresh
 
     def refresh(self) -> dict[str, int]:
+        with self._lock:
+            return self._refresh()
+
+    def _refresh(self) -> dict[str, int]:
         ready = self._source.ready_documents()
         added = removed = 0
         for doc_id in [d for d in self._seen if d not in ready]:

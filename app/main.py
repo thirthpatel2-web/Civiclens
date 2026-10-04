@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import sys
 import threading
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from typing import Any
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from starlette.concurrency import run_in_threadpool
@@ -69,6 +71,15 @@ def create_app(container: AppContainer | None = None, *, with_ui: bool = True) -
         c = container or build_container(settings)
         app.state.container = c
         loop = asyncio.get_running_loop()
+        if sys.platform == "win32":
+            # Windows' proactor loop prints a full traceback each time a browser drops a socket mid-request
+            # (closing a tab, navigating away) - harmless, but it reads like a crash in the console
+            def _quiet_reset(lp: asyncio.AbstractEventLoop, context: dict[str, Any]) -> None:
+                if isinstance(context.get("exception"), ConnectionResetError) and "_call_connection_lost" in str(context.get("handle", "")):
+                    return
+                lp.default_exception_handler(context)
+
+            loop.set_exception_handler(_quiet_reset)
         c.ws.bind_loop(loop)
         if isinstance(c.bus, LocalEventBus):
             c.bus.bind_loop(loop)
@@ -88,6 +99,13 @@ def create_app(container: AppContainer | None = None, *, with_ui: bool = True) -
                     await c.ws.sweep(is_valid)
                 except Exception:
                     logger.warning("websocket sweep failed")
+                # this process's own search index: the scheduled rag.index_refresh runs in the worker's
+                # container, so without this a document uploaded after start-up is never searchable here
+                if c.index_sync is not None:
+                    try:
+                        await run_in_threadpool(c.index_sync.refresh)
+                    except Exception:
+                        logger.warning("search index refresh failed")
 
         sweep_task = asyncio.create_task(sweeper())
         if hasattr(c.bus, "listen"):  # Redis pub/sub bridge: every web process pushes to its own sockets

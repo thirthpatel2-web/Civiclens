@@ -69,7 +69,13 @@ class CitationCheck:
         return bool(self.used_markers)
 
 
+# Models sometimes write a marker with full-width or lenticular brackets (【E1】, ［E1］, 〔E1〕) - the same
+# citation, so it is read as [E1] instead of rejecting a correctly cited answer as ungrounded.
+_ALT_MARKER = re.compile(r"[【［〔〖]\s*(E\d+|DB)\s*[】］〕〗]")
+
+
 def validate_answer_citations(answer: str, citations: list[Citation], *, db_available: bool) -> CitationCheck:
+    answer = _ALT_MARKER.sub(r"[\1]", answer)
     valid = {c.marker for c in citations} | ({DB_MARKER} if db_available else set())
     used: list[str] = []
     invalid: list[str] = []

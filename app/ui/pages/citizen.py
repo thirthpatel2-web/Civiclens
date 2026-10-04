@@ -22,7 +22,7 @@ from app.services.rti_service import (
     enhance_questions_with_llm,
 )
 from app.ui import theme
-from app.ui.base import UiUser, data_table, error_banner, info_banner, lang, page, tr
+from app.ui.base import UiUser, data_table, error_banner, error_text, info_banner, lang, page, tr
 from app.ui.components import (
     chat_bubble,
     chip,
@@ -531,7 +531,7 @@ def register(c: AppContainer) -> None:
             try:
                 r = c.complaints.create(user.ctx, ComplaintInput(client_request_id=crid, **{k: v for k, v in data.items() if v not in (None, "")}))
             except CivicLensError as exc:
-                ui.notify(exc.message + (f" {exc.details}" if exc.details else ""), type="negative")
+                ui.notify(error_text(exc.message, exc.details), type="negative")
                 return
             receipt(r.complaint, r.warnings)
             rotate_crid()
@@ -857,8 +857,11 @@ def register(c: AppContainer) -> None:
                             example_text = tr(c, key)
 
                             def use_example(t: str = example_text) -> None:
+                                # the title follows the example unless the citizen typed their own - otherwise
+                                # tapping "pothole" then "garbage" files a garbage complaint under a pothole title
+                                auto = (title.value or "").strip() in ("", derive_title(desc.value or ""))
                                 desc.value = t
-                                if not (title.value or "").strip():
+                                if auto:
                                     title.value = derive_title(t)
 
                             ui.chip(example_text, icon="edit_note", on_click=use_example).props("outline dense")
@@ -1388,9 +1391,10 @@ def register(c: AppContainer) -> None:
                     try:
                         a = run_in_uow(c, lambda uow: c.rti_for(uow).generate(user.ctx, c.rti_for(uow).create(user.ctx, draft()).id))
                     except CivicLensError as exc:
-                        ui.notify(exc.message + (f" {exc.details}" if exc.details else ""), type="negative")
+                        ui.notify(error_text(exc.message, exc.details), type="negative")
                         return
                     show(a.id)
+                    draw_mine()
 
                 pending_mismatch: dict[str, Any] = {}
                 with ui.dialog() as mismatch_dlg, ui.column().classes("cl-card gap-3 w-full max-w-sm"):
@@ -1454,10 +1458,12 @@ def register(c: AppContainer) -> None:
                         def _mark_filed() -> None:
                             run_in_uow(c, lambda uow: c.rti_for(uow).mark_filed(user.ctx, app_id))
                             show(app_id)
+                            draw_mine()
 
                         def _mark_answered() -> None:
                             run_in_uow(c, lambda uow: c.rti_for(uow).mark_responded(user.ctx, app_id))
                             show(app_id)
+                            draw_mine()
 
                         with ui.row().classes("gap-2 flex-wrap"):
                             if a.status.value == "generated":
@@ -1474,11 +1480,21 @@ def register(c: AppContainer) -> None:
                         return
                     ui.download(data, f"rti-{app_id[:8]}.pdf")
 
-                if mine:
-                    section_title(tr(c, "rti.mine"))
-                    data_table([("ref", tr(c, "lbl.reference")), ("subject", tr(c, "lbl.title")), ("status", tr(c, "lbl.status"))], [{"id": a.id, "ref": a.reference or "draft", "subject": a.draft.subject, "status": a.status.value} for a in mine], on_row=lambda r: show(r["id"]))
-                else:
-                    state_panel(icon="gavel", title=tr(c, "rti.none_title"), body=tr(c, "rti.none_body"))
+                mine_box = ui.column().classes("w-full gap-3")
+
+                def draw_mine(rows: list[Any] | None = None) -> None:
+                    # redrawn after every generate / filed / answered - never a stale "No RTI applications yet"
+                    # under an application that was just created
+                    rows = rows if rows is not None else run_in_uow(c, lambda uow: uow.rti.list_for_owner(user.ctx.user_id))
+                    mine_box.clear()
+                    with mine_box:
+                        if rows:
+                            section_title(tr(c, "rti.mine"))
+                            data_table([("ref", tr(c, "lbl.reference")), ("subject", tr(c, "lbl.title")), ("status", tr(c, "lbl.status"))], [{"id": a.id, "ref": a.reference or "draft", "subject": a.draft.subject, "status": a.status.value} for a in rows], on_row=lambda r: show(r["id"]))
+                        else:
+                            state_panel(icon="gavel", title=tr(c, "rti.none_title"), body=tr(c, "rti.none_body"))
+
+                draw_mine(mine)
 
     @page(c, "/legal", "nav.legal", roles=CIT)
     async def legal(c: AppContainer, user: UiUser) -> None:
@@ -2016,17 +2032,23 @@ def register(c: AppContainer) -> None:
                 else:
                     state_panel(icon="map", title=tr(c, "msg.no_data"), body=tr(c, "gis.none_body"))
                     return
+                cities = run_in_uow(c, lambda uow: [(x.name, x.lat, x.lng, x.code) for x in uow.config.cities() if x.lat is not None and x.lng is not None])
+
+                def nearest(h: dict[str, Any]) -> tuple[Any, ...] | None:
+                    return min(cities, key=lambda ct: (ct[1] - h["lat"]) ** 2 + (ct[2] - h["lng"]) ** 2) if cities else None
+
+                # a picked city filters the hotspots too, not just the map centre - otherwise "Pune" still lists Bengaluru clusters
+                spots = [h for h in r["hotspots"] if not city.value or (nearest(h) or (None, 0, 0, None))[3] == city.value]
                 with ui.row().classes("gap-4 w-full flex-wrap items-start"):
                     m = ui.leaflet(center=(lat0, lng0), zoom=12 if city.value else 11).classes("h-96").style("flex: 2; min-width: 320px; border-radius: var(--cl-radius-md); overflow: hidden;")
-                    for h in r["hotspots"]:
+                    for h in spots:
                         m.generic_layer(name="circleMarker", args=[(h["lat"], h["lng"]), {"radius": 6 + 3 * min(h["count"], 8), "color": "#c22a1b", "fillColor": "#c22a1b", "fillOpacity": 0.35}])
                     for o in r["offices"]:
                         m.marker(latlng=(o["lat"], o["lng"]))
                     with ui.column().classes("cl-card gap-2").style("flex: 1; min-width: 260px;"):
                         section_title(tr(c, "gis.hotspots"))
-                        if not r["hotspots"]:
+                        if not spots:
                             ui.label(tr(c, "gis.no_clusters")).classes("text-xs").style("color: var(--cl-fg-subtle);")
-                        cities = run_in_uow(c, lambda uow: [(x.name, x.lat, x.lng) for x in uow.config.cities() if x.lat is not None and x.lng is not None])
 
                         def fly(la: float, ln: float) -> None:
                             m.set_center((la, ln))
@@ -2038,12 +2060,12 @@ def register(c: AppContainer) -> None:
                             wards = [w for w in h["wards"] if w]
                             if wards:
                                 return "Ward " + ", ".join(wards)
-                            if cities:
-                                name = min(cities, key=lambda ct: (ct[1] - h["lat"]) ** 2 + (ct[2] - h["lng"]) ** 2)[0]
-                                return tr(c, "gis.near", city=name)
+                            near = nearest(h)
+                            if near:
+                                return tr(c, "gis.near", city=near[0])
                             return f"{h['lat']:.3f}, {h['lng']:.3f}"
 
-                        for h in r["hotspots"][:8]:
+                        for h in spots[:8]:
                             row = ui.row().classes("items-center justify-between w-full no-wrap cl-card-hover q-pa-xs").style("border-radius: var(--cl-radius-sm);")
                             with row:
                                 with ui.column().classes("gap-0"):
@@ -2380,7 +2402,7 @@ def register(c: AppContainer) -> None:
                         try:
                             c.external_links.add(user.ctx, platform=platform_in.value or "", external_reference=ref_in.value or "", title=title_in.value or "")
                         except CivicLensError as exc:
-                            ui.notify(exc.message + (f" {exc.details}" if exc.details else ""), type="negative")
+                            ui.notify(error_text(exc.message, exc.details), type="negative")
                             return
                         platform_in.value = ref_in.value = title_in.value = ""
                         ui.notify(tr(c, "msg.added"), type="positive")
@@ -2514,6 +2536,8 @@ def register(c: AppContainer) -> None:
 
         def search() -> None:
             out.clear()
+            if c.index_sync is not None:  # pick up a document that finished processing moments ago
+                c.index_sync.refresh()
             res = c.rag.retrieve(q.value or "", user.ctx)
             with out:
                 if not res.chunks:

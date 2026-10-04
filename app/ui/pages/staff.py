@@ -15,7 +15,7 @@ from app.core.transactions import run_in_uow
 from app.services.complaint_status import TRANSITIONS, ComplaintStatus
 from app.services.sla_service import SlaCalculator, SlaSubject
 from app.ui import theme
-from app.ui.base import UiUser, data_table, info_banner, page, tr
+from app.ui.base import UiUser, data_table, error_text, info_banner, page, tr
 from app.ui.components import chip, divider, page_header, section_title, stat_tile, state_panel
 from app.ui.navigation import OFFICER_UP, STAFF
 from app.ui.pages.citizen import _events, _timeline, government_panel
@@ -26,7 +26,7 @@ def _act(fn: Any, success: str = "Saved.") -> Any:
         try:
             fn(*a)
         except CivicLensError as exc:
-            ui.notify(exc.message + (f" {exc.details}" if exc.details else ""), type="negative")
+            ui.notify(error_text(exc.message, exc.details), type="negative")
             return
         ui.notify(success, type="positive")
         ui.navigate.reload()
