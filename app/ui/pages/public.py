@@ -131,12 +131,17 @@ def _portal_switcher(c: AppContainer, current: str) -> None:
     with ui.element("div").classes("cl-segment w-full max-w-md q-mx-auto q-mb-md"):
         for key, route, icon in (("portal.citizen", "/login", "person"), ("portal.official", "/officer/login", "account_balance")):
             on = " cl-on cl-" + ("citizen" if key.endswith("citizen") else "official") if key.split(".")[1] == current else ""
-            el = ui.element("div").classes("cl-segment-item cl-focusable" + on).props('role=tab tabindex=0')
+            # the other desk is a real link (no script): it works the moment the page shows, before the live connection is up
+            el = ui.element("div" if key.split(".")[1] == current else "a").classes("cl-segment-item cl-focusable no-underline" + on).props("role=tab tabindex=0")
+            if key.split(".")[1] != current:
+                el.props(f'href="{route}"').style("color: inherit;")
             with el:
                 ui.icon(icon).classes("text-[17px]")
                 ui.label(tr(c, key))
-            if key.split(".")[1] != current:
-                el.on("click", lambda r=route: ui.navigate.to(r))
+
+
+# The landing buttons carry a real href as well as their handler: a click in the first moment after the page
+# appears (before NiceGUI's socket connects - slower on a hosted server) is otherwise lost.
 
 
 def _landing_heading(title: str, subtitle: str | None = None) -> None:
@@ -208,9 +213,9 @@ def register(c: AppContainer) -> None:
             ui.label(tr(c, "brand")).classes("cl-hero-title text-center cl-gradient-text").style("padding-bottom: 6px;")
             ui.label(tr(c, "appTagline")).classes("cl-hero-sub text-center")
             with ui.row().classes("gap-3 q-mt-md justify-center flex-wrap"):
-                ui.button(tr(c, "portal.citizen"), icon="person", on_click=lambda: ui.navigate.to("/login")).props("unelevated size=lg").classes("cl-btn-glow")
-                ui.button(tr(c, "portal.official"), icon="account_balance", on_click=lambda: ui.navigate.to("/officer/login")).props("outline size=lg").style("color: var(--cl-warning);")
-                ui.button(tr(c, "nav.emergency"), icon="emergency", on_click=lambda: ui.navigate.to("/emergency-public")).props("flat size=lg").style("color: var(--cl-emergency);")
+                ui.button(tr(c, "portal.citizen"), icon="person", on_click=lambda: ui.navigate.to("/login")).props('unelevated size=lg href="/login"').classes("cl-btn-glow")
+                ui.button(tr(c, "portal.official"), icon="account_balance", on_click=lambda: ui.navigate.to("/officer/login")).props('outline size=lg href="/officer/login"').style("color: var(--cl-warning);")
+                ui.button(tr(c, "nav.emergency"), icon="emergency", on_click=lambda: ui.navigate.to("/emergency-public")).props('flat size=lg href="/emergency-public"').style("color: var(--cl-emergency);")
 
             # Every number here is read from this server's live configuration, never hard-coded copy.
             with ui.element("div").classes("cl-hero-strip q-mt-lg"):
@@ -252,7 +257,7 @@ def register(c: AppContainer) -> None:
                 _tile("inbox", tr(c, "nav.officer_queue"), tr(c, "land.t_queue"))
                 _tile("timer", tr(c, "nav.sla"), tr(c, "land.t_sla"))
                 _tile("hub", tr(c, "nav.interop_gateway"), tr(c, "land.t_gateway"))
-            ui.button(tr(c, "portal.official_cta"), icon="account_balance", on_click=lambda: ui.navigate.to("/officer/login")).props("outline size=lg").classes("q-mt-sm").style("color: var(--cl-warning);")
+            ui.button(tr(c, "portal.official_cta"), icon="account_balance", on_click=lambda: ui.navigate.to("/officer/login")).props('outline size=lg href="/officer/login"').classes("q-mt-sm").style("color: var(--cl-warning);")
 
     @page(c, "/login", "act.sign_in", public=True, shell_on=False)
     def login(c: AppContainer, user: UiUser | None) -> None:

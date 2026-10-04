@@ -25,9 +25,27 @@ def _load_dotenv() -> None:
     configuration comes from the platform, not a file. Cheap enough to call on every Settings.load()."""
     try:
         from dotenv import load_dotenv
+
+        load_dotenv(_REPO_ROOT / ".env", override=False)
     except ImportError:
-        return
-    load_dotenv(_REPO_ROOT / ".env", override=False)
+        pass
+    _strip_inline_comments()
+
+
+def _strip_inline_comments() -> None:
+    """Docker's ``env_file`` (unlike python-dotenv) keeps ``KEY=value   # note`` as the literal value
+    "value   # note" - the shipped .env.example has such notes, so a container got STT_PROVIDER="auto   # auto | ..."
+    and SENTRY_DSN="# unset = ...", which crashed start-up. A whitespace-led ``#`` starts a comment here too,
+    so every reader of os.environ (settings, error tracking, providers) sees the clean value."""
+    import re
+
+    for key, value in list(os.environ.items()):
+        if "#" not in value:
+            continue
+        if value.strip().startswith("#"):
+            os.environ[key] = ""
+        elif re.search(r"\s#", value):
+            os.environ[key] = re.split(r"\s+#", value, maxsplit=1)[0].strip()
 
 
 class ConfigError(ValueError):

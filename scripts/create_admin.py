@@ -20,6 +20,9 @@ def main() -> int:
     ap.add_argument("--email", required=True)
     ap.add_argument("--name", required=True)
     args = ap.parse_args()
+    from app.core.config import Settings
+
+    settings = Settings.load()  # also reads .env, so a token kept there is found (it used to be ignored)
     token = os.environ.get("ADMIN_SETUP_TOKEN", "")
     if not token:
         print("Set ADMIN_SETUP_TOKEN first.")
@@ -29,10 +32,9 @@ def main() -> int:
         print("Passwords differ.")
         return 2
     from app.container import build_container
-    from app.core.config import Settings
     from app.core.exceptions import CivicLensError
 
-    c = build_container(Settings.load())
+    c = build_container(settings)
     try:
         with c.uow_factory() as uow:
             user = c.auth_for(uow).bootstrap_first_admin(args.email, password, args.name, provided_token=token, expected_token=token)

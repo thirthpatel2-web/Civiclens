@@ -16,6 +16,16 @@ config = context.config
 if config.config_file_name:
     fileConfig(config.config_file_name)
 
+# Read .env the same way the app does (real environment variables still win), so `alembic upgrade head`
+# works straight after `cp .env.example .env` - it used to stop with "DATABASE_URL must be set", and the
+# vector migration needs EMBEDDING_DIMENSIONS from the same file.
+try:
+    from dotenv import load_dotenv
+
+    load_dotenv(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env"), override=False)
+except ImportError:
+    pass
+
 url = os.environ.get("DATABASE_URL", "").strip()
 if not url:
     raise SystemExit("DATABASE_URL must be set to run migrations")

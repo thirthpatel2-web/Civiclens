@@ -1,0 +1,15 @@
+# HTTPS front door for CivicLens (used by docker-compose.prod.yml).
+# Caddy gets and renews the certificate for {$CIVICLENS_DOMAIN} on its own; the domain's DNS A record must
+# point at this server and ports 80 and 443 must be open. WebSockets (NiceGUI's live connection) pass through.
+
+{$CIVICLENS_DOMAIN} {
+	encode gzip
+	request_body {
+		max_size 25MB
+	}
+	reverse_proxy app:8080
+	log {
+		output stdout
+		format console
+	}
+}

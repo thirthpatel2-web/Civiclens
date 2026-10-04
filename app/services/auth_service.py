@@ -16,7 +16,7 @@ import uuid
 from collections.abc import Callable
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
-from typing import Protocol
+from typing import Any, Protocol
 
 from app.core.authorization import AuthContext, Role, can_assign_role, is_privileged_role
 from app.core.exceptions import (
@@ -99,6 +99,9 @@ def normalize_email(email: str) -> str:
     return value
 
 
+_TIMING_HASHES: dict[int, tuple[Any, str]] = {}  # id(hasher) -> (hasher, hash); the hasher is kept so an id is never reused
+
+
 class AuthService:
     def __init__(
         self,
@@ -118,8 +121,17 @@ class AuthService:
         self._throttle = throttle or FailureThrottle()
         self._policy = policy or SessionPolicy()
         self._clock = clock or (lambda: datetime.now(UTC))
-        # Verified against when the account does not exist, to equalise timing.
-        self._timing_hash = hasher.hash("civiclens-timing-equaliser")
+
+    @property
+    def _timing_hash(self) -> str:
+        """Verified against when the account does not exist, to equalise timing. Hashed once per hasher and
+        reused: a new AuthService is built for every request, and hashing here cost ~75 ms of CPU each time -
+        most of every API call, which serialised the server under concurrent users."""
+        cached = _TIMING_HASHES.get(id(self._hasher))
+        if cached is None or cached[0] is not self._hasher:
+            cached = (self._hasher, self._hasher.hash("civiclens-timing-equaliser"))
+            _TIMING_HASHES[id(self._hasher)] = cached
+        return cached[1]
 
     # ------------------------------------------------------------- registration
     def register(self, email: str, password: str, full_name: str) -> UserRecord:

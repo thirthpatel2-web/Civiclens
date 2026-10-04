@@ -554,7 +554,8 @@ def register(c: AppContainer) -> None:
                         with ui.expansion(tr(c, "interop.raw_payload")).classes("w-full"):
                             import json as _json
 
-                            ui.markdown(f"```json\n{_json.dumps(ex.payload, indent=2, ensure_ascii=False)}\n```").classes("cl-mono text-xs")
+                            # a payload from an outside system is shown as inert code - never through markdown, which passes raw HTML
+                            ui.code(_json.dumps(ex.payload, indent=2, ensure_ascii=False), language="json").classes("cl-mono text-xs w-full")
                         if ex.resolution_note:
                             ui.label(f"Resolution: {ex.resolution_note}").classes("text-xs").style("color: var(--cl-success);")
                         if ex.status == "open":

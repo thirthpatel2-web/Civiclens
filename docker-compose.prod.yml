@@ -1,0 +1,55 @@
+# Production override - use together with docker-compose.yml:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+#
+# What it changes for a public server (see docs/DEPLOYMENT.md):
+#   * HTTPS in front: Caddy obtains and renews a Let's Encrypt certificate for CIVICLENS_DOMAIN automatically.
+#     HTTPS is required for the microphone (browsers only allow it on https:// or localhost).
+#   * The database password comes from .env (POSTGRES_PASSWORD), not the dev default "civiclens".
+#   * Postgres, Ollama and the app are no longer published on the host - only Caddy listens (80/443).
+#
+# Required in .env: CIVICLENS_DOMAIN, POSTGRES_PASSWORD, APP_SECRET_KEY, SESSION_SECRET, APP_ENV=production,
+# PUBLIC_BASE_URL=https://<your domain>
+
+services:
+  postgres:
+    ports: !reset []
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+
+  ollama:
+    ports: !reset []
+
+  migrate:
+    environment:
+      DATABASE_URL: postgresql+psycopg://civiclens:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/civiclens
+
+  app:
+    ports: !reset []
+    environment:
+      DATABASE_URL: postgresql+psycopg://civiclens:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/civiclens
+      APP_ENV: production
+      # the app is reachable only through Caddy on the private compose network, so Caddy's
+      # X-Forwarded-For / X-Forwarded-Proto headers are trusted (real client IP for rate limits and audit)
+      FORWARDED_ALLOW_IPS: "*"
+
+  worker:
+    environment:
+      DATABASE_URL: postgresql+psycopg://civiclens:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/civiclens
+      APP_ENV: production
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports: ["80:80", "443:443"]
+    environment:
+      CIVICLENS_DOMAIN: ${CIVICLENS_DOMAIN:?set CIVICLENS_DOMAIN in .env}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on: [app]
+
+volumes:
+  caddy_data:
+  caddy_config:

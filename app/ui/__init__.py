@@ -15,4 +15,13 @@ def mount_ui(fastapi_app: Any, container: Any, settings: Any) -> None:
     secret = settings.session_secret or settings.app_secret_key
     if settings.is_production and not secret:
         raise RuntimeError("SESSION_SECRET is required in production")
+    # The browser session cookie maps to the signed-in user, so on an https:// deployment it is marked Secure
+    # (never sent over plain http). NiceGUI reuses a SessionMiddleware that is already registered.
+    import os
+
+    from nicegui import app as nicegui_app
+    from starlette.middleware.sessions import SessionMiddleware
+
+    https = os.environ.get("PUBLIC_BASE_URL", "").strip().lower().startswith("https://")
+    nicegui_app.add_middleware(SessionMiddleware, secret_key=secret or "dev-only-storage-secret", https_only=https, same_site="lax")
     ui.run_with(fastapi_app, storage_secret=secret or "dev-only-storage-secret", title="CivicLens", favicon="🏛️", mount_path="/")

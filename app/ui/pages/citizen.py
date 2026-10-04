@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import base64
+import html as _html  # model-written text is escaped before markdown, never rendered as HTML
 import uuid
 from datetime import datetime
 from types import SimpleNamespace
@@ -1632,7 +1633,7 @@ def register(c: AppContainer) -> None:
                             section_title(tr(c, "legal.ai_interpretation_title"), tr(c, "legal.ai_interpretation_sub"))
                             with ui.row().classes("cl-card w-full items-start gap-2").style("background: var(--cl-ai-soft); border-color: transparent;"):
                                 ui.icon("auto_awesome").style("color: var(--cl-ai);")
-                                ui.markdown(r.interpretation).classes("cl-markdown text-sm").style("color: var(--cl-fg);")
+                                ui.markdown(_html.escape(r.interpretation, quote=False)).classes("cl-markdown text-sm").style("color: var(--cl-fg);")
                         for w in r.warnings:
                             info_banner(w, "orange")
                         # ---- a withheld/unavailable AI answer is never a dead end: the real, verified
@@ -1681,7 +1682,7 @@ def register(c: AppContainer) -> None:
                                     with ui.row().classes("items-center gap-2"):
                                         ui.icon("auto_awesome").classes("text-[15px]").style("color: var(--cl-ai);")
                                         ui.label(tr(c, "legal.deep_dive_title")).classes("text-xs font-semibold uppercase").style("color: var(--cl-ai); letter-spacing: .05em;")
-                                    ui.markdown(explanation).classes("cl-markdown text-sm").style("color: var(--cl-fg);")
+                                    ui.markdown(_html.escape(explanation, quote=False)).classes("cl-markdown text-sm").style("color: var(--cl-fg);")
                                 divider()
                                 ui.label(tr(c, "legal.procedure")).classes("text-xs font-semibold uppercase").style("color: var(--cl-fg-muted); letter-spacing: .05em;")
                                 for i, step in enumerate(g["steps"], 1):

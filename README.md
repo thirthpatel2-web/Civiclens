@@ -220,6 +220,8 @@ cp .env.example .env                       # then set DATABASE_URL, APP_SECRET_K
 createdb civiclens && psql civiclens -c "CREATE EXTENSION vector"
 alembic upgrade head                       # builds the whole schema
 python scripts/seed.py                     # departments, cities, routing rules, emergency contacts
+python scripts/ingest_legal_metadata_bulk.py   # the 38,238 Supreme Court judgment records (public data, ~5 min)
+python scripts/seed_demo.py                # optional: the demo accounts used in docs/DEMO_GUIDE.md and the video
 
 python run.py                              # 👉 open http://localhost:8080
 ```
@@ -238,7 +240,7 @@ docker compose exec ollama ollama pull llama3.1:8b
 docker compose exec ollama ollama pull nomic-embed-text
 ```
 
-This brings up Postgres + pgvector, Redis, Ollama, a one-shot migration service, the app on `:8080` and the background worker. The compose setup is statically checked, but we haven't run a full `docker compose up --build` end to end, so treat the plain-Python path above as the primary one.
+This brings up Postgres + pgvector, Redis, Ollama, a one-shot migration service, the app on `:8080` and the background worker; then run `scripts/seed.py`, `scripts/ingest_legal_metadata_bulk.py` and (for a demo) `scripts/seed_demo.py` with `docker compose exec app python ...`. For a public server with HTTPS, use `docker-compose.prod.yml` as described in [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md).
 </details>
 
 <details>
